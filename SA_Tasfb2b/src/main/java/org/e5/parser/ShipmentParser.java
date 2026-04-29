@@ -166,7 +166,7 @@ public class ShipmentParser {
                 int requestMinute = dateTimeToSimMinutes(date, hourStr, minuteStr, simulationStartDate, originCode, airportMap);
 
                 // Filtrar envíos fuera del rango de simulación
-                int maxSimulationMinutes = (maxSimulationDays + 1) * 1440; // Incluir el último día completo
+                int maxSimulationMinutes = (maxSimulationDays) * 1440; // Incluir el último día completo
                 if (requestMinute < 0) continue; // Ignorar envíos anteriores al inicio
                 if (requestMinute >= maxSimulationMinutes) continue; // Ignorar envíos posteriores al final
 
