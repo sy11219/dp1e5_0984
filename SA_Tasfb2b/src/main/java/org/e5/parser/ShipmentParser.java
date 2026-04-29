@@ -162,13 +162,19 @@ public class ShipmentParser {
                 int    suitcaseCount = Integer.parseInt(m.group(6));
                 String clientId     = m.group(7);
 
+                // Filtrar envíos fuera del rango de simulación por fecha local
+                int sYear = Integer.parseInt(simulationStartDate.substring(0, 4));
+                int sMonth = Integer.parseInt(simulationStartDate.substring(4, 6));
+                int sDay = Integer.parseInt(simulationStartDate.substring(6, 8));
+                int eYear = Integer.parseInt(date.substring(0, 4));
+                int eMonth = Integer.parseInt(date.substring(4, 6));
+                int eDay = Integer.parseInt(date.substring(6, 8));
+                long dayDiff = daysFromEpoch(eYear, eMonth, eDay) - daysFromEpoch(sYear, sMonth, sDay);
+                if (dayDiff < 0) continue; // Ignorar envíos anteriores al inicio
+                if (dayDiff >= maxSimulationDays) continue; // Ignorar envíos posteriores al final
+
                 // Convertir fecha/hora a minutos desde el inicio de simulación
                 int requestMinute = dateTimeToSimMinutes(date, hourStr, minuteStr, simulationStartDate, originCode, airportMap);
-
-                // Filtrar envíos fuera del rango de simulación
-                int maxSimulationMinutes = (maxSimulationDays) * 1440; // Incluir el último día completo
-                if (requestMinute < 0) continue; // Ignorar envíos anteriores al inicio
-                if (requestMinute >= maxSimulationMinutes) continue; // Ignorar envíos posteriores al final
 
                 Shipment shipment = new Shipment(
                         shipmentId, originCode, destCode,
