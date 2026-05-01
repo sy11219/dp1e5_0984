@@ -33,8 +33,8 @@ import java.util.*;
  * 2. Capacidad de aeropuertos: Un aeropuerto no puede almacenar más maletas
  *    de su capacidad (considera llegadas y salidas en el tiempo).
  * 3. Plazos de entrega:
- *    - Mismo continente: 12 horas (720 min) desde solicitud
- *    - Distinto continente: 24 horas (1440 min) desde solicitud
+ *    - Mismo continente: 24 horas (1440 min) desde solicitud
+ *    - Distinto continente: 48 horas (2880 min) desde solicitud
  * 4. Tiempo de conexión: 10 minutos mínimos entre llegada y siguiente vuelo
  *    en aeropuertos intermedios.
  *
@@ -51,9 +51,13 @@ public class SimulatedAnnealingPlanner {
 
     // ── Parámetros del SA ────────────────────────────────────────────────────
     private static final double INITIAL_TEMPERATURE   = 10000.0;
-    private static final double COOLING_RATE          = 0.98;
-    private static final double MIN_TEMPERATURE       = 0.1;
-    private static final int    ITERATIONS_PER_TEMP   = 50;
+    private static final double COOLING_RATE          = 0.995;
+    private static final double MIN_TEMPERATURE       = 0.01;
+    private static final int    ITERATIONS_PER_TEMP   = 30;
+    // Reheating: si no hay mejora en N niveles de temperatura, recalentar (máx 3 veces)
+    private static final int    REHEAT_THRESHOLD      = 100;
+    private static final double REHEAT_FACTOR         = 5.0;
+    private static final int    MAX_REHEATS           = 3;
 
     // ════════════════════════════════════════════════════════════════════════
     // PENALIZACIONES NORMALIZADAS (CORREGIDAS)
@@ -125,7 +129,7 @@ public class SimulatedAnnealingPlanner {
 
         // ── Paso 1: Generar rutas candidatas para cada envío ─────────────────
         System.out.println("[SA Planner] Generando rutas candidatas (BFS)...");
-        Map<String, List<Route>> candidatesMap = new HashMap<>();
+        List<List<Route>> candidatesList = new ArrayList<>(shipments.size());
         int noRoutesCount = 0;
 
         for (Shipment s : shipments) {
@@ -134,7 +138,7 @@ public class SimulatedAnnealingPlanner {
                     s.getRequestMinute(), s.getSuitcaseCount(),
                     s.getShipmentId()
             );
-            candidatesMap.put(s.getShipmentId(), candidates);
+            candidatesList.add(candidates);
 
             if (candidates.isEmpty()) {
                 noRoutesCount++;
@@ -151,10 +155,10 @@ public class SimulatedAnnealingPlanner {
         }
 
         // ── Paso 2: Solución inicial ──────────────────────────────────────────
-        int[] currentSolution = initializeSolutionSmart(shipments, candidatesMap);
+        int[] currentSolution = initializeSolutionSmart(shipments, candidatesList);
 
-        // Usar versión con cache para inicialización
-        double currentCost    = evaluateSolutionWithCache(shipments, candidatesMap, currentSolution);
+        // Usar evaluación completa (sin caches, siempre correcta)
+        double currentCost    = evaluateSolution(shipments, candidatesList, currentSolution);
 
         int[]  bestSolution   = Arrays.copyOf(currentSolution, currentSolution.length);
         double bestCost       = currentCost;
@@ -162,31 +166,27 @@ public class SimulatedAnnealingPlanner {
         System.out.printf("[SA Planner] Costo inicial: %.2f%n", currentCost);
 
         // ── Paso 3: Ciclo de Simulated Annealing ─────────────────────────────
+        // NOTA: Se usa evaluación COMPLETA en vez de incremental.
+        // La evaluación incremental anterior tenía un bug fundamental donde
+        // los caches se corrompían progresivamente, causando que el costo
+        // creciera monotónicamente y el SA no pudiera converger.
         double temperature = INITIAL_TEMPERATURE;
         int    totalIter   = 0, improvements = 0, accepted    = 0;
+        int    tempLevelsWithoutImprovement = 0;
+        int    reheatCount = 0;
 
         while (temperature > MIN_TEMPERATURE) {
+            boolean improvedThisLevel = false;
+
             for (int iter = 0; iter < ITERATIONS_PER_TEMP; iter++) {
                 totalIter++;
 
                 // Generar una solución vecina: cambiar la ruta de un envío al azar
-                int[] neighbor = generateNeighbor(currentSolution, shipments, candidatesMap);
+                int[] neighbor = generateNeighbor(currentSolution, shipments, candidatesList);
                 if (neighbor == null) continue;
 
-                // Encontrar qué índice cambió (para evaluación incremental)
-                int changedIdx = -1;
-                for (int i = 0; i < currentSolution.length; i++) {
-                    if (currentSolution[i] != neighbor[i]) {
-                        changedIdx = i;
-                        break;
-                    }
-                }
-                if (changedIdx == -1) continue;
-
-                // EVALUACIÓN INCREMENTAL: calcular solo el delta de costo
-                double deltaCost = evaluateSolutionIncremental(
-                        shipments, candidatesMap, currentSolution, neighbor, changedIdx);
-                double neighborCost = currentCost + deltaCost;
+                // Evaluación COMPLETA del vecino (sin caches, siempre correcta)
+                double neighborCost = evaluateSolution(shipments, candidatesList, neighbor);
 
                 double delta = neighborCost - currentCost;
 
@@ -202,16 +202,35 @@ public class SimulatedAnnealingPlanner {
                         bestSolution = Arrays.copyOf(currentSolution, currentSolution.length);
                         bestCost     = currentCost;
                         improvements++;
+                        improvedThisLevel = true;
                     }
                 }
             }
 
             temperature *= COOLING_RATE;
 
+            // ── Reheating: si no hay mejora en muchos niveles, recalentar (máx MAX_REHEATS) ──
+            if (improvedThisLevel) {
+                tempLevelsWithoutImprovement = 0;
+            } else {
+                tempLevelsWithoutImprovement++;
+            }
+
+            if (tempLevelsWithoutImprovement >= REHEAT_THRESHOLD
+                    && temperature < INITIAL_TEMPERATURE * 0.1
+                    && reheatCount < MAX_REHEATS) {
+                double oldTemp = temperature;
+                temperature = Math.min(temperature * REHEAT_FACTOR, INITIAL_TEMPERATURE * 0.5);
+                tempLevelsWithoutImprovement = 0;
+                reheatCount++;
+                System.out.printf("[SA] Reheating #%d/%d: %.2f → %.2f (sin mejora en %d niveles)%n",
+                        reheatCount, MAX_REHEATS, oldTemp, temperature, REHEAT_THRESHOLD);
+            }
+
             // Logging para depuración
-            if (totalIter % 100 == 0) {
-                System.out.printf("[DEBUG] Iter=%d | Temp=%.2f | Cost=%.0f | Best=%.0f%n",
-                        totalIter, temperature, currentCost, bestCost);
+            if (totalIter % 2000 == 0) {
+                System.out.printf("[DEBUG] Iter=%d | Temp=%.2f | Cost=%.2f | Best=%.2f | Accepted=%d%n",
+                        totalIter, temperature, currentCost, bestCost, accepted);
             }
         }
 
@@ -220,7 +239,7 @@ public class SimulatedAnnealingPlanner {
         System.out.printf("[SA Planner] Costo final: %.2f%n", bestCost);
 
         // ── Paso 4: Aplicar la mejor solución encontrada ──────────────────────
-        applySolution(shipments, candidatesMap, bestSolution);
+        applySolution(shipments, candidatesList, bestSolution);
 
         return shipments;
     }
@@ -234,11 +253,11 @@ public class SimulatedAnnealingPlanner {
      * Para envíos sin rutas, asigna -1 (sin ruta).
      *
      * @param shipments     Lista de envíos
-     * @param candidatesMap Mapa de rutas candidatas por ID de envío
+     * @param candidatesList Lista de rutas candidatas por índice de envío
      * @return Array de índices de ruta seleccionada por envío (paralelo a shipments)
      */
     private int[] initializeSolutionSmart(List<Shipment> shipments,
-                                          Map<String, List<Route>> candidatesMap) {
+                                          List<List<Route>> candidatesList) {
         int[] solution = new int[shipments.size()];
 
         // Mapa temporal de carga proyectada
@@ -251,7 +270,7 @@ public class SimulatedAnnealingPlanner {
         }
         shipmentOrder.sort(Comparator.comparingInt(i -> {
             Shipment s = shipments.get(i);
-            List<Route> cands = candidatesMap.get(s.getShipmentId());
+            List<Route> cands = candidatesList.get(i);
             int numRoutes = (cands != null) ? cands.size() : 0;
             // Priorizar: menos rutas → más urgente; luego deadline más cercano
             Airport origin = airportMap.get(s.getOriginCode());
@@ -264,7 +283,7 @@ public class SimulatedAnnealingPlanner {
         // Asignar rutas una por una, eligiendo la que menos restrinja el futuro
         for (int idx : shipmentOrder) {
             Shipment s = shipments.get(idx);
-            List<Route> cands = candidatesMap.get(s.getShipmentId());
+            List<Route> cands = candidatesList.get(idx);
 
             if (cands == null || cands.isEmpty()) {
                 solution[idx] = -1;
@@ -321,7 +340,7 @@ public class SimulatedAnnealingPlanner {
      * CORRECCIÓN: Inicializa correctamente los caches con formato Map<Integer,Integer>
      */
     private double evaluateSolutionWithCache(List<Shipment> shipments,
-                                             Map<String, List<Route>> candidatesMap,
+                                             List<List<Route>> candidatesList,
                                              int[] solution) {
         // Resetear caches
         cachedFlightLoads = new HashMap<>();
@@ -345,7 +364,7 @@ public class SimulatedAnnealingPlanner {
                 continue;
             }
 
-            List<Route> candidates = candidatesMap.get(s.getShipmentId());
+            List<Route> candidates = candidatesList.get(i);
             if (candidates == null || routeIdx >= candidates.size()) {
                 totalCost += PENALTY_NO_ROUTE_NORMALIZED;
                 continue;
@@ -373,7 +392,7 @@ public class SimulatedAnnealingPlanner {
      * CORRECCIÓN: Ahora calcula delta completo incluyendo aeropuertos afectados
      */
     private double evaluateSolutionIncremental(List<Shipment> shipments,
-                                               Map<String, List<Route>> candidatesMap,
+                                               List<List<Route>> candidatesList,
                                                int[] oldSolution,
                                                int[] newSolution,
                                                int changedIndex) {
@@ -382,13 +401,13 @@ public class SimulatedAnnealingPlanner {
 
         // Identificar aeropuertos afectados por la ruta anterior y la nueva
         if (oldSolution[changedIndex] != -1) {
-            List<Route> oldCands = candidatesMap.get(s.getShipmentId());
+            List<Route> oldCands = candidatesList.get(changedIndex);
             if (oldCands != null && oldSolution[changedIndex] < oldCands.size()) {
                 collectAffectedAirports(oldCands.get(oldSolution[changedIndex]), affectedAirports);
             }
         }
         if (newSolution[changedIndex] != -1) {
-            List<Route> newCands = candidatesMap.get(s.getShipmentId());
+            List<Route> newCands = candidatesList.get(changedIndex);
             if (newCands != null && newSolution[changedIndex] < newCands.size()) {
                 collectAffectedAirports(newCands.get(newSolution[changedIndex]), affectedAirports);
             }
@@ -401,7 +420,7 @@ public class SimulatedAnnealingPlanner {
 
         // Remover contribución de la ruta anterior
         if (oldSolution[changedIndex] != -1) {
-            List<Route> oldCandidates = candidatesMap.get(s.getShipmentId());
+            List<Route> oldCandidates = candidatesList.get(changedIndex);
             if (oldCandidates != null && oldSolution[changedIndex] < oldCandidates.size()) {
                 Route oldRoute = oldCandidates.get(oldSolution[changedIndex]);
                 deltaCost -= computeShipmentDeltaCost(s, oldRoute, -1, new HashSet<>());
@@ -410,7 +429,7 @@ public class SimulatedAnnealingPlanner {
 
         // Agregar contribución de la nueva ruta
         if (newSolution[changedIndex] != -1) {
-            List<Route> newCandidates = candidatesMap.get(s.getShipmentId());
+            List<Route> newCandidates = candidatesList.get(changedIndex);
             if (newCandidates != null && newSolution[changedIndex] < newCandidates.size()) {
                 Route newRoute = newCandidates.get(newSolution[changedIndex]);
                 deltaCost += computeShipmentDeltaCost(s, newRoute, +1, new HashSet<>());
@@ -609,6 +628,25 @@ public class SimulatedAnnealingPlanner {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // MÉTODOS DE CACHE (ROLLBACK)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Crea una copia profunda del cache de eventos de aeropuertos.
+     * Necesario para hacer rollback cuando un vecino es rechazado por el SA.
+     *
+     * Sin esta copia profunda, los Map internos se comparten por referencia
+     * y las modificaciones del vecino rechazado corromperían el cache.
+     */
+    private Map<String, Map<Integer, Integer>> deepCopyAirportEvents() {
+        Map<String, Map<Integer, Integer>> copy = new HashMap<>();
+        for (Map.Entry<String, Map<Integer, Integer>> entry : cachedAirportEvents.entrySet()) {
+            copy.put(entry.getKey(), new HashMap<>(entry.getValue()));
+        }
+        return copy;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // MÉTODOS DE PENALIZACIÓN NORMALIZADA (NUEVOS)
     // ════════════════════════════════════════════════════════════════════════
 
@@ -659,12 +697,12 @@ public class SimulatedAnnealingPlanner {
      * Usar evaluateSolutionWithCache() + evaluateSolutionIncremental() para mejor rendimiento.
      *
      * @param shipments     Lista de envíos
-     * @param candidatesMap Mapa de rutas candidatas
-     * @param solution      Indices de rutas seleccionadas
+     * @param candidatesList Lista de rutas candidatas
+     * @param solution      Índices de la solución actual
      * @return Costo total (menor es mejor)
      */
     private double evaluateSolution(List<Shipment> shipments,
-                                    Map<String, List<Route>> candidatesMap,
+                                    List<List<Route>> candidatesList,
                                     int[] solution) {
         // Contadores de carga para vuelos en esta evaluación
         Map<String, Integer> flightLoad    = new HashMap<>();
@@ -681,7 +719,7 @@ public class SimulatedAnnealingPlanner {
                 continue;
             }
 
-            List<Route> candidates = candidatesMap.get(s.getShipmentId());
+            List<Route> candidates = candidatesList.get(i);
             if (candidates == null || routeIdx >= candidates.size()) {
                 totalCost += PENALTY_NO_ROUTE_NORMALIZED;
                 continue;
@@ -698,17 +736,20 @@ public class SimulatedAnnealingPlanner {
                     : 1440;
             int deadline = s.getRequestMinute() + deadlineMinutes;
 
+            // ── Costo Base: Tiempo de Tránsito (NUEVO) ──
+            // Se cobra un costo pequeño (ej. 0.1 por hora de tránsito) para dar un gradiente al SA
+            // y que prefiera rutas más cortas incluso si ambas llegan a tiempo.
+            double transitHours = (arrivalMinute - s.getRequestMinute()) / 60.0;
+            totalCost += transitHours * 0.5;
+
             // Penalización por retraso (NORMALIZADA)
             int delay = Math.max(0, arrivalMinute - deadline);
             totalCost += computeNormalizedDelayPenalty(delay, deadlineMinutes);
 
-            // Verificar capacidad de vuelos en esta ruta (NORMALIZADA)
+            // Acumular capacidad de vuelos en esta ruta
             for (Flight f : route.getFlights()) {
                 int load = flightLoad.getOrDefault(f.getFlightId(), f.getAssignedLoad());
                 load += s.getSuitcaseCount();
-                if (load > f.getMaxCapacity()) {
-                    totalCost += computeNormalizedFlightOverloadPenalty(load, f.getMaxCapacity());
-                }
                 flightLoad.put(f.getFlightId(), load);
             }
 
@@ -750,13 +791,26 @@ public class SimulatedAnnealingPlanner {
             events.sort(Comparator.comparingInt(e -> e.minute));
 
             int currentLoad = ap.getCurrentLoad();
+            int maxLoad = currentLoad;
             for (Event e : events) {
                 currentLoad += e.delta;
-                if (currentLoad > ap.getMaxCapacity()) {
-                    totalCost += computeNormalizedAirportOverloadPenalty(currentLoad, ap.getMaxCapacity());
+                if (currentLoad > maxLoad) {
+                    maxLoad = currentLoad;
                 }
             }
+            if (maxLoad > ap.getMaxCapacity()) {
+                totalCost += computeNormalizedAirportOverloadPenalty(maxLoad, ap.getMaxCapacity());
+            }
         }
+
+        // Evaluar capacidad final de los vuelos (NORMALIZADA)
+        for (Flight f : flights) {
+            int load = flightLoad.getOrDefault(f.getFlightId(), f.getAssignedLoad());
+            if (load > f.getMaxCapacity()) {
+                totalCost += computeNormalizedFlightOverloadPenalty(load, f.getMaxCapacity());
+            }
+        }
+
         return totalCost * COST_SCALE_FACTOR;
     }
 
@@ -779,11 +833,11 @@ public class SimulatedAnnealingPlanner {
      *
      * @param current       Solución actual (array de índices)
      * @param shipments     Lista de envíos
-     * @param candidatesMap Mapa de rutas candidatas
+     * @param candidatesList Lista de rutas candidatas por índice de envío
      * @return Nueva solución vecina, o null si no se pudo generar
      */
     private int[] generateNeighbor(int[] current, List<Shipment> shipments,
-                                   Map<String, List<Route>> candidatesMap) {
+                                   List<List<Route>> candidatesList) {
         int[] neighbor = Arrays.copyOf(current, current.length);
 
         // Elegir un envío al azar que tenga múltiples rutas candidatas
@@ -791,7 +845,7 @@ public class SimulatedAnnealingPlanner {
         while (attempts < 20) {
             int i = random.nextInt(shipments.size());
             Shipment s = shipments.get(i);
-            List<Route> candidates = candidatesMap.get(s.getShipmentId());
+            List<Route> candidates = candidatesList.get(i);
 
             if (candidates != null && candidates.size() > 1) {
                 // Cambiar a una ruta diferente al azar
@@ -811,14 +865,14 @@ public class SimulatedAnnealingPlanner {
 
     // NUEVO MÉTODO (Muy lento, dejado por mientras)
     private int[] generateSmartNeighbor(int[] current, List<Shipment> shipments,
-                                        Map<String, List<Route>> candidatesMap) {
+                                        List<List<Route>> candidatesList) {
         // Calcular peso por envío: mayor peso = más probable de ser seleccionado
         double[] weights = new double[shipments.size()];
         double sumWeights = 0.0;
 
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
-            List<Route> cands = candidatesMap.get(s.getShipmentId());
+            List<Route> cands = candidatesList.get(i);
             int routeIdx = current[i];
 
             // Peso base: 1.0 para todos
@@ -869,7 +923,7 @@ public class SimulatedAnnealingPlanner {
 
         // Cambiar ruta del seleccionado
         int[] neighbor = Arrays.copyOf(current, current.length);
-        List<Route> cands = candidatesMap.get(shipments.get(selectedIdx).getShipmentId());
+        List<Route> cands = candidatesList.get(selectedIdx);
         if (cands == null || cands.size() <= 1) return null;
 
         int newIdx;
@@ -887,11 +941,11 @@ public class SimulatedAnnealingPlanner {
      * También actualiza la carga real de vuelos y aeropuertos.
      *
      * @param shipments     Lista de envíos
-     * @param candidatesMap Mapa de rutas candidatas
+     * @param candidatesList Lista de rutas candidatas por índice de envío
      * @param solution      Indices de rutas seleccionadas (la mejor solución del SA)
      */
     private void applySolution(List<Shipment> shipments,
-                               Map<String, List<Route>> candidatesMap,
+                               List<List<Route>> candidatesList,
                                int[] solution) {
         // Resetear cargas de vuelos para recalcular desde cero
         for (Flight f : flights) f.resetLoad();
@@ -911,7 +965,7 @@ public class SimulatedAnnealingPlanner {
                 continue;
             }
 
-            List<Route> candidates = candidatesMap.get(s.getShipmentId());
+            List<Route> candidates = candidatesList.get(i);
             if (candidates == null || routeIdx >= candidates.size()) {
                 noRouteCount++;
                 continue;

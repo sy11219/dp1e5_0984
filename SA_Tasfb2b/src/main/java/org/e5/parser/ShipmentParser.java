@@ -176,12 +176,31 @@ public class ShipmentParser {
                 // Convertir fecha/hora a minutos desde el inicio de simulación
                 int requestMinute = dateTimeToSimMinutes(date, hourStr, minuteStr, simulationStartDate, originCode, airportMap);
 
-                Shipment shipment = new Shipment(
-                        shipmentId, originCode, destCode,
-                        requestMinute, suitcaseCount, clientId,
-                        date, hourStr, minuteStr
-                );
-                shipments.add(shipment);
+                // ── Particionamiento de envíos grandes ──
+                // Si el envío supera MAX_CHUNK_SIZE, se divide en sub-envíos
+                int MAX_CHUNK_SIZE = 100;
+                int remainingSuitcases = suitcaseCount;
+                int chunkIndex = 1;
+
+                while (remainingSuitcases > 0) {
+                    int chunk = Math.min(remainingSuitcases, MAX_CHUNK_SIZE);
+                    
+                    // Asignar sufijo al ID solo si fue particionado
+                    String chunkId = shipmentId;
+                    if (suitcaseCount > MAX_CHUNK_SIZE) {
+                        chunkId = shipmentId + "-" + chunkIndex;
+                    }
+
+                    Shipment shipment = new Shipment(
+                            chunkId, originCode, destCode,
+                            requestMinute, chunk, clientId,
+                            date, hourStr, minuteStr
+                    );
+                    shipments.add(shipment);
+                    
+                    remainingSuitcases -= chunk;
+                    chunkIndex++;
+                }
             }
         }
 

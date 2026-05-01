@@ -30,7 +30,7 @@ public class RouteFinder {
     private static final int MAX_LAYOVERS = 3;
 
     /** Número máximo de rutas candidatas a generar por envío (limita carga computacional). */
-    private static final int MAX_CANDIDATES = 20;
+    private static final int MAX_CANDIDATES = 50;
     private Map<String,List<Flight>> flightsByOrigin;
 
     public RouteFinder(List<Flight> allFlights) {
@@ -132,7 +132,7 @@ public class RouteFinder {
 
             explored++;
             // Límite de seguridad para no explotar la memoria en grafos grandes
-            if (explored > 5000) break;
+            if (explored > 15000) break;
         }
 
         // Ordenar candidatos por tiempo de llegada estimado (de más rápido a más lento)

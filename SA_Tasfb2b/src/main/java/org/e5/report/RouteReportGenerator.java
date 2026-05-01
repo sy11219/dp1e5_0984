@@ -159,9 +159,15 @@ public class RouteReportGenerator {
             int deadlineMin = (origin != null && dest != null)
                     ? Shipment.getDeadlineMinutes(origin.getContinent(), dest.getContinent())
                     : 1440;
-            pw.printf("  Plazo max   : %s (%d minutos)%n",
-                    deadlineMin == 720 ? "12 horas (mismo continente)" : "24 horas (distinto continente)",
-                    deadlineMin);
+            String plazoLabel;
+            if (deadlineMin == 1440) {
+                plazoLabel = "24 horas (mismo continente)";
+            } else if (deadlineMin == 2880) {
+                plazoLabel = "48 horas (distinto continente)";
+            } else {
+                plazoLabel = deadlineMin / 60 + " horas";
+            }
+            pw.printf("  Plazo max   : %s (%d minutos)%n", plazoLabel, deadlineMin);
 
             if (!s.isPlanned()) {
                 pw.println("  *** SIN RUTA POSIBLE - No se encontraron vuelos disponibles ***");

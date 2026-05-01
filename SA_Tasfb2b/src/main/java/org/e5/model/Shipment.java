@@ -15,8 +15,8 @@ package org.e5.model;
  * disponibles. Puede requerir uno o más vuelos (con escalas) para llegar a destino.
  *
  * La restricción de tiempo de entrega es:
- * - Mismo continente: máximo 12 horas (720 minutos)
- * - Distinto continente: máximo 24 horas (1440 minutos)
+ * - Mismo continente: máximo 24 horas (1440 minutos)
+ * - Distinto continente: máximo 48 horas (2880 minutos)
  *
  * Esta clase también lleva el estado del envío: si fue planificado, cuándo
  * llegó, si llegó a tiempo, etc.
@@ -77,8 +77,8 @@ public class Shipment {
 
     /**
      * Devuelve el plazo máximo de entrega en minutos según los continentes.
-     * - Mismo continente: 720 minutos (12 horas)
-     * - Distinto continente: 1440 minutos (24 horas)
+     * - Mismo continente: 1440 minutos (24 horas)
+     * - Distinto continente: 2880 minutos (48 horas)
      *
      * @param originContinent  Continente del aeropuerto origen
      * @param destContinent    Continente del aeropuerto destino
