@@ -118,7 +118,7 @@ public class Main {
             int batchDays = simulationDays + 2; // margen extra de 2 días
             System.out.printf("[2/4] Cargando plan de vuelos (%d dias)...%n", batchDays);
             FlightPlanParser flightParser = new FlightPlanParser();
-            List<Flight> flights = flightParser.parse(batchDays);
+            List<Flight> flights = flightParser.parse(batchDays, airportMap);
             System.out.printf("  Total: %d vuelos cargados.%n%n", flights.size());
 
             // ── Paso 3: Cargar envíos de todos los aeropuertos ────────────────

@@ -162,45 +162,20 @@ public class ShipmentParser {
                 int    suitcaseCount = Integer.parseInt(m.group(6));
                 String clientId     = m.group(7);
 
-                // Filtrar envíos fuera del rango de simulación por fecha local
-                int sYear = Integer.parseInt(simulationStartDate.substring(0, 4));
-                int sMonth = Integer.parseInt(simulationStartDate.substring(4, 6));
-                int sDay = Integer.parseInt(simulationStartDate.substring(6, 8));
-                int eYear = Integer.parseInt(date.substring(0, 4));
-                int eMonth = Integer.parseInt(date.substring(4, 6));
-                int eDay = Integer.parseInt(date.substring(6, 8));
-                long dayDiff = daysFromEpoch(eYear, eMonth, eDay) - daysFromEpoch(sYear, sMonth, sDay);
-                if (dayDiff < 0) continue; // Ignorar envíos anteriores al inicio
-                if (dayDiff >= maxSimulationDays) continue; // Ignorar envíos posteriores al final
-
                 // Convertir fecha/hora a minutos desde el inicio de simulación
                 int requestMinute = dateTimeToSimMinutes(date, hourStr, minuteStr, simulationStartDate, originCode, airportMap);
 
-                // ── Particionamiento de envíos grandes ──
-                // Si el envío supera MAX_CHUNK_SIZE, se divide en sub-envíos
-                int MAX_CHUNK_SIZE = 100;
-                int remainingSuitcases = suitcaseCount;
-                int chunkIndex = 1;
+                // Filtrar envíos fuera del rango de simulación
+                int maxSimulationMinutes = maxSimulationDays * 1440;
+                if (requestMinute < 0) continue; // Ignorar envíos anteriores al inicio
+                if (requestMinute >= maxSimulationMinutes) continue; // Ignorar envíos posteriores al final
 
-                while (remainingSuitcases > 0) {
-                    int chunk = Math.min(remainingSuitcases, MAX_CHUNK_SIZE);
-                    
-                    // Asignar sufijo al ID solo si fue particionado
-                    String chunkId = shipmentId;
-                    if (suitcaseCount > MAX_CHUNK_SIZE) {
-                        chunkId = shipmentId + "-" + chunkIndex;
-                    }
-
-                    Shipment shipment = new Shipment(
-                            chunkId, originCode, destCode,
-                            requestMinute, chunk, clientId,
-                            date, hourStr, minuteStr
-                    );
-                    shipments.add(shipment);
-                    
-                    remainingSuitcases -= chunk;
-                    chunkIndex++;
-                }
+                Shipment shipment = new Shipment(
+                        shipmentId, originCode, destCode,
+                        requestMinute, suitcaseCount, clientId,
+                        date, hourStr, minuteStr
+                );
+                shipments.add(shipment);
             }
         }
 

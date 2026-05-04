@@ -1,5 +1,6 @@
 package org.e5.parser;
 
+import org.e5.model.Airport;
 import org.e5.model.Flight;
 
 import java.io.BufferedReader;
@@ -7,6 +8,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,6 +59,10 @@ public class FlightPlanParser {
         return parse(DEFAULT_PATH, simulationDays);
     }
 
+    public List<Flight> parse(int simulationDays, Map<String, Airport> airportMap) throws IOException {
+        return parse(DEFAULT_PATH, simulationDays, airportMap);
+    }
+
     /**
      * Carga vuelos desde una ruta de archivo específica para N días de simulación.
      *
@@ -76,6 +82,10 @@ public class FlightPlanParser {
      * @throws IOException Si el archivo no puede leerse
      */
     public List<Flight> parse(String filePath, int simulationDays) throws IOException {
+        return parse(filePath, simulationDays, null);
+    }
+
+    public List<Flight> parse(String filePath, int simulationDays, Map<String, Airport> airportMap) throws IOException {
         List<int[]> rawFlights = new ArrayList<>(); // [depMinute, arrMinute, capacity]
         List<String[]> rawCodes = new ArrayList<>(); // [origin, dest]
 
@@ -105,11 +115,11 @@ public class FlightPlanParser {
                 int    arrMin   = Integer.parseInt(m.group(6));
                 int    capacity = Integer.parseInt(m.group(7));
 
-                int depMinutes = depHour * 60 + depMin;
-                int arrMinutes = arrHour * 60 + arrMin;
+                int depMinutes = toUtcMinute(orig, depHour * 60 + depMin, airportMap);
+                int arrMinutes = toUtcMinute(dest, arrHour * 60 + arrMin, airportMap);
 
                 // Si llegada < salida, el vuelo cruza medianoche → suma un día
-                if (arrMinutes <= depMinutes) {
+                while (arrMinutes <= depMinutes) {
                     arrMinutes += 1440;
                 }
 
@@ -135,6 +145,14 @@ public class FlightPlanParser {
         System.out.printf("[FlightPlanParser] Cargados %d vuelos base, %d vuelos totales para %d dia(s).%n",
                 rawFlights.size(), allFlights.size(), simulationDays);
         return allFlights;
+    }
+
+    private int toUtcMinute(String airportCode, int localMinute, Map<String, Airport> airportMap) {
+        if (airportMap == null) return localMinute;
+
+        Airport airport = airportMap.get(airportCode);
+        int offset = airport != null ? airport.getGmtOffset() : 0;
+        return localMinute - offset * 60;
     }
 
     /**

@@ -27,10 +27,11 @@ import java.util.*;
 public class RouteFinder {
 
     /** Número máximo de escalas permitidas en una ruta. */
-    private static final int MAX_LAYOVERS = 3;
-
+    private static final int MAX_LAYOVERS = 5;
     /** Número máximo de rutas candidatas a generar por envío (limita carga computacional). */
-    private static final int MAX_CANDIDATES = 50;
+    private static final int MAX_CANDIDATES = 250; // Mas opciones para el SA
+    private static final int MAX_EXPLORED_STATES = 100000; // Mayor profundidad de busqueda
+
     private Map<String,List<Flight>> flightsByOrigin;
 
     public RouteFinder(List<Flight> allFlights) {
@@ -44,6 +45,11 @@ public class RouteFinder {
             // computeIfAbsent: si la clave no existe, crea una nueva lista
             index.computeIfAbsent(flight.getOriginCode(), k -> new ArrayList<>())
                     .add(flight);
+        }
+
+        for (List<Flight> byOrigin : index.values()) {
+            byOrigin.sort(Comparator.comparingInt(Flight::absoluteDepartureMinute)
+                    .thenComparingInt(Flight::absoluteArrivalMinute));
         }
 
         return index;
@@ -74,55 +80,50 @@ public class RouteFinder {
                                             int availableFrom, int suitcaseCount,
                                             String shipmentId) {
         List<Route> candidates = new ArrayList<>();
-
-        // Estado BFS: cada entrada es [lista de vuelos acumulados hasta ahora, aeropuerto actual, minuto actual]
-        // Usamos una cola de "estados parciales" para explorar rutas
-        Queue<RouteState> queue = new LinkedList<>();
-        queue.add(new RouteState(originCode, availableFrom, new ArrayList<>(), new HashSet<>()));
+        PriorityQueue<RouteState> queue = new PriorityQueue<>(
+                Comparator.comparingInt((RouteState state) -> state.readyAt)
+                        .thenComparingInt(state -> state.flightsSoFar.size())
+        );
+        
+        Set<String> initialVisited = new HashSet<>();
+        initialVisited.add(originCode);
+        queue.add(new RouteState(originCode, availableFrom, new ArrayList<>(), initialVisited));
 
         int explored = 0;
 
         while (!queue.isEmpty() && candidates.size() < MAX_CANDIDATES) {
             RouteState state = queue.poll();
 
-            // Si la ruta ya tiene demasiadas escalas, no seguir expandiendo
             if (state.flightsSoFar.size() > MAX_LAYOVERS) continue;
-            // Obtener vuelos que salen del aeropuerto actual (O(1) lookup)
+
             List<Flight> flightsFromCurrent = flightsByOrigin.get(state.currentAirport);
+            if (flightsFromCurrent == null) continue;
 
-            // Si no hay vuelos desde este aeropuerto, saltar al siguiente estado
-            if (flightsFromCurrent == null || flightsFromCurrent.isEmpty()) {
-                continue;
-            }
-            // Buscar vuelos que parten del aeropuerto actual y pueden ser alcanzados
             for (Flight flight : flightsFromCurrent) {
-
-                // El vuelo debe salir DESPUÉS de que el envío esté listo (con margen mínimo de 0 min)
+                // 1. Validar tiempo de conexión
                 if (flight.absoluteDepartureMinute() < state.readyAt) continue;
 
-                // No visitar aeropuertos ya visitados (evita ciclos)
+                // 2. Evitar ciclos
                 if (state.visitedAirports.contains(flight.getDestCode())) continue;
 
-                // El vuelo debe tener espacio para las maletas
-                if (!flight.hasSpaceFor(suitcaseCount)) continue;
+                /* NOTA CRÍTICA: Eliminamos 'flight.hasSpaceFor'. 
+                   Queremos que el SA vea todas las rutas físicamente posibles. 
+                   El SA decidirá si la sobrecarga es aceptable o no mediante el costo.
+                */
 
-                // Construir la nueva lista de vuelos
                 List<Flight> newFlights = new ArrayList<>(state.flightsSoFar);
                 newFlights.add(flight);
 
-                // Si llegamos al destino, tenemos una ruta candidata completa
                 if (flight.getDestCode().equals(destCode)) {
                     Route route = new Route(shipmentId, originCode, destCode,
                             newFlights, suitcaseCount, availableFrom);
+                    // Solo verificamos validez lógica (tiempos), no de carga
                     if (route.isValid()) {
                         candidates.add(route);
                     }
-                    // No seguir expandiendo desde el destino
                     continue;
                 }
 
-                // Si aún no llegamos al destino, seguir explorando desde el aeropuerto de llegada
-                // El envío estará listo en el aeropuerto intermedio después de: llegada + *10* min de escala
                 int nextReadyAt = flight.absoluteArrivalMinute() + Route.TRANSIT_TIME_MINUTES;
                 Set<String> newVisited = new HashSet<>(state.visitedAirports);
                 newVisited.add(flight.getDestCode());
@@ -131,12 +132,15 @@ public class RouteFinder {
             }
 
             explored++;
-            // Límite de seguridad para no explotar la memoria en grafos grandes
-            if (explored > 15000) break;
+            if (explored > MAX_EXPLORED_STATES) break;
         }
 
-        // Ordenar candidatos por tiempo de llegada estimado (de más rápido a más lento)
-        candidates.sort(Comparator.comparingInt(Route::calculateArrivalMinute));
+        // Ordenamos: Primero las que llegan antes, luego por menos escalas
+        candidates.sort((r1, r2) -> {
+            int arrivalComp = Integer.compare(r1.calculateArrivalMinute(), r2.calculateArrivalMinute());
+            if (arrivalComp != 0) return arrivalComp;
+            return Integer.compare(r1.getFlights().size(), r2.getFlights().size());
+        });
 
         return candidates;
     }

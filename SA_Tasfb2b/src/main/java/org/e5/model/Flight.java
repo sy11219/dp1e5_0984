@@ -14,8 +14,8 @@ package org.e5.model;
  * a jornadas futuras (simulación de múltiples días).
  *
  * NOTA: Para vuelos entre continentes distintos, el planificador respeta
- * que el tiempo de tránsito es de 1 día (1440 minutos); para mismo continente,
- * de 0.5 días (720 minutos). Esta lógica reside en el planificador usando
+ * que el tiempo de transito es de 2 dias (2880 minutos); para mismo continente,
+ * de 1 dia (1440 minutos). Esta logica reside en el planificador usando
  * los continentes de los aeropuertos involucrados.
  */
 public class Flight {

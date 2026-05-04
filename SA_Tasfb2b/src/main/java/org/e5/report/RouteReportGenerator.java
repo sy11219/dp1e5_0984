@@ -134,6 +134,9 @@ public class RouteReportGenerator {
         int onTime    = 0;
         int late      = 0;
         int noRoute   = 0;
+        int onTimeSuitcases = 0;
+        int lateSuitcases = 0;
+        int noRouteSuitcases = 0;
         long totalDelayMin = 0;
 
         // ── Detalle por envío ─────────────────────────────────────────────────
@@ -159,22 +162,24 @@ public class RouteReportGenerator {
             int deadlineMin = (origin != null && dest != null)
                     ? Shipment.getDeadlineMinutes(origin.getContinent(), dest.getContinent())
                     : 1440;
-            String plazoLabel;
-            if (deadlineMin == 1440) {
-                plazoLabel = "24 horas (mismo continente)";
-            } else if (deadlineMin == 2880) {
-                plazoLabel = "48 horas (distinto continente)";
-            } else {
-                plazoLabel = deadlineMin / 60 + " horas";
-            }
-            pw.printf("  Plazo max   : %s (%d minutos)%n", plazoLabel, deadlineMin);
+            pw.printf("  Plazo max   : %s (%d minutos)%n",
+                    deadlineMin == 1440
+                            ? "24 horas (mismo continente)"
+                            : deadlineMin == 2880
+                                    ? "48 horas (distinto continente)"
+                                    : deadlineMin + " minutos",
+                    deadlineMin);
 
-            if (!s.isPlanned()) {
+            Route assignedRoute = s.getAssignedRoute();
+            if (assignedRoute == null) {
                 pw.println("  *** SIN RUTA POSIBLE - No se encontraron vuelos disponibles ***");
                 noRoute++;
+                noRouteSuitcases += s.getSuitcaseCount();
             } else {
-                Route route = s.getAssignedRoute();
-                pw.printf("  Escalas     : %d%n", route.getLayoverCount());
+                pw.println("  Ruta asignada:");
+                if (!s.isPlanned()) {
+                    pw.println("  *** PARCIAL: no todas las maletas pudieron planificarse ***");
+                }
                 pw.printf("  Llegada est : minuto %d (%s, Dia %d)%n",
                         s.getEstimatedArrival(),
                         Flight.minutesToHHMM(s.getEstimatedArrival() % 1440),
@@ -184,21 +189,20 @@ public class RouteReportGenerator {
                 pw.printf("  Transito    : %d minutos (%.1f horas)%n",
                         transitTime, transitTime / 60.0);
 
-                // Estado: a tiempo o retrasado
                 if (s.isOnTime()) {
                     pw.println("  Estado      : *** A TIEMPO ***");
                     onTime++;
+                    onTimeSuitcases += s.getSuitcaseCount();
                 } else {
                     pw.printf("  Estado      : !!! RETRASADO !!! (+%d minutos sobre el plazo)%n",
                             s.getDelayMinutes());
                     late++;
+                    lateSuitcases += s.getSuitcaseCount();
                     totalDelayMin += s.getDelayMinutes();
                 }
 
-                // Detalle de cada vuelo en la ruta
-                pw.println("  Ruta detallada:");
-                List<Flight> routeFlights = route.getFlights();
-                int readyAt = s.getRequestMinute();
+                pw.printf("  Maletas: %d%n", s.getSuitcaseCount());
+                List<Flight> routeFlights = assignedRoute.getFlights();
                 for (int fi = 0; fi < routeFlights.size(); fi++) {
                     Flight f = routeFlights.get(fi);
                     pw.printf("    Vuelo %d: %s → %s | Dia %d | Salida: %s (min abs %d) | Llegada: %s (min abs %d) | Capacidad usada: %d/%d%n",
@@ -223,12 +227,17 @@ public class RouteReportGenerator {
         pw.println("  RESUMEN GLOBAL");
         pw.println(SEPARATOR);
         pw.printf("  Total envios planificados : %d%n", shipments.size());
+        pw.printf("  Total maletas             : %d%n",
+                onTimeSuitcases + lateSuitcases + noRouteSuitcases);
         pw.printf("  A tiempo                  : %d (%.1f%%)%n",
                 onTime, pct(onTime, shipments.size()));
+        pw.printf("  Maletas a tiempo          : %d%n", onTimeSuitcases);
         pw.printf("  Retrasados                : %d (%.1f%%)%n",
                 late, pct(late, shipments.size()));
+        pw.printf("  Maletas con retraso       : %d%n", lateSuitcases);
         pw.printf("  Sin ruta posible          : %d (%.1f%%)%n",
                 noRoute, pct(noRoute, shipments.size()));
+        pw.printf("  Maletas sin ruta          : %d%n", noRouteSuitcases);
         if (late > 0) {
             pw.printf("  Retraso total acumulado   : %d minutos (%.1f horas promedio/retrasado)%n",
                     totalDelayMin, (double)totalDelayMin / late / 60.0);
