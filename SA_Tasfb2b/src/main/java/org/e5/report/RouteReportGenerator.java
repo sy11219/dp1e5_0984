@@ -8,8 +8,10 @@ import org.e5.model.Shipment;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -138,6 +140,8 @@ public class RouteReportGenerator {
         int lateSuitcases = 0;
         int noRouteSuitcases = 0;
         long totalDelayMin = 0;
+        Map<String, Flight> usedFlights = new HashMap<>();
+        Map<Integer, Integer> suitcasesByFlightDay = new HashMap<>();
 
         // ── Detalle por envío ─────────────────────────────────────────────────
         for (int idx = 0; idx < shipments.size(); idx++) {
@@ -146,6 +150,13 @@ public class RouteReportGenerator {
             pw.printf("  ENVIO #%d%n", idx + 1);
             pw.println(THIN_SEP);
             pw.printf("  ID Envio    : %s%n", s.getShipmentId());
+            if (s.isSplitPart()) {
+                pw.printf("  Particion   : parte %d/%d del envio %s (%d maletas originales)%n",
+                        s.getSplitPartIndex(),
+                        s.getSplitPartCount(),
+                        s.getParentShipmentId(),
+                        s.getOriginalSuitcaseCount());
+            }
             pw.printf("  Cliente     : %s%n", s.getClientId());
             pw.printf("  Maletas     : %d%n", s.getSuitcaseCount());
             pw.printf("  Origen      : %s (%s)%n",
@@ -205,6 +216,8 @@ public class RouteReportGenerator {
                 List<Flight> routeFlights = assignedRoute.getFlights();
                 for (int fi = 0; fi < routeFlights.size(); fi++) {
                     Flight f = routeFlights.get(fi);
+                    usedFlights.putIfAbsent(f.getFlightId(), f);
+                    suitcasesByFlightDay.merge(f.getDayOffset(), s.getSuitcaseCount(), Integer::sum);
                     pw.printf("    Vuelo %d: %s → %s | Dia %d | Salida: %s (min abs %d) | Llegada: %s (min abs %d) | Capacidad usada: %d/%d%n",
                             fi + 1,
                             f.getOriginCode(), f.getDestCode(),
@@ -238,6 +251,11 @@ public class RouteReportGenerator {
         pw.printf("  Sin ruta posible          : %d (%.1f%%)%n",
                 noRoute, pct(noRoute, shipments.size()));
         pw.printf("  Maletas sin ruta          : %d%n", noRouteSuitcases);
+        pw.printf("  Espacio promedio sobrante vuelos usados: %.1f maletas%n",
+                averageRemainingFlightSpace(usedFlights));
+        pw.printf("  Vuelos usados sobrecargados: %d | Exceso total: %d maletas%n",
+                overloadedFlightCount(usedFlights), totalFlightOverload(usedFlights));
+        printBusiestFlightDay(pw, suitcasesByFlightDay, simulationStartDate);
         if (late > 0) {
             pw.printf("  Retraso total acumulado   : %d minutos (%.1f horas promedio/retrasado)%n",
                     totalDelayMin, (double)totalDelayMin / late / 60.0);
@@ -281,5 +299,68 @@ public class RouteReportGenerator {
      */
     private double pct(int part, int total) {
         return total == 0 ? 0.0 : (100.0 * part / total);
+    }
+
+    private double averageRemainingFlightSpace(Map<String, Flight> flights) {
+        if (flights.isEmpty()) return 0.0;
+
+        int totalRemaining = 0;
+        for (Flight f : flights.values()) {
+            totalRemaining += f.getMaxCapacity() - f.getAssignedLoad();
+        }
+        return (double) totalRemaining / flights.size();
+    }
+
+    private int overloadedFlightCount(Map<String, Flight> flights) {
+        int count = 0;
+        for (Flight f : flights.values()) {
+            if (f.getAssignedLoad() > f.getMaxCapacity()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int totalFlightOverload(Map<String, Flight> flights) {
+        int totalOverload = 0;
+        for (Flight f : flights.values()) {
+            totalOverload += Math.max(0, f.getAssignedLoad() - f.getMaxCapacity());
+        }
+        return totalOverload;
+    }
+
+    private void printBusiestFlightDay(PrintWriter pw, Map<Integer, Integer> suitcasesByFlightDay,
+                                       String simulationStartDate) {
+        if (suitcasesByFlightDay.isEmpty()) {
+            pw.println("  Dia con mas maletas enviadas: N/A (0 maletas)");
+            return;
+        }
+
+        int busiestDay = -1;
+        int maxSuitcases = 0;
+        for (Map.Entry<Integer, Integer> entry : suitcasesByFlightDay.entrySet()) {
+            int day = entry.getKey();
+            int suitcases = entry.getValue();
+            if (suitcases > maxSuitcases || (suitcases == maxSuitcases && day < busiestDay)) {
+                busiestDay = day;
+                maxSuitcases = suitcases;
+            }
+        }
+
+        pw.printf("  Dia con mas maletas enviadas: Dia %d (%s) | %d maletas%n",
+                busiestDay, formatSimulationDay(simulationStartDate, busiestDay), maxSuitcases);
+    }
+
+    private String formatSimulationDay(String simulationStartDate, int dayOffset) {
+        try {
+            LocalDate startDate = LocalDate.parse(
+                    simulationStartDate,
+                    DateTimeFormatter.ofPattern("yyyyMMdd")
+            );
+            LocalDate date = startDate.plusDays(dayOffset);
+            return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception e) {
+            return "fecha no disponible";
+        }
     }
 }

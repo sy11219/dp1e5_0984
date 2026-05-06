@@ -61,6 +61,8 @@ public class SimulatedAnnealingPlanner {
     private static final double RESTART_COST_FACTOR   = 1.30;
     private static final int    MAX_ITERATIONS_PER_ATTEMPT = 18000;
     private static final double MAX_CALIBRATED_TEMPERATURE = 5000.0;
+    private static final int    MAX_SPLIT_CHUNK_SIZE = 200;
+    private static final int    MAX_SPLIT_PARTS_PER_SHIPMENT = 50;
  
     // ════════════════════════════════════════════════════════════════════════
     // PENALIZACIONES NORMALIZADAS (CORREGIDAS)
@@ -125,6 +127,13 @@ public class SimulatedAnnealingPlanner {
      */
     public List<Shipment> plan(List<Shipment> shipments) {
         System.out.println("\n[SA Planner] Iniciando planificacion con Simulated Annealing (MULTI-START)...");
+        List<Shipment> planningShipments = splitLargeShipments(shipments);
+        if (planningShipments.size() != shipments.size()) {
+            System.out.printf("[SA Planner] Particion de envios activa: %d envios originales -> %d subenvios.%n",
+                    shipments.size(), planningShipments.size());
+            shipments.clear();
+            shipments.addAll(planningShipments);
+        }
         System.out.printf("[SA Planner] Envios a planificar: %d | Vuelos disponibles: %d%n",
                 shipments.size(), flights.size());
 
@@ -190,6 +199,64 @@ public class SimulatedAnnealingPlanner {
         applySolution(shipments, candidatesMap, bestOverallSolution);
 
         return shipments;
+    }
+
+    private List<Shipment> splitLargeShipments(List<Shipment> shipments) {
+        int maxFlightCapacity = flights.stream()
+                .mapToInt(Flight::getMaxCapacity)
+                .max()
+                .orElse(MAX_SPLIT_CHUNK_SIZE);
+        int baseChunkSize = Math.max(1, Math.min(MAX_SPLIT_CHUNK_SIZE, maxFlightCapacity));
+
+        List<Shipment> result = new ArrayList<>();
+        int splitShipments = 0;
+        int splitSuitcases = 0;
+
+        for (Shipment s : shipments) {
+            int total = s.getSuitcaseCount();
+            if (total <= baseChunkSize) {
+                result.add(s);
+                continue;
+            }
+
+            int chunkSize = baseChunkSize;
+            int partCount = (int) Math.ceil((double) total / chunkSize);
+            if (partCount > MAX_SPLIT_PARTS_PER_SHIPMENT) {
+                partCount = MAX_SPLIT_PARTS_PER_SHIPMENT;
+                chunkSize = (int) Math.ceil((double) total / partCount);
+            }
+
+            splitShipments++;
+            splitSuitcases += total;
+            int remaining = total;
+            for (int part = 1; part <= partCount; part++) {
+                int partSize = Math.min(chunkSize, remaining);
+                remaining -= partSize;
+                String partId = String.format("%s-P%02d", s.getShipmentId(), part);
+                result.add(new Shipment(
+                        partId,
+                        s.getOriginCode(),
+                        s.getDestCode(),
+                        s.getRequestMinute(),
+                        partSize,
+                        s.getClientId(),
+                        s.getRawDate(),
+                        s.getRawHour(),
+                        s.getRawMinuteStr(),
+                        s.getShipmentId(),
+                        part,
+                        partCount,
+                        total
+                ));
+            }
+        }
+
+        if (splitShipments > 0) {
+            System.out.printf("[SA Planner] Se particionaron %d envios grandes (%d maletas) en bloques de hasta %d maletas.%n",
+                    splitShipments, splitSuitcases, baseChunkSize);
+        }
+
+        return result;
     }
 
     /**
@@ -753,7 +820,7 @@ public class SimulatedAnnealingPlanner {
             Map<Integer, Integer> events = simulatedEvents
                     .computeIfAbsent(apCode, k -> new HashMap<>());
 
-            int arrivalMin = f.getArrivalMinute();
+            int arrivalMin = f.absoluteArrivalMinute();
             events.merge(arrivalMin, suitcaseCount * delta, Integer::sum);
 
             // Evento de salida
@@ -761,7 +828,7 @@ public class SimulatedAnnealingPlanner {
             if (apCode.equals(route.getFinalDestCode())) {
                 departureMin = arrivalMin + 10;
             } else if (leg + 1 < flightsInRoute.size()) {
-                departureMin = flightsInRoute.get(leg + 1).getDepartureMinute();
+                departureMin = flightsInRoute.get(leg + 1).absoluteDepartureMinute();
             } else {
                 continue;
             }
@@ -924,7 +991,7 @@ public class SimulatedAnnealingPlanner {
             Airport ap = airportMap.get(apCode);
             if (ap == null) continue;
  
-            int arrivalMin = f.getArrivalMinute();
+            int arrivalMin = f.absoluteArrivalMinute();
  
             // Trackear aeropuerto como afectado
             affectedAirports.add(apCode);
@@ -945,7 +1012,7 @@ public class SimulatedAnnealingPlanner {
                 departureMin = arrivalMin + 10;
             } else if (leg + 1 < flightsInRoute.size()) {
                 // Aeropuerto intermedio → salida en el próximo vuelo
-                departureMin = flightsInRoute.get(leg + 1).getDepartureMinute();
+                departureMin = flightsInRoute.get(leg + 1).absoluteDepartureMinute();
             } else {
                 continue;  // No hay evento de salida válido
             }
@@ -1140,7 +1207,7 @@ public class SimulatedAnnealingPlanner {
                 if (ap == null) continue;
  
                 int suitcaseCount = s.getSuitcaseCount();
-                int arrivalMin = f.getArrivalMinute();
+                int arrivalMin = f.absoluteArrivalMinute();
  
                 // Evento de llegada
                 airportEvents.computeIfAbsent(apCode, k -> new ArrayList<>())
@@ -1156,7 +1223,7 @@ public class SimulatedAnnealingPlanner {
                     if (leg + 1 < flightsInRoute.size()) {
                         Flight nextFlight = flightsInRoute.get(leg + 1);
                         airportEvents.get(apCode)
-                                .add(new Event(nextFlight.getDepartureMinute(), -suitcaseCount));
+                                .add(new Event(nextFlight.absoluteDepartureMinute(), -suitcaseCount));
                     }
                 }
             }

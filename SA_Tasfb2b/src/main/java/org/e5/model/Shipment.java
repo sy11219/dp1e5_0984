@@ -35,6 +35,10 @@ public class Shipment {
     private final String rawDate;   // aaaammdd original
     private final String rawHour;   // HH original
     private final String rawMinute; // MM original
+    private final String parentShipmentId;
+    private final int splitPartIndex;
+    private final int splitPartCount;
+    private final int originalSuitcaseCount;
  
     // ── Estado del envío (mutable, calculado por el planificador) ─────────────
     private Route assignedRoute;        // Ruta asignada por el planificador
@@ -59,6 +63,15 @@ public class Shipment {
     public Shipment(String shipmentId, String originCode, String destCode,
                     int requestMinute, int suitcaseCount, String clientId,
                     String rawDate, String rawHour, String rawMinute) {
+        this(shipmentId, originCode, destCode, requestMinute, suitcaseCount, clientId,
+                rawDate, rawHour, rawMinute, shipmentId, 1, 1, suitcaseCount);
+    }
+
+    public Shipment(String shipmentId, String originCode, String destCode,
+                    int requestMinute, int suitcaseCount, String clientId,
+                    String rawDate, String rawHour, String rawMinute,
+                    String parentShipmentId, int splitPartIndex, int splitPartCount,
+                    int originalSuitcaseCount) {
         this.shipmentId    = shipmentId;
         this.originCode    = originCode;
         this.destCode      = destCode;
@@ -68,6 +81,10 @@ public class Shipment {
         this.rawDate       = rawDate;
         this.rawHour       = rawHour;
         this.rawMinute     = rawMinute;
+        this.parentShipmentId = parentShipmentId;
+        this.splitPartIndex = splitPartIndex;
+        this.splitPartCount = splitPartCount;
+        this.originalSuitcaseCount = originalSuitcaseCount;
         this.planned       = false;
         this.onTime        = false;
         this.delayMinutes  = 0;
@@ -121,6 +138,11 @@ public class Shipment {
     public String  getRawDate()        { return rawDate; }
     public String  getRawHour()        { return rawHour; }
     public String  getRawMinuteStr()   { return rawMinute; }
+    public String  getParentShipmentId(){ return parentShipmentId; }
+    public int     getSplitPartIndex() { return splitPartIndex; }
+    public int     getSplitPartCount() { return splitPartCount; }
+    public int     getOriginalSuitcaseCount() { return originalSuitcaseCount; }
+    public boolean isSplitPart()       { return splitPartCount > 1; }
     public Route   getAssignedRoute()  { return assignedRoute; }
     public int     getEstimatedArrival(){ return estimatedArrival; }
     public boolean isOnTime()          { return onTime; }
