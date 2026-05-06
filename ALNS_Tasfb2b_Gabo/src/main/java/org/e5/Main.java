@@ -154,11 +154,11 @@ public class Main {
                                             List<Airport> airports,
                                             Map<String, Airport> airportMap) {
         ALNS alns = new ALNS(
-                150,   // pocas iteraciones para respuesta rápida
-                15,    // segmento pequeño
-                -1,
-                300.0, // temperatura inicial más baja
-                0.99,
+                50,   // pocas iteraciones para respuesta rápida 
+                5,    // segmento pequeño: Cada 5 iteraciones se ajustan pesos
+                -1, //No hay número fijo de destrucciones. Se calcula en ALNS
+                100.0, // temperatura inicial más baja para converger rápido
+                0.99, // Más cerca a 1, enfriamiento más lento para explorar más
                 3,     // menos escalas para rutas más directas
                 9.0, 3.0, 0.0, 0.8
         );

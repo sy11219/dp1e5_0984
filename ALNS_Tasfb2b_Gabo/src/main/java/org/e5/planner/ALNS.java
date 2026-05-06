@@ -110,7 +110,7 @@ public class ALNS {
         aceptadasSA           = 0;
         inicializarPesos();
 
-        int n = nDestruir > 0 ? nDestruir : Math.max(3, shipments.size() / 5);
+        int n = nDestruir > 0 ? nDestruir : Math.max(3, shipments.size() / 20);
 
         // 1. Solución inicial greedy
         Map<String, Route> solActual = construirSolucionGreedy(shipments, flights, finder, airportMap);

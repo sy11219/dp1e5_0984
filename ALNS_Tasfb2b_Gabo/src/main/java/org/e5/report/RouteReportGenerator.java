@@ -8,8 +8,10 @@ import org.e5.model.Shipment;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,7 +31,8 @@ import java.util.Map;
  * - Estado: A TIEMPO / RETRASADO (con minutos de retraso)
  * - Plazo máximo aplicable (24h o 48h según continentes)
  *
- * Al final del reporte incluye un resumen estadístico global.
+ * Al final del reporte incluye un resumen estadístico global con métricas
+ * de eficiencia temporal, uso de vuelos y día más ocupado.
  */
 public class RouteReportGenerator {
 
@@ -57,10 +60,8 @@ public class RouteReportGenerator {
      * @param simulationDays      Número de días simulados
      */
     public void generate(List<Shipment> shipments, String simulationStartDate, int simulationDays) {
-        // Imprimir en consola
         printToConsole(shipments, simulationStartDate, simulationDays);
 
-        // Escribir en archivo
         try {
             writeToFile(shipments, simulationStartDate, simulationDays);
             System.out.printf("%n[Reporte] Reporte guardado en: %s%n", REPORT_FILE);
@@ -73,13 +74,6 @@ public class RouteReportGenerator {
     // SALIDA EN CONSOLA
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Imprime el reporte completo en la consola estándar.
-     *
-     * @param shipments           Lista de envíos planificados
-     * @param simulationStartDate Fecha de inicio
-     * @param simulationDays      Días de simulación
-     */
     private void printToConsole(List<Shipment> shipments, String simulationStartDate, int simulationDays) {
         printReport(new PrintWriter(System.out, true), shipments, simulationStartDate, simulationDays);
     }
@@ -88,14 +82,6 @@ public class RouteReportGenerator {
     // ESCRITURA EN ARCHIVO TXT
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Escribe el reporte en el archivo data/reporte_rutas.txt.
-     *
-     * @param shipments           Lista de envíos planificados
-     * @param simulationStartDate Fecha de inicio
-     * @param simulationDays      Días de simulación
-     * @throws IOException Si no se puede escribir el archivo
-     */
     private void writeToFile(List<Shipment> shipments, String simulationStartDate,
                               int simulationDays) throws IOException {
         try (PrintWriter pw = new PrintWriter(new FileWriter(REPORT_FILE))) {
@@ -107,15 +93,6 @@ public class RouteReportGenerator {
     // LÓGICA DE REPORTE (reutilizada para consola y archivo)
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Escribe el reporte completo en el PrintWriter dado.
-     * Centraliza el formato para que consola y archivo sean idénticos.
-     *
-     * @param pw                  Destino de escritura
-     * @param shipments           Lista de envíos planificados
-     * @param simulationStartDate Fecha de inicio
-     * @param simulationDays      Días de simulación
-     */
     private void printReport(PrintWriter pw, List<Shipment> shipments,
                               String simulationStartDate, int simulationDays) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -130,14 +107,19 @@ public class RouteReportGenerator {
         pw.println(SEPARATOR);
         pw.println();
 
-        // Contadores para resumen
-        int onTime    = 0;
-        int late      = 0;
-        int noRoute   = 0;
-        int onTimeSuitcases = 0;
-        int lateSuitcases = 0;
+        // ── Contadores para resumen ───────────────────────────────────────────
+        int onTime           = 0;
+        int late             = 0;
+        int noRoute          = 0;
+        int onTimeSuitcases  = 0;
+        int lateSuitcases    = 0;
         int noRouteSuitcases = 0;
-        long totalDelayMin = 0;
+        long totalDelayMin   = 0;
+        int totalSpareTimeMin = 0;
+
+        // Tracking de vuelos usados y maletas por día
+        Map<String, Flight>  usedFlights         = new HashMap<>();
+        Map<Integer, Integer> suitcasesByFlightDay = new HashMap<>();
 
         // ── Detalle por envío ─────────────────────────────────────────────────
         for (int idx = 0; idx < shipments.size(); idx++) {
@@ -157,8 +139,8 @@ public class RouteReportGenerator {
             pw.printf("  Min absoluto inicio: %d%n", s.getRequestMinute());
 
             // Plazo máximo
-            Airport origin = airportMap.get(s.getOriginCode());
-            Airport dest   = airportMap.get(s.getDestCode());
+            Airport origin  = airportMap.get(s.getOriginCode());
+            Airport dest    = airportMap.get(s.getDestCode());
             int deadlineMin = (origin != null && dest != null)
                     ? Shipment.getDeadlineMinutes(origin.getContinent(), dest.getContinent())
                     : 1440;
@@ -193,18 +175,25 @@ public class RouteReportGenerator {
                     pw.println("  Estado      : *** A TIEMPO ***");
                     onTime++;
                     onTimeSuitcases += s.getSuitcaseCount();
+
+                    int spareTime = (s.getRequestMinute() + deadlineMin) - s.getEstimatedArrival();
+                    if (spareTime > 0) {
+                        totalSpareTimeMin += spareTime;
+                    }
                 } else {
                     pw.printf("  Estado      : !!! RETRASADO !!! (+%d minutos sobre el plazo)%n",
                             s.getDelayMinutes());
                     late++;
-                    lateSuitcases += s.getSuitcaseCount();
-                    totalDelayMin += s.getDelayMinutes();
+                    lateSuitcases    += s.getSuitcaseCount();
+                    totalDelayMin    += s.getDelayMinutes();
                 }
 
                 pw.printf("  Maletas: %d%n", s.getSuitcaseCount());
                 List<Flight> routeFlights = assignedRoute.getFlights();
                 for (int fi = 0; fi < routeFlights.size(); fi++) {
                     Flight f = routeFlights.get(fi);
+                    usedFlights.putIfAbsent(f.getFlightId(), f);
+                    suitcasesByFlightDay.merge(f.getDayOffset(), s.getSuitcaseCount(), Integer::sum);
                     pw.printf("    Vuelo %d: %s → %s | Dia %d | Salida: %s (min abs %d) | Llegada: %s (min abs %d) | Capacidad usada: %d/%d%n",
                             fi + 1,
                             f.getOriginCode(), f.getDestCode(),
@@ -238,23 +227,35 @@ public class RouteReportGenerator {
         pw.printf("  Sin ruta posible          : %d (%.1f%%)%n",
                 noRoute, pct(noRoute, shipments.size()));
         pw.printf("  Maletas sin ruta          : %d%n", noRouteSuitcases);
+        pw.printf("  Espacio promedio sobrante vuelos usados: %.1f maletas%n",
+                averageRemainingFlightSpace(usedFlights));
+        pw.printf("  Vuelos usados sobrecargados: %d | Exceso total: %d maletas%n",
+                overloadedFlightCount(usedFlights), totalFlightOverload(usedFlights));
+        printBusiestFlightDay(pw, suitcasesByFlightDay, simulationStartDate);
         if (late > 0) {
             pw.printf("  Retraso total acumulado   : %d minutos (%.1f horas promedio/retrasado)%n",
-                    totalDelayMin, (double)totalDelayMin / late / 60.0);
+                    totalDelayMin, (double) totalDelayMin / late / 60.0);
         }
+        pw.println();
+        pw.println("  ── Métricas de eficiencia temporal ──");
+        pw.printf("  Tiempo de sobra total acumulado: %d minutos (%.1f horas)%n",
+                totalSpareTimeMin, totalSpareTimeMin / 60.0);
+        pw.printf("  Promedio de sobra (primer día) : %.1f minutos (%.2f horas)%n",
+                averageSpareTime(shipments, 0),
+                averageSpareTime(shipments, 0) / 60.0);
+        pw.printf("  Promedio de sobra (total días) : %.1f minutos (%.2f horas)%n",
+                averageSpareTime(shipments, -1),
+                averageSpareTime(shipments, -1) / 60.0);
         pw.println(SEPARATOR);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES — FORMATO
     // ════════════════════════════════════════════════════════════════════════
 
     /**
      * Obtiene la etiqueta legible de un aeropuerto: "Ciudad, País".
      * Si el aeropuerto no está en el mapa, devuelve "Desconocido".
-     *
-     * @param code Código ICAO
-     * @return Etiqueta legible
      */
     private String getAirportLabel(String code) {
         Airport a = airportMap.get(code);
@@ -263,9 +264,6 @@ public class RouteReportGenerator {
 
     /**
      * Formatea una fecha en formato aaaammdd a dd/mm/aaaa para mayor legibilidad.
-     *
-     * @param rawDate Fecha en formato aaaammdd
-     * @return Fecha en formato dd/mm/aaaa
      */
     private String formatDate(String rawDate) {
         if (rawDate == null || rawDate.length() != 8) return rawDate;
@@ -274,12 +272,119 @@ public class RouteReportGenerator {
 
     /**
      * Calcula el porcentaje de 'part' sobre 'total' de forma segura (evita división por 0).
-     *
-     * @param part  Numerador
-     * @param total Denominador
-     * @return Porcentaje (0.0 si total == 0)
      */
     private double pct(int part, int total) {
         return total == 0 ? 0.0 : (100.0 * part / total);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MÉTODOS AUXILIARES — MÉTRICAS DE VUELOS
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Calcula el espacio promedio sobrante en los vuelos utilizados.
+     */
+    private double averageRemainingFlightSpace(Map<String, Flight> flights) {
+        if (flights.isEmpty()) return 0.0;
+        int totalRemaining = 0;
+        for (Flight f : flights.values()) {
+            totalRemaining += f.getMaxCapacity() - f.getAssignedLoad();
+        }
+        return (double) totalRemaining / flights.size();
+    }
+
+    /**
+     * Cuenta cuántos vuelos usados tienen carga asignada mayor a su capacidad máxima.
+     */
+    private int overloadedFlightCount(Map<String, Flight> flights) {
+        int count = 0;
+        for (Flight f : flights.values()) {
+            if (f.getAssignedLoad() > f.getMaxCapacity()) count++;
+        }
+        return count;
+    }
+
+    /**
+     * Suma el exceso total de maletas en vuelos sobrecargados.
+     */
+    private int totalFlightOverload(Map<String, Flight> flights) {
+        int total = 0;
+        for (Flight f : flights.values()) {
+            total += Math.max(0, f.getAssignedLoad() - f.getMaxCapacity());
+        }
+        return total;
+    }
+
+    /**
+     * Imprime el día con más maletas enviadas (por día de vuelo).
+     */
+    private void printBusiestFlightDay(PrintWriter pw, Map<Integer, Integer> suitcasesByFlightDay,
+                                       String simulationStartDate) {
+        if (suitcasesByFlightDay.isEmpty()) {
+            pw.println("  Dia con mas maletas enviadas: N/A (0 maletas)");
+            return;
+        }
+        int busiestDay   = -1;
+        int maxSuitcases = 0;
+        for (Map.Entry<Integer, Integer> entry : suitcasesByFlightDay.entrySet()) {
+            int day      = entry.getKey();
+            int suitcases = entry.getValue();
+            if (suitcases > maxSuitcases || (suitcases == maxSuitcases && day < busiestDay)) {
+                busiestDay   = day;
+                maxSuitcases = suitcases;
+            }
+        }
+        pw.printf("  Dia con mas maletas enviadas: Dia %d (%s) | %d maletas%n",
+                busiestDay, formatSimulationDay(simulationStartDate, busiestDay), maxSuitcases);
+    }
+
+    /**
+     * Convierte un offset de día de simulación a fecha legible (dd/MM/yyyy).
+     */
+    private String formatSimulationDay(String simulationStartDate, int dayOffset) {
+        try {
+            LocalDate startDate = LocalDate.parse(
+                    simulationStartDate, DateTimeFormatter.ofPattern("yyyyMMdd"));
+            return startDate.plusDays(dayOffset).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception e) {
+            return "fecha no disponible";
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MÉTODOS AUXILIARES — MÉTRICAS TEMPORALES
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Calcula el tiempo promedio de sobra (minutos antes del deadline) para
+     * envíos a tiempo.
+     *
+     * @param shipments Lista de envíos planificados
+     * @param dayFilter Día a filtrar: -1 = todos los días, 0 = primer día, etc.
+     * @return Promedio de minutos de sobra (0.0 si no hay envíos elegibles)
+     */
+    private double averageSpareTime(List<Shipment> shipments, int dayFilter) {
+        int totalSpareTime = 0;
+        int eligibleCount  = 0;
+
+        for (Shipment s : shipments) {
+            int requestDay = s.getRequestMinute() / 1440;
+            if (dayFilter >= 0 && requestDay != dayFilter) continue;
+            if (!s.isPlanned() || s.getAssignedRoute() == null || !s.isOnTime()) continue;
+
+            Airport origin = airportMap.get(s.getOriginCode());
+            Airport dest   = airportMap.get(s.getDestCode());
+            int deadlineMinutes = (origin != null && dest != null)
+                    ? Shipment.getDeadlineMinutes(origin.getContinent(), dest.getContinent())
+                    : 1440;
+
+            int spareTime = (s.getRequestMinute() + deadlineMinutes) - s.getEstimatedArrival();
+            if (spareTime > 0) {
+                totalSpareTime += spareTime;
+                eligibleCount++;
+            }
+        }
+
+        return eligibleCount > 0 ? (double) totalSpareTime / eligibleCount : 0.0;
     }
 }
