@@ -140,6 +140,9 @@ public class RouteReportGenerator {
         int lateSuitcases = 0;
         int noRouteSuitcases = 0;
         long totalDelayMin = 0;
+        int totalSpareTimeMin = 0;  // Tiempo de sobra total acumulado
+        int spareTimeDay0 = 0;      // Acumulador solo para día 0
+        int spareTimeDay0Count = 0;
         Map<String, Flight> usedFlights = new HashMap<>();
         Map<Integer, Integer> suitcasesByFlightDay = new HashMap<>();
 
@@ -204,6 +207,18 @@ public class RouteReportGenerator {
                     pw.println("  Estado      : *** A TIEMPO ***");
                     onTime++;
                     onTimeSuitcases += s.getSuitcaseCount();
+
+                    int deadline = s.getRequestMinute() + deadlineMin;
+                    int spareTime = deadline - s.getEstimatedArrival();
+                    if (spareTime > 0) {
+                        totalSpareTimeMin += spareTime;
+
+                        // Acumular para día 0 si aplica
+                        if (s.getRequestMinute() / 1440 == 0) {
+                            spareTimeDay0 += spareTime;
+                            spareTimeDay0Count++;
+                        }
+                    }
                 } else {
                     pw.printf("  Estado      : !!! RETRASADO !!! (+%d minutos sobre el plazo)%n",
                             s.getDelayMinutes());
@@ -260,6 +275,16 @@ public class RouteReportGenerator {
             pw.printf("  Retraso total acumulado   : %d minutos (%.1f horas promedio/retrasado)%n",
                     totalDelayMin, (double)totalDelayMin / late / 60.0);
         }
+        pw.println();
+        pw.println("  ── Métricas de eficiencia temporal ──");
+        pw.printf("  Tiempo de sobra total acumulado: %d minutos (%.1f horas)%n",
+                totalSpareTimeMin, totalSpareTimeMin / 60.0);
+        pw.printf("  Promedio de sobra (primer día) : %.1f minutos (%.2f horas)%n",
+                averageSpareTime(shipments, airportMap, 0),
+                averageSpareTime(shipments, airportMap, 0) / 60.0);
+        pw.printf("  Promedio de sobra (total días) : %.1f minutos (%.2f horas)%n",
+                averageSpareTime(shipments, airportMap, -1),
+                averageSpareTime(shipments, airportMap, -1) / 60.0);
         pw.println(SEPARATOR);
     }
 
@@ -362,5 +387,49 @@ public class RouteReportGenerator {
         } catch (Exception e) {
             return "fecha no disponible";
         }
+    }
+
+    /**
+     * Calcula el tiempo promedio de sobra para envíos a tiempo.
+     * @param shipments Lista de envíos planificados
+     * @param airportMap Mapa de aeropuertos para determinar continentes
+     * @param dayFilter Día a filtrar: -1 = todos, 0 = primer día, 1 = segundo día, etc.
+     * @return Promedio de minutos de sobra (0.0 si no hay envíos elegibles)
+     */
+    private double averageSpareTime(List<Shipment> shipments,
+                                    Map<String, Airport> airportMap,
+                                    int dayFilter) {
+        int totalSpareTime = 0;
+        int eligibleCount = 0;
+
+        for (Shipment s : shipments) {
+            // Filtrar por día de solicitud (0 = primer día de simulación)
+            int requestDay = s.getRequestMinute() / 1440;
+            if (dayFilter >= 0 && requestDay != dayFilter) {
+                continue;
+            }
+
+            // Solo envíos planificados, con ruta y a tiempo
+            if (!s.isPlanned() || s.getAssignedRoute() == null || !s.isOnTime()) {
+                continue;
+            }
+
+            // Calcular deadline según continentes
+            Airport origin = airportMap.get(s.getOriginCode());
+            Airport dest = airportMap.get(s.getDestCode());
+            int deadlineMinutes = (origin != null && dest != null)
+                    ? Shipment.getDeadlineMinutes(origin.getContinent(), dest.getContinent())
+                    : 1440;
+
+            int deadline = s.getRequestMinute() + deadlineMinutes;
+            int spareTime = deadline - s.getEstimatedArrival(); // Positivo = llegó antes
+
+            if (spareTime > 0) {
+                totalSpareTime += spareTime;
+                eligibleCount++;
+            }
+        }
+
+        return eligibleCount > 0 ? (double) totalSpareTime / eligibleCount : 0.0;
     }
 }
