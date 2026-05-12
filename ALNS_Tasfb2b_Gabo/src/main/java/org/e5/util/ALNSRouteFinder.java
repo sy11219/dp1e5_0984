@@ -16,6 +16,7 @@ public class ALNSRouteFinder {
 
     private final Map<String, Airport> airportMap;
     private final int maxEscalas;
+    private final Map<List<Flight>, Map<String, List<Flight>>> flightIndexCache = new IdentityHashMap<>();
 
     public ALNSRouteFinder(Map<String, Airport> airportMap) {
         this(airportMap, 4);
@@ -39,6 +40,7 @@ public class ALNSRouteFinder {
      * @return mejor Route encontrada, o null si no hay ruta válida en plazo
      */
     public Route findBestRoute(Shipment shipment, List<Flight> flights) {
+        Map<String, List<Flight>> flightsByOrigin = indexFlightsByOrigin(flights);
         int deadlineMin = getDeadlineMinutes(shipment);
         int maxLlegada  = shipment.getRequestMinute() + deadlineMin;
 
@@ -74,8 +76,7 @@ public class ALNSRouteFinder {
                     && mejorCosto.get(claveNodo) <= actual.costoMinutos) continue;
             mejorCosto.put(claveNodo, actual.costoMinutos);
 
-            for (Flight f : flights) {
-                if (!f.getOriginCode().equals(actual.aeropuerto)) continue;
+            for (Flight f : flightsByOrigin.getOrDefault(actual.aeropuerto, Collections.emptyList())) {
                 if (!f.hasSpaceFor(shipment.getSuitcaseCount())) continue;
 
                 int salidaAbs  = f.absoluteDepartureMinute();
@@ -127,6 +128,7 @@ public class ALNSRouteFinder {
     public List<Route> findCandidateRoutes(Shipment shipment,
                                             List<Flight> flights,
                                             int maxCandidatas) {
+        Map<String, List<Flight>> flightsByOrigin = indexFlightsByOrigin(flights);
         int deadlineMin = getDeadlineMinutes(shipment);
         int maxLlegada  = shipment.getRequestMinute() + deadlineMin;
 
@@ -165,9 +167,7 @@ public class ALNSRouteFinder {
             if (veces >= 3) continue;
             visitas.put(claveNodo, veces + 1);
 
-            for (Flight f : flights) {
-                if (!f.getOriginCode().equals(actual.aeropuerto)) continue;
-
+            for (Flight f : flightsByOrigin.getOrDefault(actual.aeropuerto, Collections.emptyList())) {
                 int salidaAbs  = f.absoluteDepartureMinute();
                 int llegadaAbs = f.absoluteArrivalMinute();
 
@@ -241,6 +241,19 @@ public class ALNSRouteFinder {
         String contOrig = orig != null ? orig.getContinent() : "";
         String contDest = dest != null ? dest.getContinent() : "";
         return Shipment.getDeadlineMinutes(contOrig, contDest);
+    }
+
+    private Map<String, List<Flight>> indexFlightsByOrigin(List<Flight> flights) {
+        return flightIndexCache.computeIfAbsent(flights, key -> {
+            Map<String, List<Flight>> index = new HashMap<>();
+            for (Flight flight : key) {
+                index.computeIfAbsent(flight.getOriginCode(), ignored -> new ArrayList<>()).add(flight);
+            }
+            for (List<Flight> originFlights : index.values()) {
+                originFlights.sort(Comparator.comparingInt(Flight::absoluteDepartureMinute));
+            }
+            return index;
+        });
     }
 
     // ════════════════════════════════════════════════════════════════════════

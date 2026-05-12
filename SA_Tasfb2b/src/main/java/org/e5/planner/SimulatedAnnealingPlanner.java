@@ -52,8 +52,8 @@ public class SimulatedAnnealingPlanner {
     // ── Parámetros del SA ────────────────────────────────────────────────────
     private static final double INITIAL_TEMPERATURE   = 500.0;    // Se recalibra dinamicamente antes de correr SA
     private static final double COOLING_RATE          = 0.950;    // Enfriamiento moderado para no vagar demasiado
-    private static final double MIN_TEMPERATURE       = 1.0;
-    private static final int    ITERATIONS_PER_TEMP   = 60;
+    private static final double MIN_TEMPERATURE       = 0.000001;
+    private static final int    ITERATIONS_PER_TEMP   = 50;
     private static final int    NUM_RESTART_ATTEMPTS  = 4;
     private static final int    TEMPERATURE_SAMPLES   = 60;
     private static final double TARGET_INITIAL_ACCEPTANCE = 0.80;
