@@ -11,13 +11,14 @@ import org.e5.parser.ShipmentParser;
 import org.e5.report.RouteReportGenerator;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Punto de entrada principal del sistema de planificación TASF.B2B.
  *
  * Soporta 3 escenarios según el enunciado:
  *   1. SIMULACION  — período fijo (3, 5 o 7 días). Debe ejecutarse en 30–90 min.
- *   2. TIEMPO_REAL — operaciones día a día (simula 1 día con parámetros ligeros).
+ *   2. TIEMPO_REAL — ejecución continua tick a tick con replanificación ante cancelaciones.
  *   3. COLAPSO     — incrementa demanda hasta que el sistema falle.
  */
 public class Main {
@@ -115,26 +116,22 @@ public class Main {
     /**
      * Escenario estándar: planifica todos los envíos del período.
      * Parámetros ALNS ajustados para ejecutarse entre 30 y 90 minutos.
-     * Modifica los parámetros maxIteraciones según el tamaño del problema.
      */
     private static void ejecutarSimulacion(List<Shipment> shipments,
                                             List<Flight> flights,
                                             List<Airport> airports,
                                             Map<String, Airport> airportMap) {
-        // Ajustar iteraciones según tamaño: más envíos → más iteraciones
-        int iteraciones = Math.min(1000, Math.max(300, shipments.size() * 2));
-
         ALNS alns = new ALNS(
-                iteraciones,  // maxIteraciones
-                30,           // segmento
-                -1,           // nDestruir: 20% automático
-                500.0,        // temperaturaInicial
-                0.997,        // alpha (enfriamiento)
-                4,            // maxEscalas
-                9.0,          // rewardMejora
-                3.0,          // rewardAcepta
-                0.0,          // rewardNoAcepta
-                0.8           // decayPesos
+                500,   // maxIteraciones
+                25,    // segmento
+                250,    // nDestruir
+                250.0, // temperaturaInicial
+                0.995,  // alpha (enfriamiento)
+                2,     // maxEscalas
+                9.0,   // rewardMejora
+                3.0,   // rewardAcepta
+                0.0,   // rewardNoAcepta
+                0.8    // decayPesos
         );
 
         Map<String, Route> resultado = alns.ejecutar(shipments, flights, airportMap);
@@ -142,30 +139,221 @@ public class Main {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  ESCENARIO 2: TIEMPO REAL (1 día, respuesta rápida)
+    //  ESCENARIO 2: TIEMPO REAL — ejecución continua con cancelaciones
     // ════════════════════════════════════════════════════════════════════════
 
     /**
-     * Escenario tiempo real: parámetros ligeros para respuesta inmediata.
-     * Simula operaciones del día a día donde el planificador debe responder rápido.
-     */
-    private static void ejecutarTiempoReal(List<Shipment> shipments,
-                                            List<Flight> flights,
-                                            List<Airport> airports,
-                                            Map<String, Airport> airportMap) {
-        ALNS alns = new ALNS(
-                50,   // pocas iteraciones para respuesta rápida 
-                5,    // segmento pequeño: Cada 5 iteraciones se ajustan pesos
-                -1, //No hay número fijo de destrucciones. Se calcula en ALNS
-                100.0, // temperatura inicial más baja para converger rápido
-                0.99, // Más cerca a 1, enfriamiento más lento para explorar más
-                3,     // menos escalas para rutas más directas
-                9.0, 3.0, 0.0, 0.8
-        );
+ * Escenario tiempo real: avanza tick a tick procesando envíos a medida que
+ * llegan y replanificando inmediatamente ante cancelaciones de vuelos.
+ *
+ * El ALNS se construye en cada planificación con parámetros dinámicos
+ * ajustados al tamaño del lote actual:
+ *   - Lotes pequeños (< 10 envíos)  → pocas iteraciones, converge rápido
+ *   - Lotes medianos (10–20 envíos) → iteraciones moderadas
+ *   - Lotes grandes  (> 20 envíos)  → más iteraciones, mejor exploración
+ *
+ * Controles en consola (hilo paralelo):
+ *   - Escribir un flightId → cancela ese vuelo y replanifica afectados
+ *   - Escribir "stop"      → detiene la ejecución limpiamente
+ *
+ * Parámetros clave del loop:
+ *   intervaloTick    — granularidad del avance de tiempo (minutos)
+ *   intervaloReplan  — cada cuántos minutos de simulación se llama al ALNS
+ *   umbralColaReplan — tamaño de cola que dispara planificación anticipada
+ */
+private static void ejecutarTiempoReal(List<Shipment> shipments,
+                                        List<Flight> flights,
+                                        List<Airport> airports,
+                                        Map<String, Airport> airportMap) {
 
-        Map<String, Route> resultado = alns.ejecutar(shipments, flights, airportMap);
-        System.out.printf("  [TIEMPO REAL] Rutas encontradas: %d / %d%n",
-                resultado.size(), shipments.size());
+    // ── Parámetros del loop ───────────────────────────────────────────────
+    final int intervaloTick    = 1;   // minutos por tick
+    final int intervaloReplan  = 10;  // planificar cola cada N minutos de simulación
+    final int umbralColaReplan = 20;  // o si la cola supera este tamaño
+
+    // ── Cola thread-safe para cancelaciones ───────────────────────────────
+    final ConcurrentLinkedQueue<String> cancelaciones = new ConcurrentLinkedQueue<>();
+    final boolean[] corriendo = {true};
+
+    // Hilo listener: recibe IDs de vuelos a cancelar o "stop" desde consola.
+    // Para integración con frontend/API: reemplazar este hilo por el listener
+    // de tu endpoint y hacer cancelaciones.add(flightId) desde ahí.
+    Thread cancelListener = new Thread(() -> {
+        Scanner sc = new Scanner(System.in);
+        System.out.println("  [TIEMPO REAL] Ingrese ID de vuelo a cancelar, o 'stop' para detener:");
+        while (corriendo[0]) {
+            try {
+                if (sc.hasNextLine()) {
+                    String input = sc.nextLine().trim();
+                    if (input.equalsIgnoreCase("stop")) {
+                        corriendo[0] = false;
+                        System.out.println("  [TIEMPO REAL] Señal de parada recibida.");
+                    } else if (!input.isEmpty()) {
+                        cancelaciones.add(input);
+                        System.out.printf("  [Cancelación registrada] Vuelo: %s%n", input);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+    });
+    cancelListener.setDaemon(true);
+    cancelListener.start();
+
+    // ── Indexar envíos por minuto de solicitud para acceso O(1) ──────────
+    Map<Integer, List<Shipment>> enviosPorMinuto = new HashMap<>();
+    for (Shipment s : shipments) {
+        enviosPorMinuto
+            .computeIfAbsent(s.getRequestMinute(), k -> new ArrayList<>())
+            .add(s);
+    }
+
+    int tickMaximo = flights.stream()
+            .mapToInt(Flight::absoluteArrivalMinute)
+            .max().orElse(1440);
+
+    int tickActual = 0;
+    List<Shipment> colaActual        = new ArrayList<>();
+    List<Shipment> todosPlanificados = new ArrayList<>();
+
+    System.out.println("  [TIEMPO REAL] Iniciando ejecución continua...");
+    System.out.printf("  [TIEMPO REAL] Tick máximo: %d minutos (%d días)%n%n",
+            tickMaximo, tickMaximo / 1440);
+
+    // ════════════════════════════════════════════════════════════════════
+    //  LOOP PRINCIPAL
+    // ════════════════════════════════════════════════════════════════════
+    while (corriendo[0] && tickActual <= tickMaximo) {
+
+        // ── 0. Procesar cancelaciones pendientes ──────────────────────────
+        while (!cancelaciones.isEmpty()) {
+            String flightIdCancelado = cancelaciones.poll();
+
+            Flight vueloCancelado = null;
+            for (Flight f : flights) {
+                if (f.getFlightId().equals(flightIdCancelado)) {
+                    vueloCancelado = f;
+                    break;
+                }
+            }
+
+            if (vueloCancelado == null) {
+                System.out.printf("  [Cancelación] Vuelo '%s' no encontrado — ignorado.%n",
+                        flightIdCancelado);
+                continue;
+            }
+
+            // Identificar envíos cuya ruta usa ese vuelo
+            List<Shipment> afectados = new ArrayList<>();
+            for (Shipment s : todosPlanificados) {
+                Route ruta = s.getAssignedRoute();
+                if (ruta == null) continue;
+                for (Flight f : ruta.getFlights()) {
+                    if (f.getFlightId().equals(flightIdCancelado)) {
+                        afectados.add(s);
+                        s.resetPlanningState();
+                        break;
+                    }
+                }
+            }
+
+            System.out.printf("  [Tick %d] Cancelación vuelo %s | %d envíos afectados%n",
+                    tickActual, flightIdCancelado, afectados.size());
+
+            if (!afectados.isEmpty()) {
+                // ALNS dinámico para replanificación: ajustado al número de afectados
+                int itersReplan   = Math.max(20, Math.min(80, afectados.size() * 3));
+                int segReplan     = Math.max(5, itersReplan / 5);
+                ALNS alnsReplan   = new ALNS(
+                        itersReplan, segReplan, afectados.size(),
+                        80.0, 0.96, 2,
+                        9.0, 3.0, 0.0, 0.8);
+
+                Map<String, Route> replan = alnsReplan.replanificar(
+                        afectados, flightIdCancelado, flights, airportMap);
+                System.out.printf("  [Tick %d] Replanificados: %d / %d%n",
+                        tickActual, replan.size(), afectados.size());
+            }
+        }
+
+        // ── 1. Recoger envíos que llegan en este tick ─────────────────────
+        List<Shipment> nuevos = enviosPorMinuto.getOrDefault(
+                tickActual, Collections.emptyList());
+        if (!nuevos.isEmpty()) {
+            colaActual.addAll(nuevos);
+            System.out.printf("  [Tick %d] +%d envíos nuevos (cola: %d pendientes)%n",
+                    tickActual, nuevos.size(), colaActual.size());
+        }
+
+        // ── 2. Actualizar aeropuertos: vuelos que aterrizan en este tick ──
+        for (Flight f : flights) {
+            if (f.absoluteArrivalMinute() == tickActual && f.getAssignedLoad() > 0) {
+                Airport dest = airportMap.get(f.getDestCode());
+                if (dest != null) dest.addLoad(f.getAssignedLoad());
+            }
+        }
+
+        // ── 3. Planificar la cola si toca ─────────────────────────────────
+        if (!colaActual.isEmpty()
+                && (tickActual % intervaloReplan == 0
+                    || colaActual.size() >= umbralColaReplan)) {
+
+            // ALNS dinámico: parámetros ajustados al tamaño del lote actual
+            int iters   = Math.max(20, Math.min(80, colaActual.size() * 3));
+            int segmento = Math.max(5, iters / 5);
+            ALNS alns   = new ALNS(
+                    iters,    // maxIteraciones: entre 20 y 80 según lote
+                    segmento, // ~5 actualizaciones de pesos adaptativos
+                    -1,       // nDestruir automático (20% del lote)
+                    80.0,     // temperaturaInicial baja para converger rápido
+                    0.96,     // alpha agresivo: T final ≈ 80 × 0.96^iters
+                    2,        // maxEscalas reducido: espacio más pequeño
+                    9.0, 3.0, 0.0, 0.8);
+
+            List<Flight> vuelosDisponibles = filtrarVuelosDisponibles(flights, tickActual);
+            Map<String, Route> resultado   = alns.ejecutar(
+                    colaActual, vuelosDisponibles, airportMap);
+
+            System.out.printf("  [Tick %d] Planificados: %d / %d | iters ALNS: %d%n",
+                    tickActual, resultado.size(), colaActual.size(), iters);
+
+            todosPlanificados.addAll(colaActual);
+            colaActual.clear();
+        }
+
+        tickActual += intervaloTick;
+    }
+
+    // ── Planificar lo que quedó en cola al terminar el loop ───────────────
+    if (!colaActual.isEmpty()) {
+        System.out.printf("  [TIEMPO REAL] Planificando %d envíos restantes en cola...%n",
+                colaActual.size());
+        int iters    = Math.max(20, Math.min(80, colaActual.size() * 3));
+        int segmento = Math.max(5, iters / 5);
+        ALNS alns    = new ALNS(iters, segmento, -1, 80.0, 0.96, 2, 9.0, 3.0, 0.0, 0.8);
+        List<Flight> vuelosDisponibles = filtrarVuelosDisponibles(flights, tickActual);
+        alns.ejecutar(colaActual, vuelosDisponibles, airportMap);
+        todosPlanificados.addAll(colaActual);
+        colaActual.clear();
+    }
+
+    // Propagar a la lista original para que el reporte los incluya
+    for (Shipment s : todosPlanificados) {
+        if (!shipments.contains(s)) shipments.add(s);
+    }
+
+    System.out.printf("%n  [TIEMPO REAL] Fin. Total envíos procesados: %d%n",
+            todosPlanificados.size());
+}
+
+    /**
+     * Filtra vuelos que aún no han despegado en el tick actual.
+     * Solo estos son candidatos válidos para nuevas asignaciones.
+     */
+    private static List<Flight> filtrarVuelosDisponibles(List<Flight> flights, int tickActual) {
+        List<Flight> disponibles = new ArrayList<>();
+        for (Flight f : flights)
+            if (f.absoluteDepartureMinute() >= tickActual) disponibles.add(f);
+        return disponibles;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -195,19 +383,14 @@ public class Main {
                     multiplicador, demandaActual.size());
 
             // Resetear cargas de vuelos y aeropuertos para cada intento
-            for (Flight f : flights) f.resetLoad();
+            for (Flight f : flights)   f.resetLoad();
             for (Airport a : airports) a.resetLoad();
-            // Resetear estado de planificación de envíos
-            for (Shipment s : demandaActual) {
-                // Los Shipment son inmutables en su estado original,
-                // pero podemos crear nuevas instancias o reusar.
-                // Si Shipment tiene reset, usarlo aquí.
-            }
+            for (Shipment s : demandaActual) s.resetPlanningState();
 
             ALNS alns = new ALNS(200, 20, -1, 400.0, 0.997, 4, 9.0, 3.0, 0.0, 0.8);
             Map<String, Route> resultado = alns.ejecutar(demandaActual, flights, airportMap);
 
-            // Contar envíos a tiempo
+            // Contar envíos con ruta válida
             long aTime = resultado.values().stream()
                     .filter(r -> r != null && r.isValid())
                     .count();
@@ -223,7 +406,6 @@ public class Main {
                         pctExito);
                 colapso = true;
             } else {
-                // Incrementar demanda: duplicar envíos con IDs modificados
                 multiplicador++;
                 List<Shipment> extras = new ArrayList<>();
                 for (Shipment s : shipments) {
@@ -252,7 +434,7 @@ public class Main {
         while (true) {
             System.out.println("Seleccione el escenario:");
             System.out.println("  1. SIMULACION  — período fijo (3, 5 o 7 días)");
-            System.out.println("  2. TIEMPO_REAL — operaciones del día a día (1 día)");
+            System.out.println("  2. TIEMPO_REAL — ejecución continua con cancelaciones");
             System.out.println("  3. COLAPSO     — incrementa demanda hasta fallo");
             System.out.print("Opción (1/2/3): ");
             String input = scanner.nextLine().trim();
@@ -279,7 +461,14 @@ public class Main {
     }
 
     private static int leerDias(Scanner scanner, Escenario escenario) {
-        if (escenario == Escenario.TIEMPO_REAL) return 1; // siempre 1 día
+        if (escenario == Escenario.TIEMPO_REAL) {
+            System.out.print("Ingrese días de datos a cargar para tiempo real (1–7): ");
+            try {
+                int d = Integer.parseInt(scanner.nextLine().trim());
+                if (d >= 1 && d <= 7) return d;
+            } catch (NumberFormatException ignored) {}
+            return 3; // default
+        }
         if (escenario == Escenario.COLAPSO) {
             System.out.print("Ingrese días base para colapso (1–7): ");
             try {

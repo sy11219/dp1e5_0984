@@ -9,8 +9,13 @@ import java.util.*;
 
 /**
  * Buscador de rutas para el planificador ALNS de TASF.B2B.
- * Encapsula el Dijkstra modificado, verificación de factibilidad
- * y cálculo de plazos. Reutilizable por cualquier algoritmo del sistema.
+ *
+ * Responsabilidades:
+ *   - findBestRoute()           → mejor ruta completa (todas las maletas juntas)
+ *   - findCandidateRoutes()     → múltiples candidatas pre-calculadas
+ *   - findFractionalRoutes()    → fraccionamiento dinámico cuando no caben juntas
+ *   - esFeasible()              → verifica factibilidad en el estado actual
+ *   - getDeadlineMinutes()      → plazo máximo según continentes
  */
 public class ALNSRouteFinder {
 
@@ -33,11 +38,11 @@ public class ALNSRouteFinder {
 
     /**
      * Encuentra la ruta de menor tiempo de tránsito para un envío.
-     * Extraído directamente de ALNS.encontrarMejorRuta().
+     * Verifica capacidad actual de vuelos y aeropuertos intermedios.
      *
      * @param shipment envío a rutar
      * @param flights  vuelos disponibles con estado de carga actual
-     * @return mejor Route encontrada, o null si no hay ruta válida en plazo
+     * @return mejor Route, o null si no hay ruta válida en plazo
      */
     public Route findBestRoute(Shipment shipment, List<Flight> flights) {
         Map<String, List<Flight>> flightsByOrigin = indexFlightsByOrigin(flights);
@@ -88,7 +93,6 @@ public class ALNSRouteFinder {
                 if (salidaAbs < minimoSalida) continue;
                 if (llegadaAbs > maxLlegada) continue;
 
-                // Capacidad del aeropuerto intermedio (nunca del destino final)
                 if (!f.getDestCode().equals(shipment.getDestCode())) {
                     Airport apt = airportMap.get(f.getDestCode());
                     if (apt != null && !apt.hasCapacityFor(shipment.getSuitcaseCount())) continue;
@@ -109,21 +113,114 @@ public class ALNSRouteFinder {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  FRACCIONAMIENTO DINÁMICO
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Fracciona dinámicamente las maletas de un envío entre los vuelos
+     * disponibles cuando no caben todas juntas en ninguna ruta.
+     *
+     * Estrategia:
+     *   1. Ordena los vuelos desde el origen por salida más temprana.
+     *   2. Para cada vuelo con espacio disponible, asigna un lote del
+     *      tamaño min(maletasPendientes, espacioDisponible).
+     *   3. Si el vuelo es directo al destino → ruta de un solo vuelo.
+     *   4. Si no es directo → ejecuta Dijkstra para ese lote desde ese vuelo.
+     *   5. Repite hasta asignar todas las maletas o agotar vuelos.
+     *
+     * @param shipment  envío original con todas sus maletas
+     * @param flights   vuelos disponibles con estado de carga actual
+     * @return lista de PartialRoute, cada una con su lote de maletas asignado
+     */
+    public List<PartialRoute> findFractionalRoutes(Shipment shipment,
+                                                    List<Flight> flights) {
+        List<PartialRoute> resultado = new ArrayList<>();
+        int pendientes = shipment.getSuitcaseCount();
+        if (pendientes <= 0) return resultado;
+
+        int deadlineMin = getDeadlineMinutes(shipment);
+        int maxLlegada  = shipment.getRequestMinute() + deadlineMin;
+
+        // Candidatos: vuelos desde el origen dentro del plazo, con espacio
+        List<Flight> candidatos = new ArrayList<>();
+        for (Flight f : flights) {
+            if (!f.getOriginCode().equals(shipment.getOriginCode())) continue;
+            if (f.absoluteDepartureMinute() < shipment.getRequestMinute()) continue;
+            if (f.absoluteArrivalMinute() > maxLlegada) continue;
+            if (f.availableSpace() <= 0) continue;
+            candidatos.add(f);
+        }
+        // Ordenar por salida más temprana para respetar urgencia de plazo
+        candidatos.sort(Comparator.comparingInt(Flight::absoluteDepartureMinute));
+
+        int partIndex = 1;
+        for (Flight f : candidatos) {
+            if (pendientes <= 0) break;
+
+            int lote = Math.min(pendientes, f.availableSpace());
+            if (lote <= 0) continue;
+
+            String partId = shipment.getShipmentId() + "_p" + partIndex;
+
+            Route ruta;
+            if (f.getDestCode().equals(shipment.getDestCode())) {
+                // Vuelo directo — construir ruta de un solo vuelo
+                List<Flight> vuelos = new ArrayList<>();
+                vuelos.add(f);
+                ruta = new Route(
+                        partId,
+                        shipment.getOriginCode(),
+                        shipment.getDestCode(),
+                        vuelos,
+                        lote,
+                        shipment.getRequestMinute());
+            } else {
+                // Vuelo con escala — Dijkstra para el lote desde este vuelo
+                // Creamos un Shipment temporal con el tamaño del lote
+                Shipment loteShipment = new Shipment(
+                        partId,
+                        shipment.getOriginCode(),
+                        shipment.getDestCode(),
+                        shipment.getRequestMinute(),
+                        lote,
+                        shipment.getClientId(),
+                        shipment.getRawDate(),
+                        shipment.getRawHour(),
+                        shipment.getRawMinuteStr(),
+                        shipment.getShipmentId(),
+                        partIndex,
+                        0, // totalParts desconocido aún
+                        shipment.getSuitcaseCount()
+                );
+                ruta = findBestRoute(loteShipment, flights);
+            }
+
+            if (ruta != null && ruta.isValid()) {
+                // Reservar en vuelos
+                for (Flight vf : ruta.getFlights()) vf.assignLoad(lote);
+                // Reservar en aeropuertos intermedios
+                List<Flight> rutaVuelos = ruta.getFlights();
+                for (int i = 0; i < rutaVuelos.size() - 1; i++) {
+                    Airport apt = airportMap.get(rutaVuelos.get(i).getDestCode());
+                    if (apt != null) apt.addLoad(lote);
+                }
+
+                resultado.add(new PartialRoute(ruta, lote));
+                pendientes -= lote;
+                partIndex++;
+            }
+        }
+
+        return resultado;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  PRE-CÁLCULO DE RUTAS CANDIDATAS
     // ════════════════════════════════════════════════════════════════════════
 
     /**
      * Pre-calcula hasta maxCandidatas rutas para un envío.
-     * Las candidatas NO verifican capacidad actual — se usa esFeasible()
-     * en tiempo real durante la reparación ALNS.
-     *
-     * Permite hasta 3 visitas por nodo (agrupado por hora) para
-     * encontrar rutas alternativas diversas.
-     *
-     * @param shipment      envío para el que calcular candidatas
-     * @param flights       vuelos disponibles
-     * @param maxCandidatas número máximo de rutas a retornar
-     * @return lista de rutas candidatas ordenadas de mejor a peor costo
+     * NO verifica capacidad actual — se usa esFeasible() en tiempo real.
      */
     public List<Route> findCandidateRoutes(Shipment shipment,
                                             List<Flight> flights,
@@ -140,7 +237,6 @@ public class ALNSRouteFinder {
                 new ArrayList<>(), 0));
 
         List<Route> candidatas = new ArrayList<>();
-        // Permite múltiples visitas al mismo nodo para hallar rutas alternativas
         Map<String, Integer> visitas = new HashMap<>();
 
         while (!cola.isEmpty() && candidatas.size() < maxCandidatas) {
@@ -161,7 +257,6 @@ public class ALNSRouteFinder {
 
             if (actual.vuelos.size() >= maxEscalas) continue;
 
-            // Agrupar por hora para permitir rutas con distintos horarios
             String claveNodo = actual.aeropuerto + "@" + (actual.minutoDisponible / 60);
             int veces = visitas.getOrDefault(claveNodo, 0);
             if (veces >= 3) continue;
@@ -176,9 +271,6 @@ public class ALNSRouteFinder {
 
                 if (salidaAbs < minimoSalida) continue;
                 if (llegadaAbs > maxLlegada) continue;
-
-                // Para candidatas NO verificamos capacidad actual
-                // (cambia con cada iteración ALNS — se verifica en esFeasible)
 
                 int espera     = salidaAbs - actual.minutoDisponible;
                 int duracion   = llegadaAbs - salidaAbs;
@@ -199,25 +291,15 @@ public class ALNSRouteFinder {
     // ════════════════════════════════════════════════════════════════════════
 
     /**
-     * Verifica si una ruta pre-calculada sigue siendo factible en el estado actual.
-     *
-     * Una ruta es factible si:
-     *   1. Todos sus vuelos tienen espacio (hasSpaceFor)
-     *   2. Todos los aeropuertos intermedios tienen capacidad (hasCapacityFor)
-     *   3. La ruta sigue siendo válida (tiempos coherentes)
-     *
-     * @param ruta    ruta candidata a verificar
-     * @param maletas número de maletas del envío
-     * @return true si la ruta puede usarse en el estado actual del sistema
+     * Verifica si una ruta pre-calculada sigue siendo factible:
+     * todos los vuelos tienen espacio y aeropuertos intermedios tienen capacidad.
      */
     public boolean esFeasible(Route ruta, int maletas) {
         if (ruta == null || !ruta.isValid()) return false;
-
         List<Flight> vuelos = ruta.getFlights();
         for (int i = 0; i < vuelos.size(); i++) {
             Flight f = vuelos.get(i);
             if (!f.hasSpaceFor(maletas)) return false;
-            // Verificar aeropuerto intermedio (no el destino final)
             if (i < vuelos.size() - 1) {
                 Airport apt = airportMap.get(f.getDestCode());
                 if (apt != null && !apt.hasCapacityFor(maletas)) return false;
@@ -230,11 +312,6 @@ public class ALNSRouteFinder {
     //  CÁLCULO DE PLAZO
     // ════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Plazo máximo de entrega según el enunciado:
-     *   - Mismo continente:    1440 min (1 día)
-     *   - Distinto continente: 2880 min (2 días)
-     */
     public int getDeadlineMinutes(Shipment shipment) {
         Airport orig = airportMap.get(shipment.getOriginCode());
         Airport dest = airportMap.get(shipment.getDestCode());
@@ -254,6 +331,29 @@ public class ALNSRouteFinder {
             }
             return index;
         });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CLASE: PartialRoute
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Ruta asignada a un lote parcial de maletas de un envío fraccionado.
+     * Múltiples PartialRoute pueden corresponder al mismo Shipment original.
+     */
+    public static class PartialRoute {
+        public final Route ruta;
+        public final int   maletas;
+
+        public PartialRoute(Route ruta, int maletas) {
+            this.ruta    = ruta;
+            this.maletas = maletas;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("PartialRoute[maletas=%d | %s]", maletas, ruta);
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
