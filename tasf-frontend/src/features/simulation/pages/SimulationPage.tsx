@@ -96,7 +96,7 @@ export function SimulationPage() {
             {data ? (
               <Metrics data={data} />
             ) : (
-              <div className="empty-state">Ejecuta ALNS para ver metricas.</div>
+              <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
             )}
           </section>
         </aside>
@@ -134,7 +134,7 @@ export function SimulationPage() {
           </section>
 
           <section className="panel section">
-            <h3>Aeropuertos criticos</h3>
+            <h3>Aeropuertos críticos</h3>
             {data ? (
               <AirportsTable airports={data.airports} loads={airportLoads} />
             ) : (
@@ -180,7 +180,7 @@ function SimulationControls({
 }: SimulationControlsProps) {
   return (
     <section className="panel section">
-      <h2>Simulador ALNS</h2>
+      <h2>Simulador</h2>
       <div className="control-grid">
         <div className="field">
           <label>Fecha inicial</label>
@@ -192,7 +192,7 @@ function SimulationControls({
         </div>
 
         <div className="field">
-          <label>Dias de simulacion</label>
+          <label>Dias de simulación</label>
           <div className="segmented">
             {DAY_OPTIONS.map((option) => (
               <button
@@ -200,14 +200,14 @@ function SimulationControls({
                 className={option === days ? "active" : ""}
                 onClick={() => onDaysChange(option)}
               >
-                {`${option} dias`}
+                {`${option} días`}
               </button>
             ))}
           </div>
         </div>
 
         <button className="primary" onClick={onRunSimulation} disabled={loading}>
-          {loading ? "Ejecutando ALNS..." : "Ejecutar simulacion"}
+          {loading ? "Ejecutando ALNS..." : "Ejecutar simulación"}
         </button>
 
         {error && <div className="error">{error}</div>}
@@ -251,7 +251,7 @@ function CapacityLegend() {
         </div>
         <div className="legend-row">
           <span className="dot red"></span>
-          90% o mas
+          90% o más
         </div>
       </div>
     </section>

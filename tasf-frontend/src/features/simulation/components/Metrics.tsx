@@ -29,7 +29,7 @@ export function Metrics({ data }: MetricsProps) {
   return (
     <div className="metrics">
       <Metric
-        label="Envios planificados"
+        label="Envíos planificados"
         value={`${metrics.plannedShipments}/${metrics.shipments}`}
         sub={`${plannedPct}%`}
       />

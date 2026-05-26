@@ -28,7 +28,7 @@ export function Topbar({ data, now, simMinute }: TopbarProps) {
     <header className="topbar">
       <div className="brand">
         <strong>TASF.B2B · Simulador de equipaje</strong>
-        <span>Escenario operativo ALNS</span>
+        <span>Escenario planificador</span>
       </div>
       <div className="status-strip">
         <StatusItem label="Ahora" value={formatClock(now)} sub={formatDateOnly(now)} />
@@ -58,14 +58,14 @@ export function Topbar({ data, now, simMinute }: TopbarProps) {
           sub={data ? formatTimeOnly(data.simulationEndDateTime) : "--"}
         />
         <StatusItem
-          label="Duracion ALNS"
+          label="Duración"
           value={data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--"}
-          sub="ejecucion real"
+          sub="ejecución real"
         />
         <StatusItem
-          label="Escenario"
+          label="Algoritmo"
           value={data?.scenario || "ALNS"}
-          sub="planificacion"
+          sub="--"
         />
       </div>
     </header>

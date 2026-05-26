@@ -39,7 +39,7 @@ export function AirportDetail({ airport, load }: AirportDetailProps) {
         value={airport.peakLoad}
         sub={`${Math.round(airport.utilization * 100)}%`}
       />
-      <Metric label="Ubicacion" value={airport.country} sub={airport.continent} />
+      <Metric label="Ubicación" value={airport.country} sub={airport.continent} />
     </div>
   );
 }
