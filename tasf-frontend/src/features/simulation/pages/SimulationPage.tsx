@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSimulationPlayer } from "../hooks/useSimulationPlayer";
 import L from "leaflet";
 import { Navbar } from "../../global/Navbar";
 
@@ -11,44 +12,19 @@ const STATUS_COLOR = {
 export function SimulationPage() {
   const [startDate, setStartDate] = useState("2026-01-02");
   const [days, setDays] = useState(3);
-  const [data, setData] = useState<any>(null);
-  const [simMinute, setSimMinute] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(360);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-  const frame = useRef<number | null>(null);
-
-
   const maxMinute = days * 1440;
+  const { simMinute, setSimMinute, playing, setPlaying, speed, setSpeed } = 
+  useSimulationPlayer(maxMinute);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (!playing) return;
-    let last = performance.now();
-    const tick = (time: number) => {
-      const elapsedSeconds = (time - last) / 1000;
-      last = time;
-      setSimMinute((minute) => {
-        const next = Math.min(maxMinute, minute + elapsedSeconds * speed);
-        if (next >= maxMinute) setPlaying(false);
-        return next;
-      });
-      frame.current = requestAnimationFrame(tick);
-    };
-    frame.current = requestAnimationFrame(tick);
-    return () => {
-      if (frame.current !== null) {
-        cancelAnimationFrame(frame.current);
-      }
-    };
-  }, [playing, speed, maxMinute]);
 
   async function runSimulation() {
     setLoading(true);
@@ -63,6 +39,7 @@ export function SimulationPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "No se pudo simular.");
+      console.log(payload)
       setData(payload);
       setSelectedAirport(payload.airports[0]?.code || null);
     } catch (err) {
