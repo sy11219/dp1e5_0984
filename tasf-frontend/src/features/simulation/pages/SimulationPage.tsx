@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSimulationPlayer } from "../hooks/useSimulationPlayer";
 import L from "leaflet";
 import { Navbar } from "../../global/Navbar";
 
@@ -59,6 +60,7 @@ export function SimulationPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "No se pudo simular.");
+      console.log(payload)
       setData(payload);
       setSelectedAirport(payload.airports[0]?.code || null);
     } catch (err) {

@@ -9,6 +9,9 @@ import org.e5.parser.FlightPlanParser;
 import org.e5.parser.ShipmentParser;
 import org.e5.planner.ALNS;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -219,6 +222,11 @@ public class SimulationService {
         json.arrayEnd();
 
         json.objEnd();
+        try (PrintWriter writer = new PrintWriter(new FileWriter("salida.json"))) {
+            writer.println(json.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return json.toString();
     }
 
