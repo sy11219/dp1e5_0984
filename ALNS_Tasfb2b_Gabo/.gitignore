@@ -40,3 +40,6 @@ build/
 
 ### Reporte
 data/reporte_rutas.txt
+
+## Debug
+salida.json
