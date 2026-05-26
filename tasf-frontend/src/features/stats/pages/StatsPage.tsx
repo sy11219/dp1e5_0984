@@ -1,4 +1,4 @@
-import { Navbar } from "../../global/Navbar";
+import { Navbar } from "../../../shared/components/Navbar/Navbar";
 
 export const StatsPage = () => {
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { runSimulationRequest } from "../../../api/simulationApi";
-import { Navbar } from "../../global/Navbar";
+import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import { AirportDetail } from "../components/AirportDetail";
 import { AirportsTable } from "../components/AirportsTable";
 import { FlightsTable } from "../components/FlightsTable";
