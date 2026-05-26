@@ -13,39 +13,18 @@ export function SimulationPage() {
   const [startDate, setStartDate] = useState("2026-01-02");
   const [days, setDays] = useState(3);
   const [data, setData] = useState(null);
-  const [simMinute, setSimMinute] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(360);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedAirport, setSelectedAirport] = useState(null);
   const [now, setNow] = useState(new Date());
-  const frame = useRef(null);
-
-
   const maxMinute = days * 1440;
+  const { simMinute, setSimMinute, playing, setPlaying, speed, setSpeed } = 
+  useSimulationPlayer(maxMinute);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (!playing) return;
-    let last = performance.now();
-    const tick = (time) => {
-      const elapsedSeconds = (time - last) / 1000;
-      last = time;
-      setSimMinute((minute) => {
-        const next = Math.min(maxMinute, minute + elapsedSeconds * speed);
-        if (next >= maxMinute) setPlaying(false);
-        return next;
-      });
-      frame.current = requestAnimationFrame(tick);
-    };
-    frame.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame.current);
-  }, [playing, speed, maxMinute]);
 
   async function runSimulation() {
     setLoading(true);
