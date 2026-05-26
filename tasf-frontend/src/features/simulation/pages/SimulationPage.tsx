@@ -11,15 +11,15 @@ const STATUS_COLOR = {
 export function SimulationPage() {
   const [startDate, setStartDate] = useState("2026-01-02");
   const [days, setDays] = useState(3);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<any>(null);
   const [simMinute, setSimMinute] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(360);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [selectedAirport, setSelectedAirport] = useState(null);
+  const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-  const frame = useRef(null);
+  const frame = useRef<number | null>(null);
 
 
   const maxMinute = days * 1440;
@@ -32,7 +32,7 @@ export function SimulationPage() {
   useEffect(() => {
     if (!playing) return;
     let last = performance.now();
-    const tick = (time) => {
+    const tick = (time: number) => {
       const elapsedSeconds = (time - last) / 1000;
       last = time;
       setSimMinute((minute) => {
@@ -43,7 +43,11 @@ export function SimulationPage() {
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame.current);
+    return () => {
+      if (frame.current !== null) {
+        cancelAnimationFrame(frame.current);
+      }
+    };
   }, [playing, speed, maxMinute]);
 
   async function runSimulation() {
@@ -62,7 +66,7 @@ export function SimulationPage() {
       setData(payload);
       setSelectedAirport(payload.airports[0]?.code || null);
     } catch (err) {
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -70,7 +74,7 @@ export function SimulationPage() {
 
   const airportLoads = useMemo(() => computeAirportLoads(data, simMinute), [data, simMinute]);
   const activeFlights = useMemo(() => computeActiveFlights(data, simMinute), [data, simMinute]);
-  const selected = data?.airports.find((airport) => airport.code === selectedAirport);
+  const selected = data?.airports?.find((airport: any) => airport.code === selectedAirport);
 
   return (
     React.createElement("div", { className: "app-shell" },
@@ -166,7 +170,7 @@ export function SimulationPage() {
   );
 }
 
-function Topbar({ data, now, simMinute }) {
+function Topbar({ data, now, simMinute }: { data: any; now: any; simMinute: any }) {
   return React.createElement("header", { className: "topbar" },
     React.createElement("div", { className: "brand" },
       React.createElement("strong", null, "TASF.B2B · Simulador de equipaje"),
@@ -185,7 +189,7 @@ function Topbar({ data, now, simMinute }) {
   );
 }
 
-function StatusItem({ label, value, sub }) {
+function StatusItem({ label, value, sub }: { label: any; value: any; sub: any }) {
   return React.createElement("div", { className: "status-item" },
     React.createElement("span", null, label),
     React.createElement("strong", null, value),
@@ -193,7 +197,7 @@ function StatusItem({ label, value, sub }) {
   );
 }
 
-function Metrics({ data }) {
+function Metrics({ data }: { data: any }) {
   const metrics = data.metrics;
   const plannedPct = percent(metrics.plannedShipments, metrics.shipments);
   const onTimePct = percent(metrics.onTimeShipments, metrics.shipments);
@@ -207,7 +211,7 @@ function Metrics({ data }) {
   );
 }
 
-function Metric({ label, value, sub }) {
+function Metric({ label, value, sub }: { label: any; value: any; sub: any }) {
   return React.createElement("div", { className: "metric" },
     React.createElement("span", null, label),
     React.createElement("strong", null, value),
@@ -215,17 +219,17 @@ function Metric({ label, value, sub }) {
   );
 }
 
-function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelectAirport }) {
-  const [mapInfo, setMapInfo] = useState(null);
-  const mapElement = useRef(null);
-  const mapRef = useRef(null);
-  const routeLayerRef = useRef(null);
-  const airportLayerRef = useRef(null);
-  const planeLayerRef = useRef(null);
-  const airportLoadsRef = useRef({});
+function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelectAirport }: { data: any; activeFlights: any; airportLoads: any; selectedAirport: any; onSelectAirport: any }) {
+  const [mapInfo, setMapInfo] = useState<any>(null);
+  const mapElement = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const airportLayerRef = useRef<L.LayerGroup | null>(null);
+  const planeLayerRef = useRef<L.LayerGroup | null>(null);
+  const airportLoadsRef = useRef<Record<string, number>>({});
   const airportMarkersRef = useRef(new Map());
   const airports = data?.airports || [];
-  const airportByCode = useMemo(() => Object.fromEntries(airports.map((airport) => [airport.code, airport])), [airports]);
+  const airportByCode = useMemo(() => Object.fromEntries(airports.map((airport: any) => [airport.code, airport])), [airports]);
 
   useEffect(() => {
     airportLoadsRef.current = airportLoads;
@@ -248,9 +252,9 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
     map.createPane("activeFlights");
     map.createPane("airports");
 
-    map.getPane("routes").style.zIndex = "430";
-    map.getPane("activeFlights").style.zIndex = "620";
-    map.getPane("airports").style.zIndex = "660";
+    map.getPane("routes")?.style && (map.getPane("routes")!.style.zIndex = "430");
+    map.getPane("activeFlights")?.style && (map.getPane("activeFlights")!.style.zIndex = "620");
+    map.getPane("airports")?.style && (map.getPane("airports")!.style.zIndex = "660");
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 8,
@@ -347,7 +351,7 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
       const angle = bearingDegrees(origin.latitude, origin.longitude, dest.latitude, dest.longitude);
       const icon = L.divIcon({
         className: "flight-map-icon",
-        html: planeSvg(STATUS_COLOR[flight.status], angle),
+        html: planeSvg(STATUS_COLOR[flight.status as keyof typeof STATUS_COLOR], angle),
         iconSize: [26, 26],
         iconAnchor: [13, 13],
       });
@@ -374,10 +378,10 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
 
   useEffect(() => {
     if (!data || !mapRef.current || !airports.length || !L) return;
-    const bounds = L.latLngBounds(airports.map((airport) => [airport.latitude, airport.longitude]));
+    const bounds = L.latLngBounds(airports.map((airport: any) => [airport.latitude, airport.longitude]));
     setTimeout(() => {
-      mapRef.current.invalidateSize();
-      mapRef.current.fitBounds(bounds.pad(0.16), { maxZoom: 3, animate: false });
+      mapRef.current?.invalidateSize();
+      mapRef.current?.fitBounds(bounds.pad(0.16), { maxZoom: 3, animate: false });
     }, 0);
   }, [data, airports]);
 
@@ -392,13 +396,13 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
   );
 }
 
-function MapInfoCard({ info, onClose }) {
+function MapInfoCard({ info, onClose }: { info: any; onClose: any }) {
   return React.createElement("aside", { className: `map-info-card ${info.type}` },
     React.createElement("button", { className: "map-info-close", onClick: onClose, "aria-label": "Cerrar informacion" }, "x"),
     React.createElement("strong", null, info.title),
     info.subtitle && React.createElement("span", null, info.subtitle),
     React.createElement("dl", null,
-      info.rows.map(([label, value]) => React.createElement(React.Fragment, { key: label },
+      info.rows.map(([label, value]: [any, any]) => React.createElement(React.Fragment, { key: label },
         React.createElement("dt", null, label),
         React.createElement("dd", null, value)
       ))
@@ -406,7 +410,7 @@ function MapInfoCard({ info, onClose }) {
   );
 }
 
-function planeSvg(color, angle) {
+function planeSvg(color: string, angle: number) {
   return `
     <svg class="plane-svg" viewBox="-24 -24 48 48" style="transform: rotate(${angle}deg)" aria-hidden="true">
       <path class="plane-halo" d="M0 -22 C5 -22 7 -15 7 -6 L23 6 L23 13 L5 7 L4 17 L9 22 L9 24 L0 20 L-9 24 L-9 22 L-4 17 L-5 7 L-23 13 L-23 6 L-7 -6 C-7 -15 -5 -22 0 -22 Z"></path>
@@ -415,14 +419,14 @@ function planeSvg(color, angle) {
   `;
 }
 
-function Timeline({ simMinute, maxMinute, setSimMinute, data }) {
+function Timeline({ simMinute, maxMinute, setSimMinute, data }: { simMinute: any; maxMinute: any; setSimMinute: any; data: any }) {
   return React.createElement("div", { className: "timeline" },
     React.createElement("input", {
       type: "range",
       min: "0",
       max: maxMinute,
       value: Math.floor(simMinute),
-      onChange: (event) => setSimMinute(Number(event.target.value)),
+      onChange: (event) => setSimMinute(Number((event.target as HTMLInputElement).value)),
       disabled: !data,
     }),
     React.createElement("div", { className: "timeline-meta" },
@@ -433,7 +437,7 @@ function Timeline({ simMinute, maxMinute, setSimMinute, data }) {
   );
 }
 
-function AirportDetail({ airport, load }) {
+function AirportDetail({ airport, load }: { airport: any; load: any }) {
   const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
   const status = capacityStatus(utilization);
   return React.createElement("div", { className: "metrics" },
@@ -444,21 +448,21 @@ function AirportDetail({ airport, load }) {
   );
 }
 
-function FlightsTable({ flights }) {
+function FlightsTable({ flights }: { flights: any }) {
   if (!flights.length) return React.createElement("div", { className: "empty-state" }, "No hay vuelos activos en este minuto.");
   return React.createElement("div", { className: "table" },
-    flights.slice(0, 10).map((flight) => React.createElement("div", { className: "row", key: flight.id },
+    flights.slice(0, 10).map((flight: any) => React.createElement("div", { className: "row", key: flight.id },
       React.createElement("span", { className: `dot ${flight.status}` }),
       React.createElement("div", { className: "row-main" },
         React.createElement("strong", null, `${flight.origin} -> ${flight.destination}`),
         React.createElement("span", null, `Dia ${flight.dayOffset} · ${hhmm(flight.departureMinute)}-${hhmm(flight.arrivalMinute)}`)
       ),
-      React.createElement("span", { className: "capacity-pill", style: { background: STATUS_COLOR[flight.status] } }, `${Math.round(flight.utilization * 100)}%`)
+      React.createElement("span", { className: "capacity-pill", style: { background: STATUS_COLOR[flight.status as keyof typeof STATUS_COLOR] } }, `${Math.round(flight.utilization * 100)}%`)
     ))
   );
 }
 
-function AirportsTable({ airports, loads }) {
+function AirportsTable({ airports, loads }: { airports: any; loads: any }) {
   const ordered = [...airports].sort((a, b) => (loads[b.code] || 0) / b.maxCapacity - (loads[a.code] || 0) / a.maxCapacity);
   return React.createElement("div", { className: "table" },
     ordered.slice(0, 10).map((airport) => {
@@ -477,19 +481,19 @@ function AirportsTable({ airports, loads }) {
   );
 }
 
-function computeActiveFlights(data, minute) {
+function computeActiveFlights(data: any, minute: number) {
   if (!data) return [];
   return data.flights
-    .filter((flight) => minute >= flight.absoluteDepartureMinute && minute <= flight.absoluteArrivalMinute)
-    .map((flight) => ({
+    .filter((flight: any) => minute >= flight.absoluteDepartureMinute && minute <= flight.absoluteArrivalMinute)
+    .map((flight: any) => ({
       ...flight,
       progress: clamp((minute - flight.absoluteDepartureMinute) / Math.max(1, flight.absoluteArrivalMinute - flight.absoluteDepartureMinute), 0, 1),
     }));
 }
 
-function computeAirportLoads(data, minute) {
+function computeAirportLoads(data: any, minute: number) {
   if (!data) return {};
-  const loads = Object.fromEntries(data.airports.map((airport) => [airport.code, 0]));
+  const loads = Object.fromEntries(data.airports.map((airport: any) => [airport.code, 0]));
   for (const event of data.airportEvents) {
     if (event.minute > minute) break;
     loads[event.airport] = Math.max(0, (loads[event.airport] || 0) + event.delta);
@@ -497,9 +501,9 @@ function computeAirportLoads(data, minute) {
   return loads;
 }
 
-function bearingDegrees(lat1, lon1, lat2, lon2) {
-  const toRad = (value) => value * Math.PI / 180;
-  const toDeg = (value) => value * 180 / Math.PI;
+function bearingDegrees(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRad = (value: number) => value * Math.PI / 180;
+  const toDeg = (value: number) => value * 180 / Math.PI;
   const phi1 = toRad(lat1);
   const phi2 = toRad(lat2);
   const deltaLon = toRad(lon2 - lon1);
@@ -508,21 +512,21 @@ function bearingDegrees(lat1, lon1, lat2, lon2) {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-function capacityStatus(utilization) {
+function capacityStatus(utilization: number) {
   if (utilization < 0.70) return "green";
   if (utilization < 0.90) return "yellow";
   return "red";
 }
 
-function compactDate(date) {
+function compactDate(date: string) {
   return date.replaceAll("-", "");
 }
 
-function formatClock(date) {
+function formatClock(date: Date) {
   return date.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-function formatDateOnly(value) {
+function formatDateOnly(value: string | Date | undefined) {
   if (!value) return "--";
   return new Date(value).toLocaleDateString("es-PE", {
     year: "numeric",
@@ -531,7 +535,7 @@ function formatDateOnly(value) {
   });
 }
 
-function formatTimeOnly(value) {
+function formatTimeOnly(value: string | Date | undefined) {
   if (!value) return "--";
   return new Date(value).toLocaleTimeString("es-PE", {
     hour: "2-digit",
@@ -539,14 +543,14 @@ function formatTimeOnly(value) {
   });
 }
 
-function formatFlightMoment(data, absoluteMinute) {
+function formatFlightMoment(data: any, absoluteMinute: number) {
   if (!data?.simulationStartDateTime && data?.simulationStartDate) return formatSimMinute(absoluteMinute);
   if (!data?.simulationStartDateTime) return formatSimMinute(absoluteMinute);
   const date = new Date(new Date(data.simulationStartDateTime).getTime() + absoluteMinute * 60000);
   return `${formatDateOnly(date)}, ${formatTimeOnly(date)}`;
 }
 
-function formatSimMinute(value) {
+function formatSimMinute(value: number) {
   const minute = Math.max(0, Math.floor(value));
   const day = Math.floor(minute / 1440);
   const dayMinute = minute % 1440;
@@ -555,15 +559,15 @@ function formatSimMinute(value) {
   return `Dia ${day} · ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-function hhmm(value) {
+function hhmm(value: number) {
   const minute = ((Math.floor(value) % 1440) + 1440) % 1440;
   return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 }
 
-function percent(part, total) {
+function percent(part: number, total: number) {
   return total ? Math.round((part / total) * 100) : 0;
 }
 
-function clamp(value, min, max) {
+function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
