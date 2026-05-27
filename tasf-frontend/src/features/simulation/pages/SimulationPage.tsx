@@ -269,7 +269,7 @@ function SimulationControls({
 
         {error && <div className="error">{error}</div>}
 
-        <div className="speed-row">
+        {/* <div className="speed-row">
           <input
             type="range"
             min={SPEED_MIN}
@@ -279,7 +279,7 @@ function SimulationControls({
             onChange={(event) => onSpeedChange(Number(event.target.value))}
           />
           <strong>{`${speed}x`}</strong>
-        </div>
+        </div> */}
 
         <div className="segmented">
           <button onClick={onPlay} className={playing ? "active" : ""}>

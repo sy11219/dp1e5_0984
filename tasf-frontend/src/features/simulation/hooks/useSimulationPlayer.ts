@@ -5,8 +5,8 @@ export function useSimulationPlayer(maxMinute: number) {
 
   const [playing, setPlaying] = useState(false);
 
-  const [speed, setSpeed] = useState(360);
-
+  //const [speed, setSpeed] = useState(360);
+  const FIXED_SPEED = 40;
   const frame = useRef<number | null>(null);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function useSimulationPlayer(maxMinute: number) {
       setSimMinute((minute) => {
         const next = Math.min(
           maxMinute,
-          minute + elapsedSeconds * speed
+          minute + elapsedSeconds * FIXED_SPEED
         );
 
         if (next >= maxMinute) {
@@ -42,14 +42,14 @@ export function useSimulationPlayer(maxMinute: number) {
         cancelAnimationFrame(frame.current);
       }
     };
-  }, [playing, speed, maxMinute]);
+  }, [playing, maxMinute]); //añadir speed para la barra
 
   return {
     simMinute,
     setSimMinute,
     playing,
     setPlaying,
-    speed,
-    setSpeed,
+    speed: FIXED_SPEED,
+    setSpeed: () => {}, // noop
   };
 }
