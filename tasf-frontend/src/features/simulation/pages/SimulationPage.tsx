@@ -1,72 +1,90 @@
-import { useEffect, useMemo, useState } from "react";
-import { runSimulationRequest } from "../../../api/simulationApi";
-import { Navbar } from "../../../shared/components/Navbar/Navbar";
-import { AirportDetail } from "../components/AirportDetail";
-import { AirportsTable } from "../components/AirportsTable";
-import { FlightsTable } from "../components/FlightsTable";
-import { Metrics } from "../components/Metrics";
-import MapStage from "../components/simulation/map/MapStage";
-import { Timeline } from "../components/Timeline";
-import { Topbar } from "../components/Topbar";
-import { useSimulationPlayer } from "../hooks/useSimulationPlayer";
-import type { SimulationData } from "../types";
-import { DAY_OPTIONS, DEFAULT_START_DATE, SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../utils/constants";
-import { computeActiveFlights, computeAirportLoads } from "../utils/calculations";
+import { useEffect, useMemo, useState } from "react"
+import { runSimulationRequest } from "../../../api/simulationApi"
+import { Navbar } from "../../../shared/components/Navbar/Navbar"
+import { AirportDetail } from "../components/AirportDetail"
+import { AirportsTable } from "../components/AirportsTable"
+import { FlightsTable } from "../components/FlightsTable"
+import { Metrics } from "../components/Metrics"
+import MapStage from "../components/simulation/map/MapStage"
+import { Timeline } from "../components/Timeline"
+import { Topbar } from "../components/Topbar"
+import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
+import type { SimulationData } from "../types"
+import { DAY_OPTIONS, DEFAULT_START_DATE, SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../utils/constants"
+import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { SimulationResultModal } from "../components/SimulationResultModal"
 
 export function SimulationPage() {
-  const [startDate, setStartDate] = useState(DEFAULT_START_DATE);
-  const [days, setDays] = useState(3);
-  const [data, setData] = useState<SimulationData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
-  const [now, setNow] = useState(new Date());
+  const [startDate, setStartDate] = useState(DEFAULT_START_DATE)
+  const [days, setDays] = useState(3)
+  const [data, setData] = useState<SimulationData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
+  const [showReport, setShowReport] = useState(false);
+  const [now, setNow] = useState(new Date())
 
-  const maxMinute = days * 1440;
+  const maxMinute = days * 1440
   const { simMinute, setSimMinute, playing, setPlaying, speed, setSpeed } =
-    useSimulationPlayer(maxMinute);
+    useSimulationPlayer(maxMinute)
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (simMinute >= maxMinute && data) {
+      setShowReport(true);
+    }
+  }, [simMinute, maxMinute, data]);
 
   const runSimulation = async () => {
-    setLoading(true);
-    setError("");
-    setPlaying(false);
-    setSimMinute(0);
+    setLoading(true)
+    setError("")
+    setPlaying(false)
+    setSimMinute(0)
 
     try {
-      const payload = await runSimulationRequest(startDate, days);
-      setData(payload);
-      setSelectedAirport(payload.airports[0]?.code || null);
+      const payload = await runSimulationRequest(startDate, days)
+      setData(payload)
+      setSelectedAirport(payload.airports[0]?.code || null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo simular.");
+      setError(err instanceof Error ? err.message : "No se pudo simular.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const airportLoads = useMemo(
     () => computeAirportLoads(data, simMinute),
     [data, simMinute]
-  );
+  )
   const activeFlights = useMemo(
     () => computeActiveFlights(data, simMinute),
     [data, simMinute]
-  );
-  const selected = data?.airports.find((airport) => airport.code === selectedAirport);
+  )
+  const selected = data?.airports.find((airport) => airport.code === selectedAirport)
 
   const handleDaysChange = (option: number) => {
-    setDays(option);
-    setSimMinute(0);
-  };
+    setDays(option)
+    setSimMinute(0)
+  }
 
   const handleReset = () => {
-    setPlaying(false);
-    setSimMinute(0);
-  };
+    setPlaying(false)
+    setSimMinute(0)
+  }
 
   return (
     <div className="app-shell">
@@ -127,6 +145,9 @@ export function SimulationPage() {
               />
             )}
           </section>
+          {/* <Button onClick={() => setShowReport(true)}>
+            Abrir modal
+          </Button> */}
 
           <section className="panel section">
             <h3>Vuelos activos</h3>
@@ -143,25 +164,29 @@ export function SimulationPage() {
           </section>
         </aside>
       </main>
+      <SimulationResultModal 
+      open={showReport} 
+      onOpenChange={setShowReport}
+      data={data}/>
     </div>
-  );
+  )
 }
 
 type SimulationControlsProps = {
-  days: number;
-  error: string;
-  loading: boolean;
-  playing: boolean;
-  speed: number;
-  startDate: string;
-  onDaysChange: (days: number) => void;
-  onPause: () => void;
-  onPlay: () => void;
-  onReset: () => void;
-  onRunSimulation: () => void;
-  onSpeedChange: (speed: number) => void;
-  onStartDateChange: (date: string) => void;
-};
+  days: number
+  error: string
+  loading: boolean
+  playing: boolean
+  speed: number
+  startDate: string
+  onDaysChange: (days: number) => void
+  onPause: () => void
+  onPlay: () => void
+  onReset: () => void
+  onRunSimulation: () => void
+  onSpeedChange: (speed: number) => void
+  onStartDateChange: (date: string) => void
+}
 
 function SimulationControls({
   days,
@@ -233,7 +258,7 @@ function SimulationControls({
         </div>
       </div>
     </section>
-  );
+  )
 }
 
 function CapacityLegend() {
@@ -255,5 +280,5 @@ function CapacityLegend() {
         </div>
       </div>
     </section>
-  );
+  )
 }

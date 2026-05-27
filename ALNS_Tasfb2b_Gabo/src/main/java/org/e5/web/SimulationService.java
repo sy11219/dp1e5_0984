@@ -222,7 +222,7 @@ public class SimulationService {
         json.arrayEnd();
 
         json.objEnd();
-        try (PrintWriter writer = new PrintWriter(new FileWriter("salida.json"))) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter("salida.txt"))) {
             writer.println(json.toString());
         } catch (IOException e) {
             e.printStackTrace();
