@@ -7,15 +7,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { formatRealTime } from "../utils/timeUtils"
 import type { SimulationData } from "../types"
 
 interface SimulationModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   data: SimulationData | null
+  realTimeMs: number
 }
 
-export function SimulationResultModal({ open, onOpenChange, data }: SimulationModalProps) {
+export function SimulationResultModal({ open, onOpenChange, data, realTimeMs }: SimulationModalProps) {
   if (!data) return null
   const bagCompletionRate = ((data.metrics.plannedBags / data.metrics.totalBags) * 100).toFixed(0)
   const onTimeRate = ((data.metrics.onTimeShipments / data.metrics.shipments) * 100).toFixed(0)
@@ -43,7 +45,7 @@ export function SimulationResultModal({ open, onOpenChange, data }: SimulationMo
             Tiempo de ejecución del algoritmo: {executionTimeSec} s
           </p>
           <p className="text-lg">
-            {data.days} días simulados en XX:XX
+            {data.days} días simulados en {formatRealTime(realTimeMs)}
           </p>
         </div>
 

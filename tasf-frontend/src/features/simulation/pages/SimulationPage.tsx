@@ -12,6 +12,7 @@ import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { SimulationData } from "../types"
 import { DAY_OPTIONS, DEFAULT_START_DATE, SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
+import { formatRealTime } from "../utils/timeUtils"
 
 import { SimulationResultModal } from "../components/SimulationResultModal"
 
@@ -60,16 +61,6 @@ export function SimulationPage() {
       }
     }
   }, [playing])
-
-  const formatRealTime = (ms: number) => {
-    const totalSec = Math.floor(ms / 1000)
-    const h = Math.floor(totalSec / 3600)
-    const m = Math.floor((totalSec % 3600) / 60)
-    const s = totalSec % 60
-    return h > 0
-      ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-      : `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-  }
 
   const showReport = Boolean(data && simMinute >= maxMinute && !reportDismissed)
 
@@ -197,9 +188,11 @@ export function SimulationPage() {
         </aside>
       </main>
       <SimulationResultModal 
-      open={showReport} 
-      onOpenChange={(open) => setReportDismissed(!open)}
-      data={data}/>
+        open={showReport} 
+        onOpenChange={(open) => setReportDismissed(!open)}
+        data={data}
+        realTimeMs={realTimeMs}
+      />
     </div>
   )
 }
