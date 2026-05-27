@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { runSimulationRequest } from "../../../api/simulationApi"
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
 import { AirportDetail } from "../components/AirportDetail"
@@ -24,15 +24,52 @@ export function SimulationPage() {
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
   const [reportDismissed, setReportDismissed] = useState(false)
   const [now, setNow] = useState(new Date())
+  const [realTimeMs, setRealTimeMs] = useState(0)
+  const accumulatedRef = useRef(0)
+  const playStartRef = useRef<number | null>(null)
 
   const maxMinute = days * 1440
   const { simMinute, setSimMinute, playing, setPlaying, speed, setSpeed } =
     useSimulationPlayer(maxMinute)
 
+  const resetRealTime = useCallback(() => {
+    accumulatedRef.current = 0
+    playStartRef.current = null
+    setRealTimeMs(0)
+  }, [])
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (playing) {
+      if (!playStartRef.current) playStartRef.current = Date.now()
+      
+      const timer = window.setInterval(() => {
+        setRealTimeMs(accumulatedRef.current + (Date.now() - (playStartRef.current ?? 0)))
+      }, 100)
+
+      return () => window.clearInterval(timer)
+    } else {
+      if (playStartRef.current) {
+        accumulatedRef.current += Date.now() - playStartRef.current
+        playStartRef.current = null
+        setRealTimeMs(accumulatedRef.current)
+      }
+    }
+  }, [playing])
+
+  const formatRealTime = (ms: number) => {
+    const totalSec = Math.floor(ms / 1000)
+    const h = Math.floor(totalSec / 3600)
+    const m = Math.floor((totalSec % 3600) / 60)
+    const s = totalSec % 60
+    return h > 0
+      ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+      : `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+  }
 
   const showReport = Boolean(data && simMinute >= maxMinute && !reportDismissed)
 
@@ -42,6 +79,7 @@ export function SimulationPage() {
     setPlaying(false)
     setSimMinute(0)
     setReportDismissed(false)
+    resetRealTime()
 
     try {
       const payload = await runSimulationRequest(startDate, days)
@@ -74,6 +112,7 @@ export function SimulationPage() {
     setPlaying(false)
     setSimMinute(0)
     setReportDismissed(false)
+    resetRealTime()
   }
 
   return (
@@ -126,6 +165,9 @@ export function SimulationPage() {
         </section>
 
         <aside className="right-panel">
+          <div className="panel section">
+            Tiempo de ejecución: <strong>{formatRealTime(realTimeMs)}</strong>
+          </div>
           <section className="panel section">
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
             {selected && (
