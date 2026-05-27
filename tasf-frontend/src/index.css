@@ -458,6 +458,10 @@ select {
   overflow: hidden;
 }
 
+.live-map-panel {
+  grid-template-rows: 1fr;
+}
+
 .map-header {
   position: absolute;
   z-index: 4;
@@ -779,6 +783,139 @@ select {
   font-size: 13px;
 }
 
+.dashboard-workspace {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.dashboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #111827;
+  color: #f8fafc;
+  border: 1px solid #263241;
+  border-radius: 8px;
+}
+
+.dashboard-heading h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.dashboard-heading p {
+  margin: 0;
+  color: #a7b1c2;
+  font-size: 13px;
+}
+
+.dashboard-heading .primary {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #f8fafc;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-panel {
+  display: grid;
+  gap: 4px;
+}
+
+.metric-panel span,
+.metric-panel small {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.metric-panel strong {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.management-grid,
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.management-grid > .panel:last-child,
+.stats-grid + .panel {
+  grid-column: 1 / -1;
+}
+
+.management-grid .capacity-pill {
+  background: #111827;
+}
+
+.lane-list,
+.insight-list {
+  display: grid;
+  gap: 12px;
+}
+
+.lane {
+  display: grid;
+  gap: 8px;
+}
+
+.lane-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #18212f;
+  font-size: 13px;
+}
+
+.lane-meta span,
+.insight-list span {
+  color: var(--ink-soft);
+}
+
+.lane-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7edf4;
+}
+
+.lane-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+}
+
+.chart-panel {
+  min-height: 340px;
+}
+
+.insight-list > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.insight-list strong {
+  font-size: 13px;
+}
+
+.insight-list span {
+  font-size: 12px;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: 300px 1fr;
@@ -791,6 +928,11 @@ select {
   .status-strip {
     min-width: 0;
     grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+  .dashboard-grid,
+  .management-grid,
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -810,6 +952,10 @@ select {
   }
   .leaflet-map {
     min-height: 460px;
+  }
+  .dashboard-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

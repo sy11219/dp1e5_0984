@@ -1,10 +1,13 @@
 import type { SimulationData } from "../types";
-import { formatClock, formatDateOnly, formatTimeOnly, formatSimMinute } from "../utils/formatters";
+import { formatClock, formatDateOnly, formatSimMinute, formatTimeOnly } from "../utils/formatters";
 
 interface TopbarProps {
   data: SimulationData | null;
   now: Date;
   simMinute: number;
+  title?: string;
+  subtitle?: string;
+  clockLabel?: string;
 }
 
 interface StatusItemProps {
@@ -23,17 +26,24 @@ function StatusItem({ label, value, sub }: StatusItemProps) {
   );
 }
 
-export function Topbar({ data, now, simMinute }: TopbarProps) {
+export function Topbar({
+  data,
+  now,
+  simMinute,
+  title = "TASF.B2B - Simulador de equipaje",
+  subtitle = "Escenario planificador",
+  clockLabel = "Reloj simulado",
+}: TopbarProps) {
   return (
     <header className="topbar">
       <div className="brand">
-        <strong>TASF.B2B · Simulador de equipaje</strong>
-        <span>Escenario planificador</span>
+        <strong>{title}</strong>
+        <span>{subtitle}</span>
       </div>
       <div className="status-strip">
         <StatusItem label="Ahora" value={formatClock(now)} sub={formatDateOnly(now)} />
         <StatusItem
-          label="Reloj simulado"
+          label={clockLabel}
           value={formatSimMinute(simMinute)}
           sub="avance actual"
         />
@@ -58,9 +68,9 @@ export function Topbar({ data, now, simMinute }: TopbarProps) {
           sub={data ? formatTimeOnly(data.simulationEndDateTime) : "--"}
         />
         <StatusItem
-          label="Duración"
+          label="Duracion"
           value={data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--"}
-          sub="ejecución real"
+          sub="ejecucion real"
         />
         <StatusItem
           label="Algoritmo"

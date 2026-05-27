@@ -3,10 +3,10 @@ import "./Navbar.css";
 
 export function Navbar() {
   const pages = [
-    { name: "Operaciones", path: "/operations" },
-    { name: "Simulación", path: "/" },
-    { name: "Gestión de Maletas", path: "/baggage" },
-    { name: "Estadísticas", path: "/stats" },
+    { name: "Tiempo real", path: "/operations" },
+    { name: "Simulacion", path: "/" },
+    { name: "Gestion de Maletas", path: "/baggage" },
+    { name: "Estadisticas", path: "/stats" },
   ];
 
   return (

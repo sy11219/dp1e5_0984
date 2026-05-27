@@ -1,3 +1,12 @@
+import type { SimulationData } from "../types";
+
+type FlightMomentData =
+  | (Pick<SimulationData, "simulationStartDateTime"> & {
+      simulationStartDate?: string;
+    })
+  | null
+  | undefined;
+
 export function compactDate(date: string): string {
   return date.replaceAll("-", "");
 }
@@ -36,7 +45,7 @@ export function formatSimMinute(value: number): string {
   return `Dia ${day} · ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-export function formatFlightMoment(data: any, absoluteMinute: number): string {
+export function formatFlightMoment(data: FlightMomentData, absoluteMinute: number): string {
   if (!data?.simulationStartDateTime && data?.simulationStartDate)
     return formatSimMinute(absoluteMinute);
   if (!data?.simulationStartDateTime) return formatSimMinute(absoluteMinute);

@@ -20,9 +20,10 @@ function Metric({ label, value, sub }: MetricProps) {
 interface AirportDetailProps {
   airport: Airport;
   load: number;
+  peakLabel?: string;
 }
 
-export function AirportDetail({ airport, load }: AirportDetailProps) {
+export function AirportDetail({ airport, load, peakLabel = "Pico ALNS" }: AirportDetailProps) {
   const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
   const status = capacityStatus(utilization);
 
@@ -35,7 +36,7 @@ export function AirportDetail({ airport, load }: AirportDetailProps) {
         sub={status.toUpperCase()}
       />
       <Metric
-        label="Pico ALNS"
+        label={peakLabel}
         value={airport.peakLoad}
         sub={`${Math.round(airport.utilization * 100)}%`}
       />

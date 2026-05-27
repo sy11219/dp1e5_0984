@@ -13,15 +13,6 @@ import type { SimulationData } from "../types"
 import { DAY_OPTIONS, DEFAULT_START_DATE, SPEED_MAX, SPEED_MIN, SPEED_STEP } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { SimulationResultModal } from "../components/SimulationResultModal"
 
 export function SimulationPage() {
@@ -31,7 +22,7 @@ export function SimulationPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
-  const [showReport, setShowReport] = useState(false);
+  const [reportDismissed, setReportDismissed] = useState(false)
   const [now, setNow] = useState(new Date())
 
   const maxMinute = days * 1440
@@ -43,17 +34,14 @@ export function SimulationPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    if (simMinute >= maxMinute && data) {
-      setShowReport(true);
-    }
-  }, [simMinute, maxMinute, data]);
+  const showReport = Boolean(data && simMinute >= maxMinute && !reportDismissed)
 
   const runSimulation = async () => {
     setLoading(true)
     setError("")
     setPlaying(false)
     setSimMinute(0)
+    setReportDismissed(false)
 
     try {
       const payload = await runSimulationRequest(startDate, days)
@@ -79,11 +67,13 @@ export function SimulationPage() {
   const handleDaysChange = (option: number) => {
     setDays(option)
     setSimMinute(0)
+    setReportDismissed(false)
   }
 
   const handleReset = () => {
     setPlaying(false)
     setSimMinute(0)
+    setReportDismissed(false)
   }
 
   return (
@@ -166,7 +156,7 @@ export function SimulationPage() {
       </main>
       <SimulationResultModal 
       open={showReport} 
-      onOpenChange={setShowReport}
+      onOpenChange={(open) => setReportDismissed(!open)}
       data={data}/>
     </div>
   )
