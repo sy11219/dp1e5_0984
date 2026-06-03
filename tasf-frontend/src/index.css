@@ -427,6 +427,75 @@ select {
 .yellow { background: var(--yellow); }
 .red { background: var(--red); }
 
+.airport-status-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #fbfcfe;
+}
+
+.airport-status-control span {
+  color: var(--ink-soft);
+  display: block;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.airport-status-control strong {
+  color: #18212f;
+  font-size: 14px;
+}
+
+.switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid #cfd7e3;
+  border-radius: 999px;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  transition: transform 160ms ease;
+}
+
+.switch.on {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.switch.on span {
+  transform: translateX(20px);
+}
+
+.switch:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.inline-error {
+  color: #b91c1c;
+  font-size: 12px;
+  margin: -2px 0 10px;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
