@@ -40,3 +40,8 @@ build/
 
 ### Reporte
 data/reporte_rutas.txt
+
+### Local secrets / run helpers
+run-backend-local.cmd
+run-backend-local.ps1
+.env.local

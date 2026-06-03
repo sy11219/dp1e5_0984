@@ -3,6 +3,7 @@ package org.e5.web;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.e5.db.AirportStatusService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,8 +18,11 @@ public class SimulatorServer {
     private static final int DEFAULT_PORT = 8080;
     private static final Pattern START_DATE = Pattern.compile("\"startDate\"\\s*:\\s*\"(\\d{8})\"");
     private static final Pattern DAYS = Pattern.compile("\"days\"\\s*:\\s*(\\d+)");
+    private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
 
     private final SimulationService simulationService = new SimulationService();
+    private final AirportStatusService airportStatusService = new AirportStatusService();
 
     public static void main(String[] args) throws IOException {
         int port = resolvePort(args);
@@ -49,6 +53,7 @@ public class SimulatorServer {
         HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         server.createContext("/api/health", this::health);
         server.createContext("/api/simulations/alns", this::runAlns);
+        server.createContext("/api/airports", this::airportStatus);
         server.createContext("/", this::staticFile);
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
@@ -85,6 +90,42 @@ public class SimulatorServer {
         } catch (Exception e) {
             e.printStackTrace();
             send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulacion ALNS\"}");
+        }
+    }
+
+    private void airportStatus(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        Matcher pathMatcher = AIRPORT_STATUS_PATH.matcher(exchange.getRequestURI().getPath());
+        if (!pathMatcher.matches()) {
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
+            return;
+        }
+
+        String code = pathMatcher.group(1);
+        try {
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 200, "application/json", airportStatusService.getStatus(code).toJson());
+                return;
+            }
+
+            if ("PATCH".equalsIgnoreCase(exchange.getRequestMethod())) {
+                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                Boolean active = readBoolean(ACTIVE, body);
+                if (active == null) {
+                    send(exchange, 400, "application/json", "{\"error\":\"Envie active como true o false\"}");
+                    return;
+                }
+                send(exchange, 200, "application/json", airportStatusService.updateStatus(code, active).toJson());
+                return;
+            }
+
+            send(exchange, 405, "application/json", "{\"error\":\"Use GET o PATCH\"}");
+        } catch (IllegalArgumentException e) {
+            send(exchange, 404, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
         }
     }
 
@@ -136,7 +177,7 @@ public class SimulatorServer {
 
     private void addCors(Headers headers) {
         headers.set("Access-Control-Allow-Origin", "*");
-        headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
         headers.set("Access-Control-Allow-Headers", "Content-Type");
     }
 
@@ -155,6 +196,11 @@ public class SimulatorServer {
     private int readInt(Pattern pattern, String body, int fallback) {
         Matcher matcher = pattern.matcher(body);
         return matcher.find() ? Integer.parseInt(matcher.group(1)) : fallback;
+    }
+
+    private Boolean readBoolean(Pattern pattern, String body) {
+        Matcher matcher = pattern.matcher(body);
+        return matcher.find() ? Boolean.parseBoolean(matcher.group(1)) : null;
     }
 
     private String escape(String message) {

@@ -16,3 +16,29 @@ export async function runSimulationRequest(
 
   return response.data;
 }
+
+export type AirportOperationalStatus = {
+  code: string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  active: boolean;
+};
+
+export async function getAirportStatus(
+  code: string
+): Promise<AirportOperationalStatus> {
+  const response = await api.get<AirportOperationalStatus>(
+    `/airports/${code}/status`
+  );
+  return response.data;
+}
+
+export async function updateAirportStatus(
+  code: string,
+  active: boolean
+): Promise<AirportOperationalStatus> {
+  const response = await api.patch<AirportOperationalStatus>(
+    `/airports/${code}/status`,
+    { active }
+  );
+  return response.data;
+}
