@@ -43,12 +43,17 @@ export interface AirportEvent {
     | "flight_departure"
     | "connection_arrival"
     | "connection_departure"
-    | "final_arrival";
+    | "final_arrival"
+    | "batch_complete"
+    | "replan"
+    | "flight_cancelled";
 }
 
 export interface Metrics {
   plannedShipments: number;
   shipments: number;
+  processedShipments?: number;
+  queuedShipments?: number;
   onTimeShipments: number;
   plannedBags: number;
   totalBags: number;
@@ -60,13 +65,32 @@ export interface Metrics {
   globalImprovements: number;
 }
 
+export interface Shipment {
+  id: string;
+  clientId: string;
+  origin: string;
+  destination: string;
+  requestMinute: number;
+  suitcases: number;
+  planned: boolean;
+  onTime: boolean;
+  estimatedArrival: number;
+  delayMinutes: number;
+  flightIds: string[];
+}
+
 export interface SimulationData {
   simulationId?: string;
   scenario: string;
   status?: string;
+  message?: string;
   days?: number;
+  tick?: number;
+  maxTick?: number;
+  cancelledFlightIds?: string[];
   airports: Airport[];
   flights: Flight[];
+  shipments: Shipment[];
   airportEvents: AirportEvent[];
   metrics: Metrics;
   realStartedAt: string;

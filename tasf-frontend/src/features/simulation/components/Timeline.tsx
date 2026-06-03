@@ -24,7 +24,7 @@ export function Timeline({ simMinute, maxMinute, setSimMinute, data }: TimelineP
         disabled={!data}
       />
       <div className="timeline-meta">
-        <span>Dia 0 · 00:00</span>
+        <span>Día 0 · 00:00</span>
         <strong>{formatSimMinute(simMinute)}</strong>
         <span>{`Dia ${Math.floor(maxMinute / 1440)} · 00:00`}</span>
       </div>

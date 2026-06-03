@@ -20,9 +20,12 @@ public class SimulatorServer {
     private static final Pattern DAYS = Pattern.compile("\"days\"\\s*:\\s*(\\d+)");
     private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
     private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
+    private static final Pattern STEPS = Pattern.compile("\"steps\"\\s*:\\s*(\\d+)");
+    private static final Pattern FLIGHT_ID = Pattern.compile("\"flightId\"\\s*:\\s*\"([^\"]+)\"");
 
     private final SimulationService simulationService = new SimulationService();
     private final AirportStatusService airportStatusService = new AirportStatusService();
+    private final RealtimeSimulationService realtimeSimulationService = new RealtimeSimulationService();
 
     public static void main(String[] args) throws IOException {
         int port = resolvePort(args);
@@ -54,6 +57,8 @@ public class SimulatorServer {
         server.createContext("/api/health", this::health);
         server.createContext("/api/simulations/alns", this::runAlns);
         server.createContext("/api/airports", this::airportStatus);
+        server.createContext("/api/simulations/batch", this::batchSimulation);
+        server.createContext("/api/realtime", this::realtime);
         server.createContext("/", this::staticFile);
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
@@ -126,6 +131,97 @@ public class SimulatorServer {
         } catch (Exception e) {
             e.printStackTrace();
             send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
+        }
+    }
+
+    private void realtime(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+
+        try {
+            if ("/api/realtime/start".equals(path) && "POST".equalsIgnoreCase(method)) {
+                String startDate = readString(START_DATE, body, "20260102");
+                int days = readInt(DAYS, body, 3);
+                send(exchange, 200, "application/json", realtimeSimulationService.start(startDate, days));
+                return;
+            }
+
+            Matcher stateMatcher = Pattern.compile("^/api/realtime/([^/]+)$").matcher(path);
+            if (stateMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.state(stateMatcher.group(1)));
+                return;
+            }
+
+            Matcher tickMatcher = Pattern.compile("^/api/realtime/([^/]+)/tick$").matcher(path);
+            if (tickMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                int steps = readInt(STEPS, body, 1);
+                send(exchange, 200, "application/json", realtimeSimulationService.advance(tickMatcher.group(1), steps));
+                return;
+            }
+
+            Matcher cancelMatcher = Pattern.compile("^/api/realtime/([^/]+)/cancel-flight$").matcher(path);
+            if (cancelMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                String flightId = readString(FLIGHT_ID, body, "");
+                send(exchange, 200, "application/json", realtimeSimulationService.cancelFlight(cancelMatcher.group(1), flightId));
+                return;
+            }
+
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint de tiempo real no encontrado\"}");
+        } catch (IllegalArgumentException e) {
+            send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar tiempo real\"}");
+        }
+    }
+
+    private void batchSimulation(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+
+        try {
+            if ("/api/simulations/batch/start".equals(path) && "POST".equalsIgnoreCase(method)) {
+                String startDate = readString(START_DATE, body, "20260102");
+                int days = readInt(DAYS, body, 3);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.startBatchSimulation(startDate, days));
+                return;
+            }
+
+            Matcher stateMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)$").matcher(path);
+            if (stateMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.state(stateMatcher.group(1)));
+                return;
+            }
+
+            Matcher advanceMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/advance$").matcher(path);
+            if (advanceMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                int steps = readInt(STEPS, body, 1);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.advance(advanceMatcher.group(1), steps));
+                return;
+            }
+
+            Matcher cancelMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/cancel-flight$").matcher(path);
+            if (cancelMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                String flightId = readString(FLIGHT_ID, body, "");
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.cancelFlight(cancelMatcher.group(1), flightId));
+                return;
+            }
+
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint de simulacion por lotes no encontrado\"}");
+        } catch (IllegalArgumentException e) {
+            send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulacion por lotes\"}");
         }
     }
 

@@ -45,3 +45,5 @@ data/reporte_rutas.txt
 run-backend-local.cmd
 run-backend-local.ps1
 .env.local
+## Debug
+salida.txt
