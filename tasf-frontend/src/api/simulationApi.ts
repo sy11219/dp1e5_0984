@@ -6,7 +6,7 @@ const api = axios.create({
   baseURL: "/api",
 });
 
-let realtimeOperationPromise: Promise<SimulationData> | null = null;
+// ── Simulación estática (un solo disparo, sin lotes) ─────────────────────────
 
 export async function runSimulationRequest(
   startDate: string,
@@ -16,9 +16,60 @@ export async function runSimulationRequest(
     startDate: startDate.replaceAll("-", ""),
     days,
   });
-
   return response.data;
 }
+
+// ── Simulación por lotes (SIMULACION_LOTES) ───────────────────────────────────
+
+/**
+ * Inicia una sesión de simulación por lotes.
+ * Devuelve el estado inicial (tick = 0, status = "RUNNING").
+ */
+export async function startBatchSimulationRequest(
+  startDate: string,
+  days: number
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>("/simulations/batch/start", {
+    startDate: startDate.replaceAll("-", ""),
+    days,
+  });
+  return response.data;
+}
+
+/**
+ * Avanza un lote de `steps` minutos simulados.
+ * El backend ejecuta el ALNS y responde inmediatamente (sin sleep).
+ * El frontend es responsable de la animación y de llamar de nuevo
+ * cuando la animación del lote termina.
+ */
+export async function advanceBatchSimulationRequest(
+  simulationId: string,
+  steps: number
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(
+    `/simulations/batch/${simulationId}/advance`,
+    { steps }
+  );
+  return response.data;
+}
+
+/**
+ * Cancela un vuelo futuro dentro de la sesión por lotes y replanifica.
+ */
+export async function cancelBatchFlightRequest(
+  simulationId: string,
+  flightId: string
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(
+    `/simulations/batch/${simulationId}/cancel-flight`,
+    { flightId }
+  );
+  return response.data;
+}
+
+// ── Tiempo real (sesión tick-a-tick) ─────────────────────────────────────────
+
+let realtimeOperationPromise: Promise<SimulationData> | null = null;
 
 export async function runRealtimeOperationRequest(): Promise<SimulationData> {
   if (!realtimeOperationPromise) {
@@ -29,7 +80,6 @@ export async function runRealtimeOperationRequest(): Promise<SimulationData> {
       }
     );
   }
-
   return realtimeOperationPromise;
 }
 
@@ -46,7 +96,6 @@ export async function startRealtimeSessionRequest(
     startDate: startDate.replaceAll("-", ""),
     days,
   });
-
   return response.data;
 }
 
@@ -58,7 +107,6 @@ export async function advanceRealtimeSessionRequest(
     `/realtime/${simulationId}/tick`,
     { steps }
   );
-
   return response.data;
 }
 
@@ -70,6 +118,5 @@ export async function cancelRealtimeFlightRequest(
     `/realtime/${simulationId}/cancel-flight`,
     { flightId }
   );
-
   return response.data;
 }

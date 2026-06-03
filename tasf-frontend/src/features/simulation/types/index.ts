@@ -43,7 +43,10 @@ export interface AirportEvent {
     | "flight_departure"
     | "connection_arrival"
     | "connection_departure"
-    | "final_arrival";
+    | "final_arrival"
+    | "batch_complete"
+    | "replan"
+    | "flight_cancelled";
 }
 
 export interface Metrics {
@@ -80,9 +83,11 @@ export interface SimulationData {
   simulationId?: string;
   scenario: string;
   status?: string;
+  message?: string;
   days?: number;
   tick?: number;
   maxTick?: number;
+  cancelledFlightIds?: string[];
   airports: Airport[];
   flights: Flight[];
   shipments: Shipment[];
