@@ -1,10 +1,6 @@
-import axios from "axios";
 import type { SimulationData } from "../features/simulation/types";
 import { DEFAULT_START_DATE } from "../features/simulation/utils/constants";
-
-const api = axios.create({
-  baseURL: "/api",
-});
+import { api } from "./apiClient";
 
 // ── Simulación estática (un solo disparo, sin lotes) ─────────────────────────
 

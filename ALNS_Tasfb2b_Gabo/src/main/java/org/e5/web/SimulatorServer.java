@@ -54,6 +54,7 @@ public class SimulatorServer {
         server.createContext("/api/simulations/alns", this::runAlns);
         server.createContext("/api/simulations/batch", this::batchSimulation);
         server.createContext("/api/realtime", this::realtime);
+        server.createContext("/api/upload", this::upload);
         server.createContext("/", this::staticFile);
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
@@ -70,6 +71,15 @@ public class SimulatorServer {
     private void health(HttpExchange exchange) throws IOException {
         if (preflight(exchange)) return;
         send(exchange, 200, "application/json", "{\"status\":\"ok\",\"service\":\"ALNS simulator\"}");
+    }
+
+    private void upload(HttpExchange exchange) throws IOException {
+        addCors(exchange.getResponseHeaders());
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            send(exchange, 405, "application/json", "{\"error\":\"Use POST\"}");
+            return;
+        }
+        send(exchange, 200, "application/json", "{\"status\":\"success\"}");
     }
 
     private void runAlns(HttpExchange exchange) throws IOException {
