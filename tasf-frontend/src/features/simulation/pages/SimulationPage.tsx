@@ -289,11 +289,17 @@ export function SimulationPage() {
   const handleReset = () => {
     setPlaying(false)
     setSimMinute(0)
+    setData(null)
+    setError("")
+    setNotice("")
+    setFlightToCancel("")
+    setSelectedAirport(null)
     setReportDismissed(false)
     accumulatedRef.current = 0
     playStartRef.current   = null
     setRealTimeMs(0)
     animatingRef.current   = false
+    reset()
   }
 
   return (

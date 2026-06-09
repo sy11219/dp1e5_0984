@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import type { ActiveFlight, Airport, AirportLoads, MapInfoCard as MapInfo, SimulationData } from "../../../types";
 import { STATUS_COLOR, MAP_CONFIG, PANE_Z_INDEX } from "../../../utils/constants";
-import { bearingDegrees, capacityStatus } from "../../../utils/calculations";
+import { capacityStatus } from "../../../utils/calculations";
 import { formatFlightMoment } from "../../../utils/formatters";
 
 const MAP_CENTER: L.LatLngTuple = [MAP_CONFIG.center[0], MAP_CONFIG.center[1]];
@@ -34,9 +34,8 @@ export default function MapStage({
   const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
   const mapElement = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const airportLayerRef = useRef<L.LayerGroup | null>(null);
-  const planeLayerRef = useRef<L.LayerGroup | null>(null);
   const airportLoadsRef = useRef<AirportLoads>({});
   const airportMarkersRef = useRef(new Map<string, AirportMarkerItem>());
 
@@ -50,6 +49,7 @@ export default function MapStage({
     airportLoadsRef.current = airportLoads;
   }, [airportLoads]);
 
+  // Inicializar mapa
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
 
@@ -78,9 +78,29 @@ export default function MapStage({
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    routeLayerRef.current = L.layerGroup().addTo(map);
     airportLayerRef.current = L.layerGroup().addTo(map);
-    planeLayerRef.current = L.layerGroup().addTo(map);
+
+    // Crear canvas overlay
+    const canvas = document.createElement("canvas");
+    canvas.style.position = "absolute";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.pointerEvents = "none";
+    canvas.className = "flight-canvas";
+    
+    canvas.style.zIndex = PANE_Z_INDEX.activeFlights;
+    map.getContainer().appendChild(canvas);
+    canvasRef.current = canvas;
+
+    // Función para redimensionar y redibujar canvas
+    const updateCanvasSize = () => {
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+    };
+
+    updateCanvasSize();
+    map.on("resize", updateCanvasSize);
 
     const timers = [0, 100, 350].map((delay) =>
       window.setTimeout(() => {
@@ -91,11 +111,13 @@ export default function MapStage({
 
     return () => {
       timers.forEach(window.clearTimeout);
+      map.off("resize", updateCanvasSize);
       mapRef.current?.remove();
       mapRef.current = null;
     };
   }, []);
 
+  // Renderizar aeropuertos
   useEffect(() => {
     if (!mapRef.current || !airportLayerRef.current) return;
 
@@ -122,6 +144,7 @@ export default function MapStage({
     }
   }, [airports, onSelectAirport, selectedAirport]);
 
+  // Actualizar estado de aeropuertos (colores)
   useEffect(() => {
     for (const airport of airports) {
       const item = airportMarkersRef.current.get(airport.code);
@@ -137,37 +160,101 @@ export default function MapStage({
     }
   }, [airports, airportLoads, selectedAirport]);
 
-  useEffect(() => {
-    if (!planeLayerRef.current) return;
+  // Función para dibujar en canvas
+  const drawFlights = useCallback(() => {
+    if (!canvasRef.current || !mapRef.current) return;
 
-    planeLayerRef.current.clearLayers();
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
 
+    // Limpiar canvas
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+    // Dibujar líneas de rutas
     for (const flight of activeFlights) {
       const origin = airportByCode[flight.origin];
       const destination = airportByCode[flight.destination];
       if (!origin || !destination) continue;
 
-      const latitude = origin.latitude + (destination.latitude - origin.latitude) * flight.progress;
-      const longitude = origin.longitude + (destination.longitude - origin.longitude) * flight.progress;
-      const angle = bearingDegrees(
-        origin.latitude,
-        origin.longitude,
-        destination.latitude,
-        destination.longitude
-      );
+      const { originPixel, destPixel } = getRouteGeometry(mapRef.current, origin, destination, flight.progress);
 
-      L.marker([latitude, longitude], {
-        icon: L.divIcon({
-          className: "flight-map-icon",
-          html: planeSvg(STATUS_COLOR[flight.status], angle),
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        }),
-        pane: "activeFlights",
-      })
-        .on("click", () => setMapInfo(createFlightInfo(data, flight, origin, destination)))
-        .addTo(planeLayerRef.current);
+      ctx.strokeStyle = STATUS_COLOR[flight.status];
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(originPixel.x, originPixel.y);
+      ctx.lineTo(destPixel.x, destPixel.y);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     }
+
+    // Dibujar aviones
+    for (const flight of activeFlights) {
+      const origin = airportByCode[flight.origin];
+      const destination = airportByCode[flight.destination];
+      if (!origin || !destination) continue;
+
+      const { planePixel, angle } = getRouteGeometry(mapRef.current, origin, destination, flight.progress);
+
+      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, STATUS_COLOR[flight.status]);
+    }
+  }, [activeFlights, airportByCode, mapRef]);
+
+  // Redibujar cuando cambian vuelos o mapa se mueve
+  useEffect(() => {
+    drawFlights();
+  }, [activeFlights, drawFlights]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const redraw = () => drawFlights();
+    mapRef.current.on("move", redraw);
+    mapRef.current.on("zoom", redraw);
+    mapRef.current.on("zoomend", redraw);
+    mapRef.current.on("viewreset", redraw);
+
+    return () => {
+      mapRef.current?.off("move", redraw);
+      mapRef.current?.off("zoom", redraw);
+      mapRef.current?.off("zoomend", redraw);
+      mapRef.current?.off("viewreset", redraw);
+    };
+  }, [drawFlights]);
+
+  // Manejar clicks en los aviones sin bloquear pan/zoom del mapa.
+  useEffect(() => {
+    if (!canvasRef.current || !mapRef.current) return;
+
+    const map = mapRef.current;
+    const mapContainer = map.getContainer();
+
+    const handleClick = (e: MouseEvent) => {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Buscar avión cerca del click (hitarea de 15px)
+      for (const flight of activeFlights) {
+        const origin = airportByCode[flight.origin];
+        const destination = airportByCode[flight.destination];
+        if (!origin || !destination) continue;
+
+        const { planePixel } = getRouteGeometry(map, origin, destination, flight.progress);
+
+        const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
+        if (dist < 15) {
+          setMapInfo(createFlightInfo(data, flight, origin, destination));
+          return;
+        }
+      }
+    };
+
+    mapContainer.addEventListener("click", handleClick);
+
+    return () => {
+      mapContainer.removeEventListener("click", handleClick);
+    };
   }, [activeFlights, airportByCode, data]);
 
   useEffect(() => {
@@ -276,11 +363,84 @@ function setPaneZIndex(map: L.Map, paneName: string, zIndex: string) {
   if (pane) pane.style.zIndex = zIndex;
 }
 
-function planeSvg(color: string, angle: number) {
-  return `
-    <svg class="plane-svg" viewBox="-24 -24 48 48" style="transform: rotate(${angle}deg)" aria-hidden="true">
-      <path class="plane-halo" d="M0 -22 C5 -22 7 -15 7 -6 L23 6 L23 13 L5 7 L4 17 L9 22 L9 24 L0 20 L-9 24 L-9 22 L-4 17 L-5 7 L-23 13 L-23 6 L-7 -6 C-7 -15 -5 -22 0 -22 Z"></path>
-      <path class="plane-body" fill="${color}" d="M0 -22 C5 -22 7 -15 7 -6 L23 6 L23 13 L5 7 L4 17 L9 22 L9 24 L0 20 L-9 24 L-9 22 L-4 17 L-5 7 L-23 13 L-23 6 L-7 -6 C-7 -15 -5 -22 0 -22 Z"></path>
-    </svg>
-  `;
+function getRouteGeometry(map: L.Map, origin: Airport, destination: Airport, progress: number) {
+  const originPixel = map.latLngToContainerPoint([origin.latitude, origin.longitude]);
+  const destPixel = map.latLngToContainerPoint([destination.latitude, destination.longitude]);
+  const dx = destPixel.x - originPixel.x;
+  const dy = destPixel.y - originPixel.y;
+
+  return {
+    originPixel,
+    destPixel,
+    planePixel: L.point(originPixel.x + dx * progress, originPixel.y + dy * progress),
+    angle: (Math.atan2(dx, -dy) * 180) / Math.PI,
+  };
+}
+
+function drawPlaneIcon(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, color: string) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.scale(0.54, 0.54);
+
+  drawPlanePath(ctx);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.lineWidth = 5.5;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+
+  drawPlanePath(ctx);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = "round";
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+  return;
+
+  // Dibujar cuerpo del avión (triangulo apuntando arriba)
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -10); // Punta
+  ctx.lineTo(-6, 8);   // Cola izquierda
+  ctx.lineTo(0, 4);    // Centro cola
+  ctx.lineTo(6, 8);    // Cola derecha
+  ctx.closePath();
+  ctx.fill();
+
+  // Outline
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Halo (sombra)
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawPlanePath(ctx: CanvasRenderingContext2D) {
+  ctx.beginPath();
+  ctx.moveTo(0, -22);
+  ctx.bezierCurveTo(5, -22, 7, -15, 7, -6);
+  ctx.lineTo(23, 6);
+  ctx.lineTo(23, 13);
+  ctx.lineTo(5, 7);
+  ctx.lineTo(4, 17);
+  ctx.lineTo(9, 22);
+  ctx.lineTo(9, 24);
+  ctx.lineTo(0, 20);
+  ctx.lineTo(-9, 24);
+  ctx.lineTo(-9, 22);
+  ctx.lineTo(-4, 17);
+  ctx.lineTo(-5, 7);
+  ctx.lineTo(-23, 13);
+  ctx.lineTo(-23, 6);
+  ctx.lineTo(-7, -6);
+  ctx.bezierCurveTo(-7, -15, -5, -22, 0, -22);
+  ctx.closePath();
 }

@@ -623,7 +623,7 @@ select {
   height: 26px;
   display: block;
   filter: drop-shadow(0 3px 7px rgba(15,23,42,0.32));
-  transform-origin: center;
+  transform-origin: center center;
   cursor: pointer;
   pointer-events: auto;
 }
@@ -699,8 +699,8 @@ select {
   z-index: 1200;
   top: 58px;
   right: 16px;
-  width: min(280px, calc(100% - 32px));
-  padding: 12px;
+  width: min(340px, calc(100% - 32px));
+  padding: 14px;
   border: 1px solid rgba(203,213,225,0.95);
   border-radius: 8px;
   background: rgba(255,255,255,0.96);
@@ -723,22 +723,32 @@ select {
 }
 
 .map-info-card dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin: 0;
   font-size: 12px;
+}
+
+.map-info-card dl > div {
+  display: grid;
+  grid-template-columns: minmax(76px, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
 }
 
 .map-info-card dt {
   color: var(--ink-soft);
   font-weight: 800;
+  min-width: 0;
 }
 
 .map-info-card dd {
   margin: 0;
   text-align: right;
   font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .map-info-close {
