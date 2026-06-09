@@ -45,7 +45,7 @@ public class SimulationService {
 
         int flightDays = days + 2;
         FlightPlanParser flightParser = new FlightPlanParser();
-        List<Flight> flights = flightParser.parse(flightDays, airportMap);
+        List<Flight> flights = flightParser.parseScheduledFromDatabase(startDate, flightDays, airportMap);
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
         List<Shipment> shipments = shipmentParser.parseAll(startDate, days);

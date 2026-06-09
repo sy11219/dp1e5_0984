@@ -1,4 +1,4 @@
-import type { SimulationData } from "../features/simulation/types";
+import type { Airport, Flight, SimulationData } from "../features/simulation/types";
 import { DEFAULT_START_DATE } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
 
@@ -122,6 +122,16 @@ export type AirportOperationalStatus = {
   status: "ACTIVE" | "INACTIVE" | string;
   active: boolean;
 };
+
+export async function getAirportsRequest(): Promise<Airport[]> {
+  const response = await api.get<Airport[]>("/airports");
+  return response.data;
+}
+
+export async function getFlightsRequest(): Promise<Flight[]> {
+  const response = await api.get<Flight[]>("/flights");
+  return response.data;
+}
 
 export async function getAirportStatus(
   code: string

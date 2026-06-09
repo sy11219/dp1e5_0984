@@ -13,6 +13,8 @@ export interface Airport {
   finalLoad?: number;
   utilization: number;
   status?: CapacityStatus;
+  operationalStatus?: "ACTIVE" | "INACTIVE" | string;
+  active?: boolean;
 }
 
 export interface Flight {
@@ -28,6 +30,7 @@ export interface Flight {
   maxCapacity: number;
   absoluteDepartureMinute: number;
   absoluteArrivalMinute: number;
+  scheduleStatus?: "SCHEDULED" | string;
 }
 
 export type ActiveFlight = Flight & {

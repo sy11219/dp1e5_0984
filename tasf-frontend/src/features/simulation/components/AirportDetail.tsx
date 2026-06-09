@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAirportStatus, updateAirportStatus } from "../../../api/simulationApi";
+import { updateAirportStatus } from "../../../api/simulationApi";
 import type { Airport } from "../types";
 import { capacityStatus } from "../utils/calculations";
 
@@ -23,40 +23,25 @@ interface AirportDetailProps {
   airport: Airport;
   load: number;
   peakLabel?: string;
+  onStatusUpdated?: (code: string, active: boolean, status: string) => void;
 }
 
 export function AirportDetail({
   airport,
   load,
   peakLabel = "Pico ALNS",
+  onStatusUpdated,
 }: AirportDetailProps) {
   const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
   const status = capacityStatus(utilization);
-  const [active, setActive] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [active, setActive] = useState(airport.active ?? true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [statusError, setStatusError] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    setLoadingStatus(true);
+    setActive(airport.active ?? airport.operationalStatus !== "INACTIVE");
     setStatusError("");
-
-    getAirportStatus(airport.code)
-      .then((response) => {
-        if (!cancelled) setActive(response.active);
-      })
-      .catch(() => {
-        if (!cancelled) setStatusError("No se pudo leer el estado.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStatus(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [airport.code]);
+  }, [airport.active, airport.code, airport.operationalStatus]);
 
   const handleStatusChange = async () => {
     const nextActive = !active;
@@ -67,6 +52,7 @@ export function AirportDetail({
     try {
       const response = await updateAirportStatus(airport.code, nextActive);
       setActive(response.active);
+      onStatusUpdated?.(response.code, response.active, response.status);
     } catch {
       setActive(!nextActive);
       setStatusError("No se pudo actualizar en BD.");
@@ -88,7 +74,7 @@ export function AirportDetail({
           aria-checked={active}
           className={`switch ${active ? "on" : ""}`}
           onClick={handleStatusChange}
-          disabled={loadingStatus || savingStatus}
+          disabled={savingStatus}
           title={active ? "Desactivar aeropuerto" : "Activar aeropuerto"}
         >
           <span />

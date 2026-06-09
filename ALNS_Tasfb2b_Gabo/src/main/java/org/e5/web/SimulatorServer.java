@@ -4,6 +4,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.e5.db.AirportStatusService;
+import org.e5.db.FlightPlanService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,6 +26,7 @@ public class SimulatorServer {
 
     private final SimulationService simulationService = new SimulationService();
     private final AirportStatusService airportStatusService = new AirportStatusService();
+    private final FlightPlanService flightPlanService = new FlightPlanService();
     private final RealtimeSimulationService realtimeSimulationService = new RealtimeSimulationService();
 
     public static void main(String[] args) throws IOException {
@@ -57,6 +59,7 @@ public class SimulatorServer {
         server.createContext("/api/health", this::health);
         server.createContext("/api/simulations/alns", this::runAlns);
         server.createContext("/api/airports", this::airportStatus);
+        server.createContext("/api/flights", this::flights);
         server.createContext("/api/simulations/batch", this::batchSimulation);
         server.createContext("/api/realtime", this::realtime);
         server.createContext("/api/upload", this::upload);
@@ -111,6 +114,21 @@ public class SimulatorServer {
     private void airportStatus(HttpExchange exchange) throws IOException {
         if (preflight(exchange)) return;
 
+        String path = exchange.getRequestURI().getPath();
+        if ("/api/airports".equals(path) || "/api/airports/".equals(path)) {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 405, "application/json", "{\"error\":\"Use GET\"}");
+                return;
+            }
+            try {
+                send(exchange, 200, "application/json", airportStatusService.listAirportsJson());
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudieron leer los aeropuertos\"}");
+            }
+            return;
+        }
+
         Matcher pathMatcher = AIRPORT_STATUS_PATH.matcher(exchange.getRequestURI().getPath());
         if (!pathMatcher.matches()) {
             send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
@@ -141,6 +159,28 @@ public class SimulatorServer {
         } catch (Exception e) {
             e.printStackTrace();
             send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
+        }
+    }
+
+    private void flights(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        String path = exchange.getRequestURI().getPath();
+        if (!"/api/flights".equals(path) && !"/api/flights/".equals(path)) {
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
+            return;
+        }
+
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            send(exchange, 405, "application/json", "{\"error\":\"Use GET\"}");
+            return;
+        }
+
+        try {
+            send(exchange, 200, "application/json", flightPlanService.listFlightsJson());
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudieron leer los vuelos\"}");
         }
     }
 

@@ -1,5 +1,6 @@
 package org.e5.web;
 
+import org.e5.db.FlightPlanService;
 import org.e5.model.Airport;
 import org.e5.model.Flight;
 import org.e5.model.Route;
@@ -58,6 +59,7 @@ public class RealtimeSimulationService {
     private static final int UMBRAL_COLA_REPLAN = 20;
 
     private final Map<String, RealtimeSession> sessions = new ConcurrentHashMap<>();
+    private final FlightPlanService flightPlanService = new FlightPlanService();
 
     // ════════════════════════════════════════════════════════════════════════
     //  API pública
@@ -111,7 +113,12 @@ public class RealtimeSimulationService {
      */
     public String cancelFlight(String id, String flightId) {
         RealtimeSession session = require(id);
-        session.cancel(flightId);
+        try {
+            flightPlanService.cancelFlight(flightId);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo marcar el vuelo como CANCELED en BD: " + flightId, e);
+        }
+        session.markCancelled(flightId);
         return session.snapshotJson();
     }
 
@@ -129,7 +136,7 @@ public class RealtimeSimulationService {
         }
 
         FlightPlanParser flightParser = new FlightPlanParser();
-        List<Flight> flights = flightParser.parse(days + 2, airportMap);
+        List<Flight> flights = flightParser.parseScheduledFromDatabase(startDate, days + 2, airportMap);
         for (Flight flight : flights) flight.resetLoad();
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
@@ -377,15 +384,16 @@ public class RealtimeSimulationService {
          *
          * Para TIEMPO_REAL: solo replanifica los afectados.
          */
-        synchronized void cancel(String flightId) {
+        synchronized void cancel(String flightId, FlightPlanService flightPlanService) {
             Flight toCancel = findFlight(flightId);
             if (toCancel == null)
                 throw new IllegalArgumentException("Vuelo no encontrado: " + flightId);
-            if (toCancel.absoluteDepartureMinute() <= tick)
-                throw new IllegalArgumentException(
-                        "Solo se pueden cancelar vuelos futuros. El vuelo " + flightId +
-                        " despega en el minuto " + toCancel.absoluteDepartureMinute() +
-                        " y el minuto actual es " + tick + ".");
+
+            try {
+                flightPlanService.cancelFlight(flightId);
+            } catch (Exception e) {
+                throw new IllegalStateException("No se pudo marcar el vuelo como CANCELED en BD: " + flightId, e);
+            }
 
             cancellations.add(flightId);
             events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
@@ -395,6 +403,11 @@ public class RealtimeSimulationService {
             } else {
                 replanAffected(flightId);
             }
+        }
+
+        synchronized void markCancelled(String flightId) {
+            cancellations.add(flightId);
+            events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
         }
 
         /**

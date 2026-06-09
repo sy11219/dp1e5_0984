@@ -62,7 +62,7 @@ public class Main {
             int batchDays = simulationDays + 2;
             System.out.printf("[2/4] Cargando plan de vuelos (%d días)...%n", batchDays);
             FlightPlanParser flightParser = new FlightPlanParser();
-            List<Flight> flights = flightParser.parse(batchDays, airportMap);
+            List<Flight> flights = flightParser.parseScheduledFromDatabase(simulationStartDate, batchDays, airportMap);
             System.out.printf("  Total: %d vuelos cargados.%n%n", flights.size());
 
             // ── Paso 3: Cargar envíos ─────────────────────────────────────────

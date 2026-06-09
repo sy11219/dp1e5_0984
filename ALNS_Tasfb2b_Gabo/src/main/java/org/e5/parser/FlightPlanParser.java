@@ -6,6 +6,13 @@ import org.e5.model.Flight;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,12 +62,16 @@ public class FlightPlanParser {
      * @return Lista de vuelos con dayOffset 0..simulationDays-1
      * @throws IOException Si el archivo no puede leerse
      */
-    public List<Flight> parse(int simulationDays) throws IOException {
-        return parse(DEFAULT_PATH, simulationDays);
+    public List<Flight> parse(int simulationDays) throws Exception {
+        return parseFromDatabase(null, simulationDays);
     }
 
-    public List<Flight> parse(int simulationDays, Map<String, Airport> airportMap) throws IOException {
-        return parse(DEFAULT_PATH, simulationDays, airportMap);
+    public List<Flight> parse(int simulationDays, Map<String, Airport> airportMap) throws Exception {
+        return parseFromDatabase(null, simulationDays);
+    }
+
+    public List<Flight> parseScheduledFromDatabase(String startDate, int simulationDays, Map<String, Airport> airportMap) throws Exception {
+        return parseFromDatabase(startDate, simulationDays);
     }
 
     /**
@@ -145,6 +156,80 @@ public class FlightPlanParser {
         System.out.printf("[FlightPlanParser] Cargados %d vuelos base, %d vuelos totales para %d dia(s).%n",
                 rawFlights.size(), allFlights.size(), simulationDays);
         return allFlights;
+    }
+
+    private List<Flight> parseFromDatabase(String startDate, int simulationDays) throws SQLException {
+        String sql = """
+                SELECT fp.flight_code,
+                       oa.code AS origin_code,
+                       da.code AS destination_code,
+                       fp.departure_time_utc,
+                       fp.arrival_time_utc,
+                       fp.capacity
+                FROM flight_plans fp
+                JOIN airports oa ON oa.id = fp.origin_airport_id
+                JOIN airports da ON da.id = fp.destination_airport_id
+                WHERE UPPER(fp.status) = 'SCHEDULED'
+                ORDER BY fp.departure_time_utc, fp.flight_code
+                """;
+
+        List<Flight> flights = new ArrayList<>();
+        try (Connection connection = openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    ZonedDateTime departure = result.getTimestamp("departure_time_utc")
+                            .toInstant()
+                            .atZone(ZoneOffset.UTC);
+                    ZonedDateTime arrival = result.getTimestamp("arrival_time_utc")
+                            .toInstant()
+                            .atZone(ZoneOffset.UTC);
+
+                    int departureMinute = departure.getHour() * 60 + departure.getMinute();
+                    int arrivalMinute = arrival.getHour() * 60 + arrival.getMinute();
+                    while (arrivalMinute <= departureMinute) {
+                        arrivalMinute += 1440;
+                    }
+
+                    for (int dayOffset = 0; dayOffset < simulationDays; dayOffset++) {
+                        flights.add(new Flight(
+                                result.getString("flight_code"),
+                                result.getString("origin_code"),
+                                result.getString("destination_code"),
+                                departureMinute,
+                                arrivalMinute,
+                                result.getInt("capacity"),
+                                dayOffset
+                        ));
+                    }
+                }
+            }
+        }
+
+        System.out.printf("[FlightPlanParser] Cargados %d vuelos SCHEDULED desde BD para %d dia(s).%n",
+                flights.size(), simulationDays);
+        return flights;
+    }
+
+    private Connection openConnection() throws SQLException {
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("No se encontro el driver JDBC de PostgreSQL. Verifica la dependencia org.postgresql:postgresql en pom.xml.", e);
+        }
+
+        String url = requireEnv("DB_URL");
+        String user = requireEnv("DB_USER");
+        String password = requireEnv("DB_PASSWORD");
+        return DriverManager.getConnection(url, user, password);
+    }
+
+    private String requireEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Falta variable de entorno: " + name);
+        }
+        return value;
     }
 
     private int toUtcMinute(String airportCode, int localMinute, Map<String, Airport> airportMap) {

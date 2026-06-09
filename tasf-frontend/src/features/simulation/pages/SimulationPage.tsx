@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import {
+  getAirportsRequest,
+  getFlightsRequest,
   startBatchSimulationRequest,
   advanceBatchSimulationRequest,
   cancelBatchFlightRequest,
@@ -13,7 +15,7 @@ import MapStage from "../components/simulation/map/MapStage"
 import { Timeline } from "../components/Timeline"
 import { Topbar } from "../components/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
-import type { SimulationData } from "../types"
+import type { Airport, Flight, SimulationData } from "../types"
 import { DAY_OPTIONS, DEFAULT_START_DATE } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 import { formatRealTime } from "../utils/timeUtils"
@@ -39,7 +41,11 @@ export function SimulationPage() {
   const [startDate, setStartDate]     = useState(DEFAULT_START_DATE)
   const [days, setDays]               = useState(3)
   const [data, setData]               = useState<SimulationData | null>(null)
+  const [airportCatalog, setAirportCatalog] = useState<Airport[]>([])
+  const [flightCatalog, setFlightCatalog] = useState<Flight[]>([])
   const [loading, setLoading]         = useState(false)   // cargando primer lote
+  const [loadingAirports, setLoadingAirports] = useState(false)
+  const [loadingFlights, setLoadingFlights] = useState(false)
   const [fetching, setFetching]       = useState(false)   // cargando lote intermedio
   const [cancelling, setCancelling]   = useState(false)
   const [error, setError]             = useState("")
@@ -81,6 +87,33 @@ export function SimulationPage() {
     return () => window.clearInterval(t)
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    setLoadingAirports(true)
+    setLoadingFlights(true)
+
+    Promise.all([getAirportsRequest(), getFlightsRequest()])
+      .then(([airports, flights]) => {
+        if (cancelled) return
+        setAirportCatalog(airports)
+        setFlightCatalog(flights)
+        setSelectedAirport((current) => current || airports[0]?.code || null)
+      })
+      .catch(() => {
+        if (!cancelled) setError("No se pudieron leer los aeropuertos o vuelos desde la BD.")
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingAirports(false)
+          setLoadingFlights(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // ── Contador de tiempo real de ejecución ───────────────────────────────────
   useEffect(() => {
     if (playing) {
@@ -100,7 +133,7 @@ export function SimulationPage() {
 
   // ── Pedir siguiente lote ───────────────────────────────────────────────────
   const fetchNextBatch = useCallback(async (sessionId: string, fromTick: number) => {
-    if (fetching || cancelling) return
+    if (fetching) return
     setFetching(true)
     setError("")
     try {
@@ -126,7 +159,7 @@ export function SimulationPage() {
     } finally {
       setFetching(false)
     }
-  }, [fetching, cancelling, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
+  }, [fetching, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
 
   // ── Callback que dispara el hook cuando termina la animación de un lote ────
   useEffect(() => {
@@ -167,7 +200,7 @@ export function SimulationPage() {
       // 1. Crear la sesión (tick = 0, status = RUNNING, sin datos aún)
       const initial = await startBatchSimulationRequest(startDate, days)
       setData(initial)
-      setSelectedAirport(initial.airports[0]?.code || null)
+      setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
       setPlaying(true)
 
       // 2. Pedir inmediatamente el primer lote
@@ -183,7 +216,7 @@ export function SimulationPage() {
   // ── Cancelar vuelo futuro ─────────────────────────────────────────────────
   const cancelFlight = async () => {
     const id = flightToCancel.trim()
-    if (!id) { setError("Ingresa el ID de un vuelo futuro."); return }
+    if (!id) { setError("Ingresa el codigo de un vuelo."); return }
     if (!data?.simulationId) { setError("Primero inicia una simulación."); return }
 
     // Pausar la animación durante la cancelación
@@ -194,35 +227,58 @@ export function SimulationPage() {
     setNotice("")
 
     try {
-      const payload = await cancelBatchFlightRequest(data.simulationId, id)
-      setData(payload)
-      setNotice(payload.message || `Vuelo ${id} cancelado y replanificado.`)
+      await cancelBatchFlightRequest(data.simulationId, id)
       setFlightToCancel("")
 
-      // Reanudar desde el tick actual
-      if (payload.status !== "COMPLETED") {
-        const currentTick = payload.tick ?? 0
-        prevTickRef.current = currentTick
-        setPlaying(true)
-        void fetchNextBatch(payload.simulationId!, currentTick)
-      }
+      accumulatedRef.current = 0
+      playStartRef.current   = null
+      prevTickRef.current    = 0
+      animatingRef.current   = false
+      setRealTimeMs(0)
+      reset()
+
+      const initial = await startBatchSimulationRequest(startDate, days)
+      setData(initial)
+      setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
+      setNotice(`Vuelo ${id} cancelado. Simulacion reiniciada desde cero.`)
+      setPlaying(true)
+
+      await fetchNextBatch(initial.simulationId!, 0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo.")
+      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo y reiniciar la simulacion.")
+      setPlaying(false)
     } finally {
       setCancelling(false)
     }
   }
 
   // ── Derivados de la UI ─────────────────────────────────────────────────────
+  const displayData = useMemo(
+    () => data ?? catalogSimulationData(airportCatalog, flightCatalog),
+    [airportCatalog, data, flightCatalog]
+  )
   const airportLoads = useMemo(
-    () => computeAirportLoads(data, simMinute),
-    [data, simMinute]
+    () => computeAirportLoads(displayData, simMinute),
+    [displayData, simMinute]
   )
   const activeFlights = useMemo(
-    () => computeActiveFlights(data, simMinute),
-    [data, simMinute]
+    () => computeActiveFlights(displayData, simMinute),
+    [displayData, simMinute]
   )
-  const selected = data?.airports.find((a) => a.code === selectedAirport)
+  const selected = displayData.airports.find((a) => a.code === selectedAirport)
+
+  const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
+    const updateAirport = (airport: Airport) =>
+      airport.code === code
+        ? { ...airport, active, operationalStatus: status }
+        : airport
+
+    setAirportCatalog((airports) => airports.map(updateAirport))
+    setData((current) => current
+      ? { ...current, airports: current.airports.map(updateAirport) }
+      : current
+    )
+  }
 
   const handleDaysChange = (option: number) => {
     setDays(option)
@@ -289,7 +345,7 @@ export function SimulationPage() {
 
         <section className="panel map-panel">
           <MapStage
-            data={data}
+            data={displayData}
             activeFlights={activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
@@ -309,18 +365,24 @@ export function SimulationPage() {
           </div>
           <section className="panel section">
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
+            {loadingAirports && <div className="empty-state">Cargando aeropuertos...</div>}
             {selected && (
-              <AirportDetail airport={selected} load={airportLoads[selected.code] || 0} />
+              <AirportDetail
+                airport={selected}
+                load={airportLoads[selected.code] || 0}
+                onStatusUpdated={handleAirportStatusUpdated}
+              />
             )}
           </section>
           <section className="panel section">
             <h3>Vuelos activos</h3>
+            {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
             <FlightsTable flights={activeFlights} />
           </section>
           <section className="panel section">
             <h3>Aeropuertos críticos</h3>
-            {data ? (
-              <AirportsTable airports={data.airports} loads={airportLoads} />
+            {displayData.airports.length ? (
+              <AirportsTable airports={displayData.airports} loads={airportLoads} />
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}
@@ -422,7 +484,7 @@ function SimulationControls({
           <label>Cancelar vuelo futuro</label>
           <input
             type="text"
-            placeholder="ID de vuelo (ej: LA-101-D1)"
+            placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
             value={flightToCancel}
             onChange={(e) => onFlightToCancelChange(e.target.value)}
             disabled={!hasSimulation || busy}
@@ -460,4 +522,37 @@ function CapacityLegend() {
       </div>
     </section>
   )
+}
+
+function catalogSimulationData(airports: Airport[], flights: Flight[]): SimulationData {
+  const start = `${DEFAULT_START_DATE}T00:00:00`
+  return {
+    scenario: "CATALOG",
+    status: "IDLE",
+    days: 0,
+    tick: 0,
+    maxTick: 0,
+    airports,
+    flights,
+    shipments: [],
+    airportEvents: [],
+    metrics: {
+      plannedShipments: 0,
+      shipments: 0,
+      onTimeShipments: 0,
+      plannedBags: 0,
+      totalBags: 0,
+      usedFlights: 0,
+      iterations: 0,
+      fitnessFinal: 0,
+      fitnessInitial: 0,
+      acceptedBySa: 0,
+      globalImprovements: 0,
+    },
+    realStartedAt: start,
+    realFinishedAt: start,
+    simulationStartDateTime: start,
+    simulationEndDateTime: start,
+    runtimeMs: 0,
+  }
 }
