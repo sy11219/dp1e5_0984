@@ -306,6 +306,7 @@ export function SimulationPage() {
             maxMinute={maxMinute}
             setSimMinute={setSimMinute}
             data={data}
+            startDate={startDate}
           />
         </section>
 
