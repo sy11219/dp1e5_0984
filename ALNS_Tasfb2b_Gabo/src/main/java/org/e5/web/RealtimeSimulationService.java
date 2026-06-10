@@ -264,7 +264,7 @@ public class RealtimeSimulationService {
                 ALNS alns = new ALNS(iters, seg, nDestr, 300.0, 0.995, 2,
                         9.0, 3.0, 0.0, 0.8);
 
-                Map<String, Route> resultado = alns.ejecutar(loteShipments, vuelosDisponibles, airportMap);
+                Map<String, Route> resultado = alns.ejecutarIncremental(loteShipments, vuelosDisponibles, airportMap);
 
                 // Registrar eventos de aeropuerto para la animación
                 for (Shipment s : loteShipments) {

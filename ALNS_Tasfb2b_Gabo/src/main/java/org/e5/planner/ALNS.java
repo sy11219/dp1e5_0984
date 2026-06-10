@@ -105,10 +105,33 @@ public class ALNS {
     public Map<String, Route> ejecutar(List<Shipment> shipments,
                                         List<Flight> flights,
                                         Map<String, Airport> airportMap) {
+        return ejecutar(shipments, flights, airportMap, false);
+    }
+
+    /**
+     * Planifica nuevos envíos respetando las cargas que ya existen en vuelos y
+     * aeropuertos. Se usa en simulación incremental para no perder reservas de
+     * lotes anteriores.
+     */
+    public Map<String, Route> ejecutarIncremental(List<Shipment> shipments,
+                                                   List<Flight> flights,
+                                                   Map<String, Airport> airportMap) {
+        return ejecutar(shipments, flights, airportMap, true);
+    }
+
+    private Map<String, Route> ejecutar(List<Shipment> shipments,
+                                        List<Flight> flights,
+                                        Map<String, Airport> airportMap,
+                                        boolean preservarCapacidadExistente) {
         if (shipments.isEmpty()) return new HashMap<>();
 
-        for (Flight f : flights)  f.resetLoad();
-        for (Airport a : airportMap.values()) a.resetLoad();
+        Map<Flight, Integer> cargaBaseVuelos =
+                snapshotCargasVuelos(flights, preservarCapacidadExistente);
+        Map<String, Integer> cargaBaseAeropuertos =
+                snapshotCargasAeropuertos(airportMap, preservarCapacidadExistente);
+        reconstruirCapacidad(Collections.emptyMap(), Collections.emptyList(),
+                flights, airportMap, cargaBaseVuelos, cargaBaseAeropuertos);
+        for (Shipment s : shipments) s.resetPlanningState();
 
         ALNSRouteFinder finder = new ALNSRouteFinder(airportMap, maxEscalas);
 
@@ -171,6 +194,8 @@ public class ALNS {
                 }
             } else {
                 reward = rewardNoAcepta;
+                reconstruirCapacidad(solActual, allShipments, flights, airportMap,
+                        cargaBaseVuelos, cargaBaseAeropuertos);
             }
 
             scoreDestructor[idxD] += reward;
@@ -183,6 +208,8 @@ public class ALNS {
         }
 
         fitnessMejorFinal = fitMejor;
+        reconstruirCapacidad(solMejor, allShipments, flights, airportMap,
+                cargaBaseVuelos, cargaBaseAeropuertos);
         registrarResultados(solMejor, allShipments, finder);
         imprimirResumen();
         return solMejor;
@@ -209,7 +236,7 @@ public class ALNS {
                 Math.max(80, maxIteraciones / 5), Math.max(10, segmento / 2),
                 afectados.size(), temperaturaInicial * 0.3, 0.99, maxEscalas,
                 rewardMejora, rewardAcepta, rewardNoAcepta, decayPesos);
-        return rapido.ejecutar(afectados, disponibles, airportMap);
+        return rapido.ejecutarIncremental(afectados, disponibles, airportMap);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -568,6 +595,55 @@ public class ALNS {
         for (int i = 0; i < vuelos.size() - 1; i++) {
             Airport apt = airportMap.get(vuelos.get(i).getDestCode());
             if (apt != null) apt.removeLoad(maletas);
+        }
+    }
+
+    private Map<Flight, Integer> snapshotCargasVuelos(List<Flight> flights,
+                                                       boolean preservar) {
+        Map<Flight, Integer> snapshot = new IdentityHashMap<>();
+        for (Flight f : flights) {
+            snapshot.put(f, preservar ? f.getAssignedLoad() : 0);
+        }
+        return snapshot;
+    }
+
+    private Map<String, Integer> snapshotCargasAeropuertos(Map<String, Airport> airportMap,
+                                                           boolean preservar) {
+        Map<String, Integer> snapshot = new HashMap<>();
+        for (Airport a : airportMap.values()) {
+            snapshot.put(a.getCode(), preservar ? a.getCurrentLoad() : 0);
+        }
+        return snapshot;
+    }
+
+    private void restaurarCapacidadBase(List<Flight> flights,
+                                        Map<String, Airport> airportMap,
+                                        Map<Flight, Integer> cargaBaseVuelos,
+                                        Map<String, Integer> cargaBaseAeropuertos) {
+        for (Flight f : flights) {
+            f.resetLoad();
+            int carga = cargaBaseVuelos.getOrDefault(f, 0);
+            if (carga > 0) f.assignLoad(carga);
+        }
+        for (Airport a : airportMap.values()) {
+            a.resetLoad();
+            int carga = cargaBaseAeropuertos.getOrDefault(a.getCode(), 0);
+            if (carga > 0) a.addLoad(carga);
+        }
+    }
+
+    private void reconstruirCapacidad(Map<String, Route> sol,
+                                      List<Shipment> shipments,
+                                      List<Flight> flights,
+                                      Map<String, Airport> airportMap,
+                                      Map<Flight, Integer> cargaBaseVuelos,
+                                      Map<String, Integer> cargaBaseAeropuertos) {
+        restaurarCapacidadBase(flights, airportMap, cargaBaseVuelos, cargaBaseAeropuertos);
+        for (Shipment s : shipments) {
+            Route ruta = sol.get(s.getShipmentId());
+            if (ruta != null && ruta.isValid()) {
+                reservarCapacidad(ruta, s.getSuitcaseCount(), airportMap);
+            }
         }
     }
 
