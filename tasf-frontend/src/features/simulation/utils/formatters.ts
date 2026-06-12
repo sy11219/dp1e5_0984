@@ -38,11 +38,11 @@ export function formatTimeOnly(value: string | Date | undefined): string {
 
 export function formatSimMinute(value: number): string {
   const minute = Math.max(0, Math.floor(value));
-  const day = Math.floor(minute / 1440);
+  //const day = Math.floor(minute / 1440);
   const dayMinute = minute % 1440;
   const hour = Math.floor(dayMinute / 60);
   const min = dayMinute % 60;
-  return `Dia ${day} · ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  return `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
 export function formatFlightMoment(data: FlightMomentData, absoluteMinute: number): string {
