@@ -150,7 +150,7 @@ export const BaggagePage = () => {
       <main className="dashboard-workspace">
         <section className="dashboard-heading">
           <div>
-            <h1>Gestion de maletas</h1>
+            <h1>Gestión de maletas</h1>
             <p>Monitoreo de carga, conexiones y pendientes por aeropuerto.</p>
           </div>
           <button className="primary" onClick={loadData} disabled={loading}>
@@ -169,7 +169,7 @@ export const BaggagePage = () => {
           <div className="panel section metric-panel">
             <span>Pendientes</span>
             <strong>{pendingBags.toLocaleString("es-PE")}</strong>
-            <small>revision o conexion activa</small>
+            <small>revisión o conexión activa</small>
           </div>
           <div className="panel section metric-panel">
             <span>Incidencias</span>
@@ -220,7 +220,7 @@ export const BaggagePage = () => {
               </div>
             ) : (
               <div className="empty-state">
-                {loading ? "Cargando incidencias..." : "No hay incidencias en la simulacion."}
+                {loading ? "Cargando incidencias..." : "No hay incidencias en la simulación."}
               </div>
             )}
           </div>

@@ -65,13 +65,13 @@ function buildInsights(data: SimulationData) {
   return [
     {
       title: mostUsedAirport
-        ? `${mostUsedAirport.code} esta cerca del limite.`
+        ? `${mostUsedAirport.code} esta cerca del límite.`
         : "Sin aeropuertos cargados.",
       detail: mostUsedAirport
         ? `La utilizacion llega a ${Math.round(
             mostUsedAirport.utilization * 100
-          )}% durante la simulacion.`
-        : "Ejecuta la simulacion para poblar los indicadores.",
+          )}% durante la simulación.`
+        : "Ejecuta la simulación para poblar los indicadores.",
     },
     {
       title: busiestBucket
@@ -102,7 +102,7 @@ export const StatsPage = () => {
       const payload = await refreshRealtimeOperationRequest();
       setData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar estadisticas.");
+      setError(err instanceof Error ? err.message : "No se pudo cargar estadísticas.");
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ export const StatsPage = () => {
       })
       .catch((err) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "No se pudo cargar estadisticas.");
+          setError(err instanceof Error ? err.message : "No se pudo cargar estadísticas.");
         }
       })
       .finally(() => {
@@ -150,8 +150,8 @@ export const StatsPage = () => {
       <main className="dashboard-workspace">
         <section className="dashboard-heading">
           <div>
-            <h1>Estadisticas</h1>
-            <p>Resumen de rendimiento, capacidad y cumplimiento de la operacion.</p>
+            <h1>Estadísticas</h1>
+            <p>Resumen de rendimiento, capacidad y cumplimiento de la operación.</p>
           </div>
           <button className="primary" onClick={loadData} disabled={loading}>
             {loading ? "Actualizando..." : "Actualizar reporte"}
@@ -162,9 +162,9 @@ export const StatsPage = () => {
 
         <section className="dashboard-grid">
           <div className="panel section metric-panel">
-            <span>Planificacion</span>
+            <span>Planificación</span>
             <strong>{`${planningPct}%`}</strong>
-            <small>envios asignados correctamente</small>
+            <small>envíos asignados correctamente</small>
           </div>
           <div className="panel section metric-panel">
             <span>A tiempo</span>
@@ -194,13 +194,13 @@ export const StatsPage = () => {
               </ResponsiveContainer>
             ) : (
               <div className="empty-state">
-                {loading ? "Cargando datos del backend..." : "Sin envios para graficar."}
+                {loading ? "Cargando datos del backend..." : "Sin envíos para graficar."}
               </div>
             )}
           </div>
 
           <div className="panel section chart-panel">
-            <h2>Utilizacion por aeropuerto</h2>
+            <h2>Utilización por aeropuerto</h2>
             {airportUse.length ? (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={airportUse} margin={{ left: -18, right: 12, top: 10 }}>

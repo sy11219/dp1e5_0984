@@ -68,13 +68,13 @@ export function Topbar({
           sub={data ? formatTimeOnly(data.simulationEndDateTime) : "--"}
         />
         <StatusItem
-          label="Duracion"
+          label="Duración"
           value={data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--"}
-          sub="ejecucion real"
+          sub="ejecución real"
         />
         <StatusItem
-          label="Algoritmo"
-          value={data?.scenario || "ALNS"}
+          label="Escenario"
+          value={data?.scenario || "SIMULACION_LOTES"}
           sub="--"
         />
       </div>
