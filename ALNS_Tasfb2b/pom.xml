@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.e5</groupId>
-    <artifactId>ALNS_Tasfb2b_Gabo</artifactId>
+    <artifactId>ALNS_Tasfb2b</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
