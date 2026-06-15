@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   advanceRealtimeSessionRequest,
+  cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
@@ -155,11 +156,18 @@ export const OperationsPage = () => {
   const [data, setData] = useState<SimulationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [advancing, setAdvancing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [flightToCancel, setFlightToCancel] = useState("");
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
 
-  const operationalMinute = data?.tick || 0;
+  const operationalMinute = useMemo(() => {
+    if (!data?.tick || !data.realFinishedAt) return data?.tick || 0;
+    const elapsedMinutes = (now.getTime() - new Date(data.realFinishedAt).getTime()) / 60000;
+    return Math.min(data.maxTick || Number.POSITIVE_INFINITY, data.tick + Math.max(0, elapsedMinutes));
+  }, [data, now]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -167,8 +175,9 @@ export const OperationsPage = () => {
   }, []);
 
   const connectOperation = async () => {
-    setLoading(true);
-    setError("");
+      setLoading(true);
+      setError("");
+      setNotice("");
 
     try {
       const payload = await startRealtimeSessionRequest();
@@ -243,7 +252,32 @@ export const OperationsPage = () => {
     () => computeActiveFlights(data, operationalMinute),
     [data, operationalMinute]
   );
+  const cancellableFlights = useMemo(() => {
+    if (!data) return [];
+    const cancelled = new Set(data.cancelledFlightIds || []);
+    return data.flights
+      .filter((flight) => flight.absoluteDepartureMinute > operationalMinute)
+      .filter((flight) => !cancelled.has(flight.id))
+      .slice(0, 100);
+  }, [data, operationalMinute]);
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
+
+  const cancelFlight = async () => {
+    if (!data?.simulationId || !flightToCancel.trim()) return;
+    setCancelling(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await cancelRealtimeFlightRequest(data.simulationId, flightToCancel.trim());
+      setData(updated);
+      setFlightToCancel("");
+      setNotice("Cancelacion registrada. Se aplicara en la siguiente ejecucion de Tiempo real.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -261,11 +295,48 @@ export const OperationsPage = () => {
                 <span>{advancing ? "actualizando desde backend" : "sin adelanto manual"}</span>
               </div>
 
+              <div className="metric">
+                <span>Cola de vuelos</span>
+                <strong>{data?.flightQueueSize ?? data?.metrics.flightQueueSize ?? 0}</strong>
+                <span>{`${data?.realtimeWindowMinutes ?? 60} min por ejecucion`}</span>
+              </div>
+
+              <div className="metric">
+                <span>Cancelaciones pendientes</span>
+                <strong>{data?.pendingCancellationCount ?? data?.metrics.pendingCancellations ?? 0}</strong>
+                <span>siguiente ejecucion</span>
+              </div>
+
               <button className="primary" onClick={connectOperation} disabled={loading}>
                 {loading ? "Conectando..." : "Reconectar operacion"}
               </button>
 
+              <div className="field">
+                <label>Cancelar vuelo</label>
+                <select
+                  value={flightToCancel}
+                  onChange={(event) => setFlightToCancel(event.target.value)}
+                  disabled={!cancellableFlights.length || cancelling}
+                >
+                  <option value="">Selecciona un vuelo futuro</option>
+                  {cancellableFlights.map((flight) => (
+                    <option key={flight.id} value={flight.id}>
+                      {`${flight.id} · ${flight.origin}-${flight.destination}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                className="secondary"
+                onClick={cancelFlight}
+                disabled={!flightToCancel || cancelling}
+              >
+                {cancelling ? "Registrando..." : "Registrar cancelacion"}
+              </button>
+
               {error && <div className="error">{error}</div>}
+              {notice && <div className="success">{notice}</div>}
             </div>
           </section>
 

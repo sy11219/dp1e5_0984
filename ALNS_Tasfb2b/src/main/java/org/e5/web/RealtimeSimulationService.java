@@ -61,8 +61,9 @@ public class RealtimeSimulationService {
 
     // ── Parámetros del loop de tiempo real ────────────────────────────────────
     private static final int INTERVALO_TICK    = 1;
-    private static final int INTERVALO_REPLAN  = 10;
     private static final int UMBRAL_COLA_REPLAN = 20;
+    private static final int REALTIME_WINDOW_MINUTES = 60;
+    private static final long REALTIME_EXECUTION_INTERVAL_MS = 300_000L;
 
     private final Map<String, RealtimeSession> sessions = new ConcurrentHashMap<>();
     private final FlightPlanService flightPlanService = new FlightPlanService();
@@ -246,8 +247,8 @@ public class RealtimeSimulationService {
             if (days != 5)
                 throw new IllegalArgumentException("Solo se permite simular 5 dias.");
         } else {
-            if (days != 5)
-                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
+            if (days < 1 || days > 7)
+                throw new IllegalArgumentException("Tiempo real permite operar entre 1 y 7 dias.");
         }
     }
 
@@ -275,8 +276,12 @@ public class RealtimeSimulationService {
         // Estado de tiempo real
         final List<Shipment> queue     = new ArrayList<>();
         final List<Shipment> processed = new ArrayList<>();
+        final List<Flight> flightQueue = new ArrayList<>();
         final List<RealtimeEvent> events = new ArrayList<>();
         final Set<String> processedFlightEvents = new HashSet<>();
+        final Set<String> loadedRealtimeFlightIds = new HashSet<>();
+        final Set<String> queuedShipmentIds = new HashSet<>();
+        final Set<String> pendingCancellations = new HashSet<>();
         final Set<String> cancellations = new HashSet<>();
 
         final long realStartedAtMs = System.currentTimeMillis();
@@ -288,6 +293,9 @@ public class RealtimeSimulationService {
         int batchCount = 0;
         long lastBatchRuntimeMs = 0;
         long lastRealtimeAdvanceMs = 0;
+        long lastRealtimeExecutionMs = 0;
+        int nextRealtimeFlightLoadMinute;
+        int realtimeExecutionCount = 0;
 
         // ── Solo para SIMULACION_LOTES: solución acumulada global ─────────────
         // Guarda las rutas de todos los lotes anteriores para poder hacer
@@ -312,6 +320,7 @@ public class RealtimeSimulationService {
                 shipmentsByMinute.computeIfAbsent(s.getRequestMinute(), k -> new ArrayList<>()).add(s);
             this.tick = startOffsetMinutes;
             this.maxTick = startOffsetMinutes + days * 1440;
+            this.nextRealtimeFlightLoadMinute = startOffsetMinutes;
             ZonedDateTime simulationStart = LocalDate.parse(startDate, RAW_DATE)
                     .atStartOfDay(originZone)
                     .plusMinutes(startOffsetMinutes);
@@ -449,6 +458,8 @@ public class RealtimeSimulationService {
         // ── TIEMPO_REAL: avance tick a tick ───────────────────────────────────
 
         synchronized void advance(int steps) {
+            if (completed) return;
+            executeRealtimeCycleIfDue(true);
             for (int i = 0; i < steps && !completed; i++) step();
         }
 
@@ -462,7 +473,7 @@ public class RealtimeSimulationService {
         private void step() {
             List<Shipment> incoming = shipmentsByMinute.getOrDefault(tick, Collections.emptyList());
             if (!incoming.isEmpty()) {
-                queue.addAll(incoming);
+                for (Shipment s : incoming) enqueueShipment(s);
                 for (Shipment s : incoming) {
                     Airport origin = airportMap.get(s.getOriginCode());
                     if (origin != null) origin.addLoad(s.getSuitcaseCount());
@@ -470,13 +481,63 @@ public class RealtimeSimulationService {
                 }
             }
             processFlightMovements();
-            if (!queue.isEmpty() && (tick % INTERVALO_REPLAN == 0 || queue.size() >= UMBRAL_COLA_REPLAN))
-                planQueue();
+            executeRealtimeCycleIfDue(false);
             tick += INTERVALO_TICK;
             if (tick > maxTick) {
                 if (!queue.isEmpty()) planQueue();
                 completed = true;
             }
+        }
+
+        private void executeRealtimeCycleIfDue(boolean allowInitial) {
+            long now = System.currentTimeMillis();
+            boolean firstCycle = lastRealtimeExecutionMs == 0;
+            boolean dueByClock = !firstCycle && now - lastRealtimeExecutionMs >= REALTIME_EXECUTION_INTERVAL_MS;
+            if (firstCycle) {
+                if (!allowInitial) return;
+            } else if (!dueByClock) {
+                return;
+            }
+
+            long cycleStartMs = System.currentTimeMillis();
+            int windowStart = nextRealtimeFlightLoadMinute;
+            int windowEnd = Math.min(windowStart + REALTIME_WINDOW_MINUTES, maxTick);
+            loadRealtimeFlights(windowStart, windowEnd);
+            nextRealtimeFlightLoadMinute = windowEnd;
+
+            applyPendingRealtimeCancellations();
+
+            lastBatchStart = windowStart;
+            lastBatchEnd = windowEnd;
+            batchCount++;
+            realtimeExecutionCount++;
+
+            if (!queue.isEmpty()) planQueue();
+
+            events.add(new RealtimeEvent(tick, "SYSTEM", flightQueue.size(), "replan"));
+            lastBatchRuntimeMs = System.currentTimeMillis() - cycleStartMs;
+            lastRealtimeExecutionMs = now;
+        }
+
+        private void loadRealtimeFlights(int windowStart, int windowEnd) {
+            if (windowStart >= windowEnd) return;
+            int added = 0;
+            for (Flight f : flights) {
+                int departure = f.absoluteDepartureMinute();
+                if (departure < windowStart || departure >= windowEnd) continue;
+                if (cancellations.contains(f.getFlightId()) || pendingCancellations.contains(f.getFlightId())) continue;
+                if (loadedRealtimeFlightIds.add(f.getFlightId())) {
+                    flightQueue.add(f);
+                    added++;
+                }
+            }
+            System.out.printf("[Tiempo real] Ventana vuelos %d-%d | +%d | cola=%d%n",
+                    windowStart, windowEnd, added, flightQueue.size());
+        }
+
+        private void enqueueShipment(Shipment shipment) {
+            if (shipment == null) return;
+            if (queuedShipmentIds.add(shipment.getShipmentId())) queue.add(shipment);
         }
 
         private void processFlightMovements() {
@@ -509,7 +570,42 @@ public class RealtimeSimulationService {
             Map<String, Route> result = alns.ejecutar(queue, availableFlightsFrom(tick), airportMap);
             events.add(new RealtimeEvent(tick, "SYSTEM", result.size(), "replan"));
             processed.addAll(queue);
+            for (Shipment s : queue) queuedShipmentIds.remove(s.getShipmentId());
             queue.clear();
+        }
+
+        private void applyPendingRealtimeCancellations() {
+            if (pendingCancellations.isEmpty()) return;
+            List<String> pending = new ArrayList<>(pendingCancellations);
+            pendingCancellations.clear();
+            for (String flightId : pending) {
+                cancellations.add(flightId);
+                flightQueue.removeIf(f -> f.getFlightId().equals(flightId));
+                loadedRealtimeFlightIds.remove(flightId);
+                requeueAffectedByRealtimeCancellation(flightId);
+                events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
+            }
+        }
+
+        private void requeueAffectedByRealtimeCancellation(String flightId) {
+            Iterator<Shipment> iterator = processed.iterator();
+            while (iterator.hasNext()) {
+                Shipment s = iterator.next();
+                Route route = s.getAssignedRoute();
+                if (route == null) continue;
+                boolean usesCancelled = route.getFlights().stream()
+                        .anyMatch(f -> f.getFlightId().equals(flightId));
+                if (!usesCancelled) continue;
+
+                for (Flight f : route.getFlights()) {
+                    if (f.absoluteDepartureMinute() >= tick) {
+                        f.releaseLoad(s.getSuitcaseCount());
+                    }
+                }
+                s.resetPlanningState();
+                iterator.remove();
+                enqueueShipment(s);
+            }
         }
 
         // ── Cancelación de vuelos futuros ────────────────────────────────────
@@ -537,13 +633,13 @@ public class RealtimeSimulationService {
                 throw new IllegalStateException("No se pudo marcar el vuelo como CANCELED en BD: " + flightId, e);
             }
 
-            cancellations.add(flightId);
-            events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
-
             if ("SIMULACION_LOTES".equals(scenario)) {
+                cancellations.add(flightId);
+                events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
                 cancelBatch(flightId);
             } else {
-                replanAffected(flightId);
+                pendingCancellations.add(flightId);
+                events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled_pending"));
             }
         }
 
@@ -648,8 +744,10 @@ public class RealtimeSimulationService {
 
         private List<Flight> availableFlightsFrom(int fromMinute) {
             List<Flight> available = new ArrayList<>();
-            for (Flight f : flights) {
+            List<Flight> source = "TIEMPO_REAL".equals(scenario) ? flightQueue : flights;
+            for (Flight f : source) {
                 if (!cancellations.contains(f.getFlightId())
+                        && !pendingCancellations.contains(f.getFlightId())
                         && f.absoluteDepartureMinute() >= fromMinute)
                     available.add(f);
             }
@@ -696,6 +794,10 @@ public class RealtimeSimulationService {
             json.prop("lastBatchStart", lastBatchStart).comma();
             json.prop("lastBatchEnd", lastBatchEnd).comma();
             json.prop("lastBatchRuntimeMs", lastBatchRuntimeMs).comma();
+            json.prop("realtimeWindowMinutes", REALTIME_WINDOW_MINUTES).comma();
+            json.prop("realtimeExecutionIntervalMs", REALTIME_EXECUTION_INTERVAL_MS).comma();
+            json.prop("flightQueueSize", flightQueue.size()).comma();
+            json.prop("pendingCancellationCount", pendingCancellations.size()).comma();
             json.prop("message", message).comma();
             json.prop("simulationStartDateTime", simulationStartInstant).comma();
             json.prop("simulationEndDateTime", simulationEndInstant).comma();
@@ -706,10 +808,14 @@ public class RealtimeSimulationService {
 
             // cancelledFlightIds
             json.name("cancelledFlightIds").arrayStart();
+            List<String> visibleCancellations = new ArrayList<>(cancellations);
+            for (String pending : pendingCancellations) {
+                if (!visibleCancellations.contains(pending)) visibleCancellations.add(pending);
+            }
             int ci = 0;
-            for (String cid : cancellations) {
+            for (String cid : visibleCancellations) {
                 json.value(cid);
-                if (++ci < cancellations.size()) json.comma();
+                if (++ci < visibleCancellations.size()) json.comma();
             }
             json.arrayEnd().comma();
 
@@ -723,6 +829,8 @@ public class RealtimeSimulationService {
             json.prop("totalBags", totalBags).comma();
             json.prop("plannedBags", plannedBags).comma();
             json.prop("usedFlights", usedFlights).comma();
+            json.prop("flightQueueSize", flightQueue.size()).comma();
+            json.prop("pendingCancellations", pendingCancellations.size()).comma();
             json.prop("fitnessInitial", 0).comma();
             json.prop("fitnessFinal", 0).comma();
             json.prop("iterations", 0).comma();
@@ -755,7 +863,13 @@ public class RealtimeSimulationService {
 
             // flights
             json.name("flights").arrayStart();
-            List<Flight> used = flights.stream()
+            List<Flight> used = "TIEMPO_REAL".equals(scenario)
+                    ? flightQueue.stream()
+                    .filter(f -> f.absoluteArrivalMinute() >= tick)
+                    .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
+                    .limit(300)
+                    .toList()
+                    : flights.stream()
                     .filter(f -> f.getAssignedLoad() > 0)
                     .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
                     .toList();
@@ -774,7 +888,11 @@ public class RealtimeSimulationService {
                 json.prop("assignedLoad", f.getAssignedLoad()).comma();
                 json.prop("maxCapacity", f.getMaxCapacity()).comma();
                 json.prop("utilization", util).comma();
-                json.prop("status", status(util));
+                json.prop("status", status(util)).comma();
+                json.prop("scheduleStatus",
+                        cancellations.contains(f.getFlightId()) ? "CANCELLED" :
+                                pendingCancellations.contains(f.getFlightId()) ? "PENDING_CANCEL" :
+                                        f.absoluteDepartureMinute() <= tick ? "IN_PROGRESS" : "QUEUED");
                 json.objEnd();
                 if (i < used.size() - 1) json.comma();
             }
