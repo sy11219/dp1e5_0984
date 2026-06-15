@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   advanceRealtimeSessionRequest,
+  getCurrentRealtimeSessionRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
@@ -13,6 +14,7 @@ import { computeActiveFlights } from "../../simulation/utils/calculations";
 import {
   formatClock,
   formatDateOnly,
+  formatFlightMoment,
   formatTimeOnly,
   percent,
 } from "../../simulation/utils/formatters";
@@ -57,15 +59,15 @@ function OperationsTopbar({
   return (
     <header className="topbar">
       <div className="brand">
-        <strong>TASF.B2B - Operaciones en tiempo real</strong>
-        <span>Monitoreo de la operación real minuto a minuto</span>
+        <strong>TASF.B2B - Tiempo real</strong>
+        <span>Tiempo real</span>
       </div>
       <div className="status-strip">
         <StatusItem label="Hora actual" value={formatClock(now)} sub={formatDateOnly(now)} />
         <StatusItem
           label="Minuto operativo"
           value={formatOperationalMinute(operationalMinute)}
-          sub="avanza con el reloj real"
+          sub={data ? formatFlightMoment(data, operationalMinute) : "avanza con el reloj real"}
         />
         <StatusItem
           label="Estado"
@@ -95,7 +97,7 @@ function OperationsTopbar({
         <StatusItem
           label="Backend"
           value={data?.simulationId ? "Conectado" : "--"}
-          sub="API tiempo real"
+          sub="Tiempo real"
         />
       </div>
     </header>
@@ -182,11 +184,19 @@ export const OperationsPage = () => {
   useEffect(() => {
     let ignore = false;
 
-    void startRealtimeSessionRequest()
+    void getCurrentRealtimeSessionRequest()
       .then((payload) => {
         if (ignore) return;
-        setData(payload);
-        setSelectedAirport(payload.airports[0]?.code || null);
+        if (payload) {
+          setData(payload);
+          setSelectedAirport(payload.airports[0]?.code || null);
+          return;
+        }
+        return startRealtimeSessionRequest().then((created) => {
+          if (ignore) return;
+          setData(created);
+          setSelectedAirport(created.airports[0]?.code || null);
+        });
       })
       .catch((err) => {
         if (!ignore) {
@@ -208,7 +218,7 @@ export const OperationsPage = () => {
     const timer = window.setInterval(() => {
       setAdvancing(true);
       setError("");
-      void advanceRealtimeSessionRequest(simulationId, 1)
+      void advanceRealtimeSessionRequest(simulationId, 1, data.tick ?? 0)
         .then((payload) => {
           setData(payload);
           if (!selectedAirport) {
@@ -221,7 +231,7 @@ export const OperationsPage = () => {
         .finally(() => setAdvancing(false));
     }, 60_000);
     return () => window.clearInterval(timer);
-  }, [data?.simulationId, data?.status, advancing, selectedAirport]);
+  }, [data?.simulationId, data?.status, data?.tick, advancing, selectedAirport]);
 
   const airportLoads = useMemo<AirportLoads>(() => {
     if (!data) return {};
@@ -243,7 +253,7 @@ export const OperationsPage = () => {
       <main className="workspace">
         <aside className="side-panel">
           <section className="panel section">
-            <h2>Operacion en vivo</h2>
+            <h2>Tiempo real</h2>
             <div className="control-grid">
               <div className="metric">
                 <span>Reloj operativo</span>

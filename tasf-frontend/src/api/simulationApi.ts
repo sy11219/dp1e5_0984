@@ -1,6 +1,8 @@
 import type { Airport, Flight, SimulationData } from "../features/simulation/types";
-import { DEFAULT_START_DATE } from "../features/simulation/utils/constants";
+import { DEFAULT_START_DATE, SIMULATION_DAYS } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
+
+const clientTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "";
 
 // ── Simulación estática (un solo disparo, sin lotes) ─────────────────────────
 
@@ -11,6 +13,7 @@ export async function runSimulationRequest(
   const response = await api.post<SimulationData>("/simulations/alns", {
     startDate: startDate.replaceAll("-", ""),
     days,
+    timeZone: clientTimeZone(),
   });
   return response.data;
 }
@@ -23,13 +26,22 @@ export async function runSimulationRequest(
  */
 export async function startBatchSimulationRequest(
   startDate: string,
-  days: number
+  days: number,
+  startTime = "00:00"
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>("/simulations/batch/start", {
     startDate: startDate.replaceAll("-", ""),
     days,
+    startTime,
+    timeZone: clientTimeZone(),
   });
   return response.data;
+}
+
+export async function getCurrentBatchSimulationRequest(): Promise<SimulationData | null> {
+  const response = await api.get<SimulationData | Record<string, never>>("/simulations/batch/current");
+  const data = response.data as Partial<SimulationData>;
+  return data.simulationId ? (data as SimulationData) : null;
 }
 
 /**
@@ -40,11 +52,12 @@ export async function startBatchSimulationRequest(
  */
 export async function advanceBatchSimulationRequest(
   simulationId: string,
-  steps: number
+  steps: number,
+  expectedTick: number
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>(
     `/simulations/batch/${simulationId}/advance`,
-    { steps }
+    { steps, expectedTick }
   );
   return response.data;
 }
@@ -69,7 +82,7 @@ let realtimeOperationPromise: Promise<SimulationData> | null = null;
 
 export async function runRealtimeOperationRequest(): Promise<SimulationData> {
   if (!realtimeOperationPromise) {
-    realtimeOperationPromise = runSimulationRequest(DEFAULT_START_DATE, 3).catch(
+    realtimeOperationPromise = runSimulationRequest(DEFAULT_START_DATE, SIMULATION_DAYS).catch(
       (error) => {
         realtimeOperationPromise = null;
         throw error;
@@ -86,22 +99,30 @@ export async function refreshRealtimeOperationRequest(): Promise<SimulationData>
 
 export async function startRealtimeSessionRequest(
   startDate = DEFAULT_START_DATE,
-  days = 3
+  days = SIMULATION_DAYS
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>("/realtime/start", {
     startDate: startDate.replaceAll("-", ""),
     days,
+    timeZone: clientTimeZone(),
   });
   return response.data;
 }
 
+export async function getCurrentRealtimeSessionRequest(): Promise<SimulationData | null> {
+  const response = await api.get<SimulationData | Record<string, never>>("/realtime/current");
+  const data = response.data as Partial<SimulationData>;
+  return data.simulationId ? (data as SimulationData) : null;
+}
+
 export async function advanceRealtimeSessionRequest(
   simulationId: string,
-  steps: number
+  steps: number,
+  expectedTick: number
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>(
     `/realtime/${simulationId}/tick`,
-    { steps }
+    { steps, expectedTick }
   );
   return response.data;
 }

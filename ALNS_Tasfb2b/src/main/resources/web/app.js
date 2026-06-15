@@ -6,20 +6,28 @@ const STATUS_COLOR = {
   red: "#d84545",
 };
 
+const BATCH_MINUTES = 180;
+const BATCH_INTERVAL_MS = 120_000;
+
 function App() {
-  const [startDate, setStartDate] = useState("2026-01-02");
-  const [days, setDays] = useState(3);
+  const [startDate, setStartDate] = useState("2026-07-01");
+  const [startTime, setStartTime] = useState("10:00");
+  const [days] = useState(5);
   const [data, setData] = useState(null);
   const [simMinute, setSimMinute] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(360);
   const [loading, setLoading] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchPhase, setBatchPhase] = useState("");
   const [error, setError] = useState("");
   const [selectedAirport, setSelectedAirport] = useState(null);
   const [now, setNow] = useState(new Date());
   const frame = useRef(null);
+  const batchAbortRef = useRef(false);
 
-  const maxMinute = days * 1440;
+  const isBatchMode = true;
+  const maxMinute = data?.maxTick ?? days * 1440;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -27,7 +35,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || batchRunning) return;
     let last = performance.now();
     const tick = (time) => {
       const elapsedSeconds = (time - last) / 1000;
@@ -41,9 +49,16 @@ function App() {
     };
     frame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame.current);
-  }, [playing, speed, maxMinute]);
+  }, [playing, speed, maxMinute, batchRunning]);
+
+  useEffect(() => () => { batchAbortRef.current = true; }, []);
 
   async function runSimulation() {
+    if (isBatchMode) {
+      await runBatchSimulation();
+      return;
+    }
+
     setLoading(true);
     setError("");
     setPlaying(false);
@@ -65,17 +80,120 @@ function App() {
     }
   }
 
+  async function runBatchSimulation() {
+    setLoading(true);
+    setError("");
+    setPlaying(false);
+    setBatchRunning(true);
+    setBatchPhase("Iniciando sesion...");
+    batchAbortRef.current = false;
+
+    try {
+      const startResponse = await fetch("/api/simulations/batch/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: compactDate(startDate),
+          days: 5,
+          startTime,
+        }),
+      });
+      let payload = await startResponse.json();
+      if (!startResponse.ok) throw new Error(payload.error || "No se pudo iniciar la Simulacion 5 dias.");
+
+      setData(payload);
+      setSelectedAirport(payload.airports[0]?.code || null);
+      setSimMinute(payload.startOffsetMinutes ?? payload.tick ?? 0);
+      setLoading(false);
+
+      while (!batchAbortRef.current && payload.status === "RUNNING") {
+        const cycleStart = performance.now();
+        setBatchPhase(`Actualizando simulacion ${formatSimMinute(payload.tick)} → ${formatSimMinute(payload.tick + BATCH_MINUTES)}`);
+
+        const advanceResponse = await fetch(`/api/simulations/batch/${payload.simulationId}/advance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ steps: BATCH_MINUTES }),
+        });
+        payload = await advanceResponse.json();
+        if (!advanceResponse.ok) throw new Error(payload.error || "No se pudo actualizar la simulacion.");
+
+        setData(payload);
+
+        const batchStart = payload.lastBatchStart ?? Math.max(payload.startOffsetMinutes ?? 0, payload.tick - BATCH_MINUTES);
+        const batchEnd = payload.lastBatchEnd ?? payload.tick;
+        setSimMinute(batchStart);
+
+        const elapsedBeforeAnim = performance.now() - cycleStart;
+        const animDuration = Math.max(5_000, (payload.batchIntervalMs ?? BATCH_INTERVAL_MS) - elapsedBeforeAnim);
+
+        setBatchPhase(`Animando ${formatSimMinute(batchStart)} → ${formatSimMinute(batchEnd)} (${Math.round(animDuration / 1000)} s)`);
+        await animateSimWindow(batchStart, batchEnd, animDuration);
+
+        const cycleElapsed = performance.now() - cycleStart;
+        const waitMs = (payload.batchIntervalMs ?? BATCH_INTERVAL_MS) - cycleElapsed;
+        if (waitMs > 0) {
+          await sleep(waitMs);
+        }
+
+        if (payload.status === "COMPLETED") {
+          setBatchPhase("Simulacion completada.");
+          break;
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+      setBatchPhase("");
+    } finally {
+      setBatchRunning(false);
+      setLoading(false);
+    }
+  }
+
+  function animateSimWindow(fromMinute, toMinute, durationMs) {
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+
+      const step = (now) => {
+        if (batchAbortRef.current) {
+          resolve();
+          return;
+        }
+        const progress = Math.min(1, (now - startedAt) / durationMs);
+        setSimMinute(fromMinute + (toMinute - fromMinute) * progress);
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setSimMinute(toMinute);
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(step);
+    });
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function stopBatchSimulation() {
+    batchAbortRef.current = true;
+    setBatchRunning(false);
+    setBatchPhase("Detenido.");
+  }
+
   const airportLoads = useMemo(() => computeAirportLoads(data, simMinute), [data, simMinute]);
   const activeFlights = useMemo(() => computeActiveFlights(data, simMinute), [data, simMinute]);
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
 
   return (
     React.createElement("div", { className: "app-shell" },
-      React.createElement(Topbar, { data, now, simMinute }),
+      React.createElement(Topbar, { data, now, simMinute, batchPhase, batchRunning }),
       React.createElement("main", { className: "workspace" },
         React.createElement("aside", { className: "side-panel" },
           React.createElement("section", { className: "panel section" },
-            React.createElement("h2", null, "Simulador ALNS"),
+            React.createElement("h2", null, "Simulacion 5 dias"),
             React.createElement("div", { className: "control-grid" },
               React.createElement("div", { className: "field" },
                 React.createElement("label", null, "Fecha inicial"),
@@ -86,21 +204,35 @@ function App() {
                 })
               ),
               React.createElement("div", { className: "field" },
+                React.createElement("label", null, "Hora inicial"),
+                React.createElement("input", {
+                  type: "time",
+                  value: startTime,
+                  disabled: batchRunning,
+                  onChange: (event) => setStartTime(event.target.value),
+                })
+              ),
+              React.createElement("div", { className: "field" },
                 React.createElement("label", null, "Dias de simulacion"),
                 React.createElement("div", { className: "segmented" },
-                  [3, 5, 7].map((option) => React.createElement("button", {
-                    key: option,
-                    className: option === days ? "active" : "",
-                    onClick: () => {
-                      setDays(option);
-                      setSimMinute(0);
-                    },
-                  }, `${option} dias`))
+                  React.createElement("button", {
+                    className: "active",
+                    disabled: true,
+                  }, "5 dias")
                 )
               ),
-              React.createElement("button", { className: "primary", onClick: runSimulation, disabled: loading },
-                loading ? "Ejecutando ALNS..." : "Ejecutar simulacion"
-              ),
+              React.createElement("button", {
+                className: "primary",
+                onClick: runSimulation,
+                disabled: loading || batchRunning,
+              }, loading
+                ? "Preparando simulacion..."
+                : "Ejecutar Simulacion 5 dias"),
+              batchRunning && React.createElement("button", {
+                className: "secondary",
+                onClick: stopBatchSimulation,
+              }, "Detener"),
+              batchPhase && React.createElement("div", { className: "batch-status" }, batchPhase),
               error && React.createElement("div", { className: "error" }, error),
               React.createElement("div", { className: "speed-row" },
                 React.createElement("input", {
@@ -109,14 +241,25 @@ function App() {
                   max: "1800",
                   step: "60",
                   value: speed,
+                  disabled: batchRunning,
                   onChange: (event) => setSpeed(Number(event.target.value)),
                 }),
-                React.createElement("strong", null, `${speed}x`)
+                React.createElement("strong", null, batchRunning ? "auto" : `${speed}x`)
               ),
               React.createElement("div", { className: "segmented" },
-                React.createElement("button", { onClick: () => setPlaying(true), className: playing ? "active" : "" }, "Play"),
-                React.createElement("button", { onClick: () => setPlaying(false) }, "Pausa"),
-                React.createElement("button", { onClick: () => { setPlaying(false); setSimMinute(0); } }, "Reset")
+                React.createElement("button", {
+                  onClick: () => setPlaying(true),
+                  className: playing ? "active" : "",
+                  disabled: batchRunning || !data,
+                }, "Play"),
+                React.createElement("button", { onClick: () => setPlaying(false), disabled: batchRunning }, "Pausa"),
+                React.createElement("button", {
+                  onClick: () => {
+                    setPlaying(false);
+                    setSimMinute(data?.startOffsetMinutes ?? 0);
+                  },
+                  disabled: batchRunning || !data,
+                }, "Reset")
               )
             )
           ),
@@ -130,7 +273,7 @@ function App() {
           ),
           React.createElement("section", { className: "panel section" },
             React.createElement("h3", null, "Indicadores"),
-            data ? React.createElement(Metrics, { data }) : React.createElement("div", { className: "empty-state" }, "Ejecuta ALNS para ver metricas.")
+            data ? React.createElement(Metrics, { data }) : React.createElement("div", { className: "empty-state" }, "Ejecuta Simulacion 5 dias para ver metricas.")
           )
         ),
         React.createElement("section", { className: "panel map-panel" },
@@ -141,7 +284,7 @@ function App() {
             selectedAirport,
             onSelectAirport: setSelectedAirport,
           }),
-          React.createElement(Timeline, { simMinute, maxMinute, setSimMinute, data })
+          React.createElement(Timeline, { simMinute, maxMinute, setSimMinute, data, disabled: batchRunning })
         ),
         React.createElement("aside", { className: "right-panel" },
           React.createElement("section", { className: "panel section" },
@@ -162,21 +305,22 @@ function App() {
   );
 }
 
-function Topbar({ data, now, simMinute }) {
+function Topbar({ data, now, simMinute, batchPhase, batchRunning }) {
   return React.createElement("header", { className: "topbar" },
     React.createElement("div", { className: "brand" },
-      React.createElement("strong", null, "TASF.B2B · Simulador de equipaje"),
-      React.createElement("span", null, "Escenario operativo ALNS")
+      React.createElement("strong", null, "TASF.B2B · Simulacion 5 dias"),
+      React.createElement("span", null, batchRunning ? "Simulacion 5 dias" : "Tiempo real")
     ),
     React.createElement("div", { className: "status-strip" },
       React.createElement(StatusItem, { label: "Ahora", value: formatClock(now), sub: formatDateOnly(now) }),
-      React.createElement(StatusItem, { label: "Reloj simulado", value: formatSimMinute(simMinute), sub: "avance actual" }),
-      React.createElement(StatusItem, { label: "ALNS inicio", value: data ? formatTimeOnly(data.realStartedAt) : "--", sub: data ? formatDateOnly(data.realStartedAt) : "--" }),
-      React.createElement(StatusItem, { label: "ALNS fin", value: data ? formatTimeOnly(data.realFinishedAt) : "--", sub: data ? formatDateOnly(data.realFinishedAt) : "--" }),
+      React.createElement(StatusItem, { label: "Reloj simulado", value: formatSimMinute(simMinute), sub: formatWallClock(data, simMinute) }),
+      batchRunning && React.createElement(StatusItem, { label: "Actualizacion", value: data?.batchCount ?? 0, sub: batchPhase || "en curso" }),
+      React.createElement(StatusItem, { label: "Inicio", value: data ? formatTimeOnly(data.realStartedAt) : "--", sub: data ? formatDateOnly(data.realStartedAt) : "--" }),
+      React.createElement(StatusItem, { label: "Ultima actualizacion", value: data ? formatTimeOnly(data.realFinishedAt) : "--", sub: data ? formatDateOnly(data.realFinishedAt) : "--" }),
       React.createElement(StatusItem, { label: "Simulado desde", value: data ? formatDateOnly(data.simulationStartDateTime) : "--", sub: data ? formatTimeOnly(data.simulationStartDateTime) : "--" }),
       React.createElement(StatusItem, { label: "Simulado hasta", value: data ? formatDateOnly(data.simulationEndDateTime) : "--", sub: data ? formatTimeOnly(data.simulationEndDateTime) : "--" }),
-      React.createElement(StatusItem, { label: "Duracion ALNS", value: data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--", sub: "ejecucion real" }),
-      React.createElement(StatusItem, { label: "Escenario", value: data?.scenario || "ALNS", sub: "planificacion" })
+      React.createElement(StatusItem, { label: "Duracion", value: data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--", sub: "ejecucion real" }),
+      React.createElement(StatusItem, { label: "Escenario", value: data?.scenario || "Simulacion 5 dias", sub: "planificacion" })
     )
   );
 }
@@ -377,7 +521,7 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
   return React.createElement("div", { className: "map-stage" },
     React.createElement("div", { className: "map-header" },
       React.createElement("span", { className: "badge" }, data ? `${data.airports.length} aeropuertos` : "Mapa operativo"),
-      React.createElement("span", { className: "badge" }, data ? `${activeFlights.length} vuelos en aire` : "ALNS")
+      React.createElement("span", { className: "badge" }, data ? `${activeFlights.length} vuelos en aire` : "Simulacion")
     ),
     mapInfo && React.createElement(MapInfoCard, { info: mapInfo, onClose: () => setMapInfo(null) }),
     React.createElement("div", { ref: mapElement, className: "leaflet-map", role: "img", "aria-label": "Mapa mundial con aeropuertos y vuelos activos" }),
@@ -417,7 +561,7 @@ function airportPopup(airport, load, status) {
       <dl>
         <dt>Carga actual</dt><dd>${load}/${airport.maxCapacity} maletas</dd>
         <dt>Uso actual</dt><dd>${usage}% (${status.toUpperCase()})</dd>
-        <dt>Pico ALNS</dt><dd>${airport.peakLoad} maletas</dd>
+        <dt>Pico registrado</dt><dd>${airport.peakLoad} maletas</dd>
       </dl>
     </div>
   `;
@@ -452,20 +596,21 @@ function flightRoutePopup(flight, origin, dest, data) {
   `;
 }
 
-function Timeline({ simMinute, maxMinute, setSimMinute, data }) {
+function Timeline({ simMinute, maxMinute, setSimMinute, data, disabled }) {
+  const startOffset = data?.startOffsetMinutes ?? 0;
   return React.createElement("div", { className: "timeline" },
     React.createElement("input", {
       type: "range",
-      min: "0",
+      min: String(startOffset),
       max: maxMinute,
       value: Math.floor(simMinute),
       onChange: (event) => setSimMinute(Number(event.target.value)),
-      disabled: !data,
+      disabled: !data || disabled,
     }),
     React.createElement("div", { className: "timeline-meta" },
-      React.createElement("span", null, "Dia 0 · 00:00"),
+      React.createElement("span", null, formatSimMinute(startOffset)),
       React.createElement("strong", null, formatSimMinute(simMinute)),
-      React.createElement("span", null, `Dia ${Math.floor(maxMinute / 1440)} · 00:00`)
+      React.createElement("span", null, formatSimMinute(maxMinute))
     )
   );
 }
@@ -476,7 +621,7 @@ function AirportDetail({ airport, load }) {
   return React.createElement("div", { className: "metrics" },
     React.createElement(Metric, { label: "Carga actual", value: load, sub: `cap. ${airport.maxCapacity}` }),
     React.createElement(Metric, { label: "Uso actual", value: `${Math.round(utilization * 100)}%`, sub: status.toUpperCase() }),
-    React.createElement(Metric, { label: "Pico ALNS", value: airport.peakLoad, sub: `${Math.round(airport.utilization * 100)}%` }),
+    React.createElement(Metric, { label: "Pico registrado", value: airport.peakLoad, sub: `${Math.round(airport.utilization * 100)}%` }),
     React.createElement(Metric, { label: "Ubicacion", value: airport.country, sub: airport.continent })
   );
 }
@@ -592,6 +737,12 @@ function formatFlightMoment(data, absoluteMinute) {
   if (!data?.simulationStartDateTime) return formatSimMinute(absoluteMinute);
   const date = new Date(new Date(data.simulationStartDateTime).getTime() + absoluteMinute * 60000);
   return `${formatDateOnly(date)}, ${formatTimeOnly(date)}`;
+}
+
+function formatWallClock(data, absoluteMinute) {
+  if (!data?.simulationStartDateTime) return "avance actual";
+  const date = new Date(new Date(data.simulationStartDateTime).getTime() + absoluteMinute * 60000);
+  return `${formatDateOnly(date)} ${formatTimeOnly(date)}`;
 }
 
 function formatSimMinute(value) {

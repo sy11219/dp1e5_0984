@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *     para que pida el siguiente lote.
  */
 
-const BATCH_MINUTES = 360;          // minutos simulados por lote (6 horas)
+const BATCH_MINUTES = 180;          // minutos simulados por lote (3 horas)
 const BATCH_DURATION_MS = 120_000;  // duración real de cada lote (2 minutos)
 
 export function useSimulationPlayer(maxMinute: number) {

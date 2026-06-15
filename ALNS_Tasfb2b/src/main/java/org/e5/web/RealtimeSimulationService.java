@@ -11,7 +11,8 @@ import org.e5.parser.ShipmentParser;
 import org.e5.planner.ALNS;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,8 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * ── Escenario SIMULACION_LOTES ────────────────────────────────────────────────
  *
- *   El período total (3/5/7 días) se divide en lotes de BATCH_MINUTES minutos
- *   simulados (360 min = 6 h por defecto). El frontend llama a /advance con
+ *   El período total de 5 días se divide en lotes de BATCH_MINUTES minutos
+ *   simulados (180 min = 3 h). El frontend llama a /advance con
  *   steps=BATCH_MINUTES cada BATCH_INTERVAL_MS ms (120 000 ms = 2 min).
  *
  *   El backend en advance() hace exactamente:
@@ -52,7 +53,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RealtimeSimulationService {
     private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    // ── Parámetros de temporización del lote ─────────────────────────────────
+    // ── Parámetros de temporización del lote (simulación incremental) ────────
+    /** Minutos simulados por lote (3 horas). */
+    public static final int BATCH_MINUTES = 180;
+    /** Milisegundos reales entre ejecuciones ALNS (2 minutos). */
+    public static final long BATCH_INTERVAL_MS = 120_000L;
+
     // ── Parámetros del loop de tiempo real ────────────────────────────────────
     private static final int INTERVALO_TICK    = 1;
     private static final int INTERVALO_REPLAN  = 10;
@@ -60,6 +66,9 @@ public class RealtimeSimulationService {
 
     private final Map<String, RealtimeSession> sessions = new ConcurrentHashMap<>();
     private final FlightPlanService flightPlanService = new FlightPlanService();
+    private volatile String sharedRealtimeSessionId;
+    private volatile String sharedSimulationSessionId;
+    private volatile String lastCreatedSessionId;
 
     // ════════════════════════════════════════════════════════════════════════
     //  API pública
@@ -67,8 +76,21 @@ public class RealtimeSimulationService {
 
     /** Inicia una sesión de tiempo real clásica. */
     public String start(String startDate, int days) throws Exception {
+        return start(startDate, days, ZoneId.systemDefault().getId());
+    }
+
+    public synchronized String start(String startDate, int days, String timeZone) throws Exception {
         validate(startDate, days, false);
-        return createSession(startDate, days, "TIEMPO_REAL");
+        RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        if (current != null && !current.completed) return current.snapshotJson();
+        String json = createSession(startDate, days, "TIEMPO_REAL", 0, timeZone);
+        sharedRealtimeSessionId = lastCreatedSessionId;
+        return json;
+    }
+
+    public String currentRealtime() {
+        RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        return current == null ? "{}" : current.snapshotJson();
     }
 
     /**
@@ -78,8 +100,29 @@ public class RealtimeSimulationService {
      * BATCH_REAL_DURATION_MS milisegundos desde la perspectiva del frontend.
      */
     public String startBatchSimulation(String startDate, int days) throws Exception {
+        return startBatchSimulation(startDate, days, "00:00", ZoneId.systemDefault().getId());
+    }
+
+    /**
+     * Inicia simulación por lotes con hora de inicio opcional (HH:mm).
+     * El tick inicial queda en ese offset; cada lote cubre {@link #BATCH_MINUTES} minutos.
+     */
+    public String startBatchSimulation(String startDate, int days, String startTime) throws Exception {
+        return startBatchSimulation(startDate, days, startTime, ZoneId.systemDefault().getId());
+    }
+
+    public synchronized String startBatchSimulation(String startDate, int days, String startTime,
+                                                   String timeZone) throws Exception {
         validate(startDate, days, true);
-        return createSession(startDate, days, "SIMULACION_LOTES");
+        int startOffsetMinutes = parseStartTime(startTime);
+        String json = createSession(startDate, days, "SIMULACION_LOTES", startOffsetMinutes, timeZone);
+        sharedSimulationSessionId = lastCreatedSessionId;
+        return json;
+    }
+
+    public String currentSimulation() {
+        RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        return current == null ? "{}" : current.snapshotJson();
     }
 
     public String state(String id) {
@@ -98,10 +141,17 @@ public class RealtimeSimulationService {
      *   – Avanza tick a tick como antes.
      */
     public String advance(String id, int steps) {
+        return advance(id, steps, -1);
+    }
+
+    public String advance(String id, int steps, int expectedTick) {
         RealtimeSession session = require(id);
         if ("SIMULACION_LOTES".equals(session.scenario)) {
-            session.advanceBatch(Math.max(1, steps));
+            if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJson();
+            int batchSteps = steps > 0 ? steps : BATCH_MINUTES;
+            session.advanceBatch(batchSteps);
         } else {
+            if (!session.canAdvanceRealtime()) return session.snapshotJson();
             session.advance(Math.max(1, Math.min(steps, 720)));
         }
         return session.snapshotJson();
@@ -113,12 +163,7 @@ public class RealtimeSimulationService {
      */
     public String cancelFlight(String id, String flightId) {
         RealtimeSession session = require(id);
-        try {
-            flightPlanService.cancelFlight(flightId);
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo marcar el vuelo como CANCELED en BD: " + flightId, e);
-        }
-        session.markCancelled(flightId);
+        session.cancel(flightId, flightPlanService);
         return session.snapshotJson();
     }
 
@@ -126,7 +171,30 @@ public class RealtimeSimulationService {
     //  Internos
     // ════════════════════════════════════════════════════════════════════════
 
+    private static int parseStartTime(String startTime) {
+        if (startTime == null || startTime.isBlank()) return 0;
+        String[] parts = startTime.trim().split(":");
+        if (parts.length != 2)
+            throw new IllegalArgumentException("startTime debe tener formato HH:mm.");
+        int hours;
+        int minutes;
+        try {
+            hours = Integer.parseInt(parts[0]);
+            minutes = Integer.parseInt(parts[1]);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("startTime debe tener formato HH:mm.");
+        }
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59)
+            throw new IllegalArgumentException("startTime fuera de rango (00:00–23:59).");
+        return hours * 60 + minutes;
+    }
+
     private String createSession(String startDate, int days, String scenario) throws Exception {
+        return createSession(startDate, days, scenario, 0, ZoneId.systemDefault().getId());
+    }
+
+    private String createSession(String startDate, int days, String scenario,
+                                 int startOffsetMinutes, String timeZone) throws Exception {
         AirportParser airportParser = new AirportParser();
         List<Airport> airports = airportParser.parse();
         Map<String, Airport> airportMap = new LinkedHashMap<>();
@@ -140,13 +208,28 @@ public class RealtimeSimulationService {
         for (Flight flight : flights) flight.resetLoad();
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
-        List<Shipment> shipments = shipmentParser.parseAll(startDate, days);
+        int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
+        int simulationEndMinute = startOffsetMinutes + days * 1440;
+        List<Shipment> shipments = shipmentParser.parseAll(startDate, shipmentDaysToLoad);
+        shipments.removeIf(s -> s.getRequestMinute() < startOffsetMinutes
+                || s.getRequestMinute() >= simulationEndMinute);
         shipments.sort(Comparator.comparingInt(Shipment::getRequestMinute));
 
         RealtimeSession session = new RealtimeSession(
-                startDate, days, scenario, airports, airportMap, flights, shipments);
+                startDate, days, scenario, startOffsetMinutes, resolveZone(timeZone),
+                airports, airportMap, flights, shipments);
         sessions.put(session.id, session);
+        lastCreatedSessionId = session.id;
         return session.snapshotJson();
+    }
+
+    private ZoneId resolveZone(String timeZone) {
+        if (timeZone == null || timeZone.isBlank()) return ZoneId.systemDefault();
+        try {
+            return ZoneId.of(timeZone.trim());
+        } catch (Exception ignored) {
+            return ZoneId.systemDefault();
+        }
     }
 
     private RealtimeSession require(String id) {
@@ -160,11 +243,11 @@ public class RealtimeSimulationService {
             throw new IllegalArgumentException("La fecha inicial debe tener formato aaaammdd.");
         LocalDate.parse(startDate, RAW_DATE);
         if (batch) {
-            if (days != 3 && days != 5 && days != 7)
-                throw new IllegalArgumentException("Solo se permite simular 3, 5 o 7 dias.");
+            if (days != 5)
+                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
         } else {
-            if (days < 1 || days > 7)
-                throw new IllegalArgumentException("Tiempo real permite simular entre 1 y 7 dias.");
+            if (days != 5)
+                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
         }
     }
 
@@ -177,6 +260,10 @@ public class RealtimeSimulationService {
         final String startDate;
         final int days;
         final String scenario;
+        final int startOffsetMinutes;
+        final ZoneId originZone;
+        final String simulationStartInstant;
+        final String simulationEndInstant;
         final List<Airport> airports;
         final Map<String, Airport> airportMap;
         final List<Flight> flights;
@@ -192,10 +279,15 @@ public class RealtimeSimulationService {
         final Set<String> processedFlightEvents = new HashSet<>();
         final Set<String> cancellations = new HashSet<>();
 
-        final LocalDateTime realStartedAt = LocalDateTime.now();
-        int tick = 0;
+        final long realStartedAtMs = System.currentTimeMillis();
+        int tick;
         final int maxTick;
         boolean completed = false;
+        int lastBatchStart = -1;
+        int lastBatchEnd = -1;
+        int batchCount = 0;
+        long lastBatchRuntimeMs = 0;
+        long lastRealtimeAdvanceMs = 0;
 
         // ── Solo para SIMULACION_LOTES: solución acumulada global ─────────────
         // Guarda las rutas de todos los lotes anteriores para poder hacer
@@ -203,20 +295,28 @@ public class RealtimeSimulationService {
         final Map<String, Route> solucionGlobal = new HashMap<>();
         final List<Shipment> todosLosShipmentsProcesados = new ArrayList<>();
 
-        RealtimeSession(String startDate, int days, String scenario,
+        RealtimeSession(String startDate, int days, String scenario, int startOffsetMinutes,
+                        ZoneId originZone,
                         List<Airport> airports, Map<String, Airport> airportMap,
                         List<Flight> flights, List<Shipment> shipments) {
             this.startDate  = startDate;
             this.days       = days;
             this.scenario   = scenario;
+            this.startOffsetMinutes = startOffsetMinutes;
+            this.originZone = originZone;
             this.airports   = airports;
             this.airportMap = airportMap;
             this.flights    = flights;
             this.shipments  = shipments;
             for (Shipment s : shipments)
                 shipmentsByMinute.computeIfAbsent(s.getRequestMinute(), k -> new ArrayList<>()).add(s);
-            this.maxTick = Math.max(days * 1440,
-                    flights.stream().mapToInt(Flight::absoluteArrivalMinute).max().orElse(days * 1440));
+            this.tick = startOffsetMinutes;
+            this.maxTick = startOffsetMinutes + days * 1440;
+            ZonedDateTime simulationStart = LocalDate.parse(startDate, RAW_DATE)
+                    .atStartOfDay(originZone)
+                    .plusMinutes(startOffsetMinutes);
+            this.simulationStartInstant = simulationStart.toInstant().toString();
+            this.simulationEndInstant = simulationStart.plusDays(days).toInstant().toString();
         }
 
         // ── SIMULACION_LOTES: avance de un lote completo ─────────────────────
@@ -240,21 +340,23 @@ public class RealtimeSimulationService {
             long batchStartMs = System.currentTimeMillis();
             int batchStart = tick;
             int batchEnd   = Math.min(tick + steps, maxTick);
+            lastBatchStart = batchStart;
+            lastBatchEnd   = batchEnd;
 
-            // 1. Recoger envíos que caen en esta ventana
+            // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
             List<Shipment> loteShipments = new ArrayList<>();
             for (int min = batchStart; min < batchEnd; min++) {
                 List<Shipment> en = shipmentsByMinute.getOrDefault(min, Collections.emptyList());
                 loteShipments.addAll(en);
             }
 
-            // 2. Vuelos disponibles: no cancelados, que salen en o después del lote
+            // 2. Vuelos disponibles: no cancelados y que aún no han despegado
             List<Flight> vuelosDisponibles = availableFlightsFrom(batchStart);
 
             System.out.printf("[Lote] Ventana %d–%d | %d envíos | %d vuelos disponibles%n",
                     batchStart, batchEnd, loteShipments.size(), vuelosDisponibles.size());
 
-            // 3. Ejecutar ALNS para el lote (si hay envíos nuevos)
+            // 3. Ejecutar ALNS incremental (conserva capacidad de lotes anteriores)
             if (!loteShipments.isEmpty()) {
                 int n       = loteShipments.size();
                 int iters   = Math.max(80, Math.min(400, n * 4));
@@ -264,34 +366,11 @@ public class RealtimeSimulationService {
                 ALNS alns = new ALNS(iters, seg, nDestr, 300.0, 0.995, 2,
                         9.0, 3.0, 0.0, 0.8);
 
-                Map<String, Route> resultado = alns.ejecutarIncremental(loteShipments, vuelosDisponibles, airportMap);
+                Map<String, Route> resultado = alns.ejecutarIncremental(
+                        loteShipments, vuelosDisponibles, airportMap);
 
-                // Registrar eventos de aeropuerto para la animación
-                for (Shipment s : loteShipments) {
-                    Airport origin = airportMap.get(s.getOriginCode());
-                    if (origin != null) origin.addLoad(s.getSuitcaseCount());
-                    events.add(new RealtimeEvent(s.getRequestMinute(),
-                            s.getOriginCode(), s.getSuitcaseCount(), "shipment_created"));
+                registrarEventosLote(loteShipments, resultado);
 
-                    Route ruta = resultado.get(s.getShipmentId());
-                    if (ruta != null && ruta.isValid()) {
-                        List<Flight> rutaVuelos = ruta.getFlights();
-                        if (!rutaVuelos.isEmpty()) {
-                            events.add(new RealtimeEvent(
-                                    rutaVuelos.get(0).absoluteDepartureMinute(),
-                                    s.getOriginCode(), -s.getSuitcaseCount(), "flight_departure"));
-                        }
-                        for (int i = 0; i < rutaVuelos.size(); i++) {
-                            Flight f = rutaVuelos.get(i);
-                            boolean last = (i == rutaVuelos.size() - 1);
-                            events.add(new RealtimeEvent(f.absoluteArrivalMinute(),
-                                    f.getDestCode(), s.getSuitcaseCount(),
-                                    last ? "final_arrival" : "connection_arrival"));
-                        }
-                    }
-                }
-
-                // Acumular en la solución global
                 solucionGlobal.putAll(resultado);
                 processed.addAll(loteShipments);
                 todosLosShipmentsProcesados.addAll(loteShipments);
@@ -299,7 +378,7 @@ public class RealtimeSimulationService {
                 System.out.printf("[Lote] Rutas: %d / %d%n", resultado.size(), n);
             }
 
-            // 4. Avanzar tick
+            batchCount++;
             tick = batchEnd;
             if (tick >= maxTick) {
                 if (!queue.isEmpty()) planQueue();
@@ -309,14 +388,75 @@ public class RealtimeSimulationService {
 
             events.add(new RealtimeEvent(tick, "SYSTEM", loteShipments.size(), "batch_complete"));
 
-            long elapsed = System.currentTimeMillis() - batchStartMs;
-            System.out.printf("[Lote] Completado en %d ms%n", elapsed);
+            lastBatchRuntimeMs = System.currentTimeMillis() - batchStartMs;
+            System.out.printf("[Lote] Completado en %d ms (animación sugerida: %d ms)%n",
+                    lastBatchRuntimeMs, BATCH_INTERVAL_MS);
+        }
+
+        private void registrarEventosLote(List<Shipment> loteShipments, Map<String, Route> resultado) {
+            Set<String> createdEvents = new HashSet<>();
+            Set<String> routeEvents = new HashSet<>();
+
+            for (Shipment s : loteShipments) {
+                if (!s.isSplitPart() && createdEvents.add(s.getShipmentId())) {
+                    events.add(new RealtimeEvent(s.getRequestMinute(),
+                            s.getOriginCode(), s.getSuitcaseCount(), "shipment_created"));
+                }
+            }
+
+            for (Map.Entry<String, Route> entry : resultado.entrySet()) {
+                Shipment s = findShipmentById(entry.getKey(), loteShipments);
+                if (s != null) {
+                    registrarEventosRuta(s, entry.getValue(), routeEvents);
+                }
+            }
+        }
+
+        private Shipment findShipmentById(String shipmentId, List<Shipment> loteShipments) {
+            for (Shipment s : loteShipments) {
+                if (shipmentId.equals(s.getShipmentId())) return s;
+            }
+            for (Shipment s : shipments) {
+                if (shipmentId.equals(s.getShipmentId())) return s;
+            }
+            return null;
+        }
+
+        private void registrarEventosRuta(Shipment s, Route ruta, Set<String> registrados) {
+            if (s == null || ruta == null || !ruta.isValid() || !registrados.add(s.getShipmentId())) return;
+
+            List<Flight> rutaVuelos = ruta.getFlights();
+            if (rutaVuelos.isEmpty()) return;
+
+            events.add(new RealtimeEvent(
+                    rutaVuelos.get(0).absoluteDepartureMinute(),
+                    s.getOriginCode(), -s.getSuitcaseCount(), "flight_departure"));
+
+            for (int i = 0; i < rutaVuelos.size(); i++) {
+                Flight f = rutaVuelos.get(i);
+                boolean last = (i == rutaVuelos.size() - 1);
+                events.add(new RealtimeEvent(f.absoluteArrivalMinute(),
+                        f.getDestCode(), s.getSuitcaseCount(),
+                        last ? "final_arrival" : "connection_arrival"));
+                if (!last) {
+                    Flight next = rutaVuelos.get(i + 1);
+                    events.add(new RealtimeEvent(next.absoluteDepartureMinute(),
+                            f.getDestCode(), -s.getSuitcaseCount(), "connection_departure"));
+                }
+            }
         }
 
         // ── TIEMPO_REAL: avance tick a tick ───────────────────────────────────
 
         synchronized void advance(int steps) {
             for (int i = 0; i < steps && !completed; i++) step();
+        }
+
+        synchronized boolean canAdvanceRealtime() {
+            long now = System.currentTimeMillis();
+            if (lastRealtimeAdvanceMs > 0 && now - lastRealtimeAdvanceMs < 55_000L) return false;
+            lastRealtimeAdvanceMs = now;
+            return true;
         }
 
         private void step() {
@@ -388,6 +528,8 @@ public class RealtimeSimulationService {
             Flight toCancel = findFlight(flightId);
             if (toCancel == null)
                 throw new IllegalArgumentException("Vuelo no encontrado: " + flightId);
+            if (toCancel.absoluteDepartureMinute() <= tick)
+                throw new IllegalArgumentException("No se puede cancelar un vuelo que ya inicio.");
 
             try {
                 flightPlanService.cancelFlight(flightId);
@@ -406,6 +548,11 @@ public class RealtimeSimulationService {
         }
 
         synchronized void markCancelled(String flightId) {
+            Flight toCancel = findFlight(flightId);
+            if (toCancel == null)
+                throw new IllegalArgumentException("Vuelo no encontrado: " + flightId);
+            if (toCancel.absoluteDepartureMinute() <= tick)
+                throw new IllegalArgumentException("No se puede cancelar un vuelo que ya inicio.");
             cancellations.add(flightId);
             events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
         }
@@ -537,20 +684,25 @@ public class RealtimeSimulationService {
 
             json.objStart();
             json.prop("simulationId", id).comma();
-            json.prop("scenario", scenario).comma();
+            json.prop("scenario", scenarioLabel()).comma();
             json.prop("status", completed ? "COMPLETED" : "RUNNING").comma();
             json.prop("days", days).comma();
             json.prop("tick", tick).comma();
             json.prop("maxTick", maxTick).comma();
+            json.prop("startOffsetMinutes", startOffsetMinutes).comma();
+            json.prop("batchMinutes", BATCH_MINUTES).comma();
+            json.prop("batchIntervalMs", BATCH_INTERVAL_MS).comma();
+            json.prop("batchCount", batchCount).comma();
+            json.prop("lastBatchStart", lastBatchStart).comma();
+            json.prop("lastBatchEnd", lastBatchEnd).comma();
+            json.prop("lastBatchRuntimeMs", lastBatchRuntimeMs).comma();
             json.prop("message", message).comma();
-            json.prop("simulationStartDateTime",
-                    LocalDate.parse(startDate, RAW_DATE).atStartOfDay().toString()).comma();
-            json.prop("simulationEndDateTime",
-                    LocalDate.parse(startDate, RAW_DATE).plusDays(days).atStartOfDay().toString()).comma();
-            json.prop("realStartedAt", realStartedAt.toString()).comma();
-            json.prop("realFinishedAt", LocalDateTime.now().toString()).comma();
-            json.prop("runtimeMs",
-                    java.time.Duration.between(realStartedAt, LocalDateTime.now()).toMillis()).comma();
+            json.prop("simulationStartDateTime", simulationStartInstant).comma();
+            json.prop("simulationEndDateTime", simulationEndInstant).comma();
+            long realFinishedAtMs = System.currentTimeMillis();
+            json.prop("realStartedAt", java.time.Instant.ofEpochMilli(realStartedAtMs).toString()).comma();
+            json.prop("realFinishedAt", java.time.Instant.ofEpochMilli(realFinishedAtMs).toString()).comma();
+            json.prop("runtimeMs", realFinishedAtMs - realStartedAtMs).comma();
 
             // cancelledFlightIds
             json.name("cancelledFlightIds").arrayStart();
@@ -682,6 +834,10 @@ public class RealtimeSimulationService {
             }
             json.arrayEnd();
             json.objEnd();
+        }
+
+        private String scenarioLabel() {
+            return "SIMULACION_LOTES".equals(scenario) ? "Simulación 5 días" : "Tiempo real";
         }
 
         private double ratio(int value, int total) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import {
   getAirportsRequest,
   getFlightsRequest,
+  getCurrentBatchSimulationRequest,
   startBatchSimulationRequest,
   advanceBatchSimulationRequest,
   cancelBatchFlightRequest,
@@ -16,7 +17,7 @@ import { Timeline } from "../components/Timeline"
 import { Topbar } from "../components/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, Flight, SimulationData } from "../types"
-import { DAY_OPTIONS, DEFAULT_START_DATE } from "../utils/constants"
+import { DEFAULT_START_DATE, SIMULATION_DAYS } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 import { formatRealTime } from "../utils/timeUtils"
 import { SimulationResultModal } from "../components/SimulationResultModal"
@@ -25,7 +26,7 @@ import { SimulationResultModal } from "../components/SimulationResultModal"
  * SimulationPage — Simulación por lotes sincronizada con el backend.
  *
  * Flujo por lote:
- *   1. El frontend llama a /advance (steps = BATCH_MINUTES = 360).
+ *   1. El frontend llama a /advance (steps = BATCH_MINUTES = 180).
  *   2. El backend ejecuta el ALNS y responde con el nuevo estado (tick avanzado).
  *   3. El frontend recibe los datos y arranca animateBatch(tickAnterior, tickNuevo).
  *   4. requestAnimationFrame interpola simMinute durante BATCH_DURATION_MS (2 min).
@@ -39,7 +40,8 @@ import { SimulationResultModal } from "../components/SimulationResultModal"
  */
 export function SimulationPage() {
   const [startDate, setStartDate]     = useState(DEFAULT_START_DATE)
-  const [days, setDays]               = useState(3)
+  const [startTime, setStartTime]     = useState("00:00")
+  const [days]                        = useState(SIMULATION_DAYS)
   const [data, setData]               = useState<SimulationData | null>(null)
   const [airportCatalog, setAirportCatalog] = useState<Airport[]>([])
   const [flightCatalog, setFlightCatalog] = useState<Flight[]>([])
@@ -64,7 +66,7 @@ export function SimulationPage() {
   // true mientras la animación del lote está corriendo
   const animatingRef    = useRef(false)
 
-  const maxMinute = days * 1440
+  const maxMinute = data?.maxTick ?? days * 1440
 
   const {
     simMinute,
@@ -137,7 +139,7 @@ export function SimulationPage() {
     setFetching(true)
     setError("")
     try {
-      const payload = await advanceBatchSimulationRequest(sessionId, BATCH_MINUTES)
+      const payload = await advanceBatchSimulationRequest(sessionId, BATCH_MINUTES, fromTick)
       setData(payload)
       setNotice(payload.message || "")
 
@@ -153,7 +155,7 @@ export function SimulationPage() {
         setPlaying(false)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al avanzar el lote.")
+      setError(err instanceof Error ? err.message : "Error al actualizar la simulación.")
       setPlaying(false)
       animatingRef.current = false
     } finally {
@@ -183,6 +185,46 @@ export function SimulationPage() {
     }
   }, [data, playing, maxMinute, setPlaying, fetchNextBatch, onBatchCompleteRef])
 
+  useEffect(() => {
+    let cancelled = false
+    void getCurrentBatchSimulationRequest()
+      .then((payload) => {
+        if (cancelled || !payload) return
+        setData(payload)
+        setSelectedAirport(payload.airports[0]?.code || airportCatalog[0]?.code || null)
+        setSimMinute(payload.tick ?? payload.startOffsetMinutes ?? 0)
+        setPlaying(payload.status !== "COMPLETED")
+      })
+      .catch(() => {
+        // No hay simulación compartida todavía o el backend no está disponible.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [airportCatalog, setPlaying, setSimMinute])
+
+  useEffect(() => {
+    if (!data?.simulationId || data.status === "COMPLETED") return
+    const timer = window.setInterval(() => {
+      if (fetching || animatingRef.current) return
+      void getCurrentBatchSimulationRequest()
+        .then((payload) => {
+          if (!payload) return
+          const previousTick = data.tick ?? data.startOffsetMinutes ?? 0
+          const nextTick = payload.tick ?? previousTick
+          setData(payload)
+          if (nextTick > previousTick) {
+            animatingRef.current = true
+            animateBatch(previousTick, Math.min(nextTick, maxMinute))
+          } else {
+            setSimMinute(nextTick)
+          }
+        })
+        .catch(() => {})
+    }, 5_000)
+    return () => window.clearInterval(timer)
+  }, [data, fetching, animateBatch, maxMinute, setSimMinute])
+
   // ── Iniciar simulación ─────────────────────────────────────────────────────
   const runSimulation = async () => {
     setLoading(true)
@@ -198,13 +240,14 @@ export function SimulationPage() {
 
     try {
       // 1. Crear la sesión (tick = 0, status = RUNNING, sin datos aún)
-      const initial = await startBatchSimulationRequest(startDate, days)
+      const initial = await startBatchSimulationRequest(startDate, days, startTime)
       setData(initial)
+      setSimMinute(initial.tick ?? initial.startOffsetMinutes ?? 0)
       setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
       setPlaying(true)
 
       // 2. Pedir inmediatamente el primer lote
-      await fetchNextBatch(initial.simulationId!, 0)
+      await fetchNextBatch(initial.simulationId!, initial.tick ?? initial.startOffsetMinutes ?? 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar la simulación.")
       setPlaying(false)
@@ -227,25 +270,14 @@ export function SimulationPage() {
     setNotice("")
 
     try {
-      await cancelBatchFlightRequest(data.simulationId, id)
+      const updated = await cancelBatchFlightRequest(data.simulationId, id)
       setFlightToCancel("")
-
-      accumulatedRef.current = 0
-      playStartRef.current   = null
-      prevTickRef.current    = 0
-      animatingRef.current   = false
-      setRealTimeMs(0)
-      reset()
-
-      const initial = await startBatchSimulationRequest(startDate, days)
-      setData(initial)
-      setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
-      setNotice(`Vuelo ${id} cancelado. Simulacion reiniciada desde cero.`)
+      setData(updated)
+      setSelectedAirport(updated.airports[0]?.code || airportCatalog[0]?.code || null)
+      setNotice(`Vuelo ${id} cancelado. Replanificacion aplicada sobre el estado actual.`)
       setPlaying(true)
-
-      await fetchNextBatch(initial.simulationId!, 0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo y reiniciar la simulacion.")
+      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo y replanificar.")
       setPlaying(false)
     } finally {
       setCancelling(false)
@@ -278,12 +310,6 @@ export function SimulationPage() {
       ? { ...current, airports: current.airports.map(updateAirport) }
       : current
     )
-  }
-
-  const handleDaysChange = (option: number) => {
-    setDays(option)
-    setSimMinute(0)
-    setReportDismissed(false)
   }
 
   const handleReset = () => {
@@ -321,8 +347,8 @@ export function SimulationPage() {
             cancelling={cancelling}
             simMinute={simMinute}
             startDate={startDate}
+            startTime={startTime}
             onCancelFlight={cancelFlight}
-            onDaysChange={handleDaysChange}
             onFlightToCancelChange={setFlightToCancel}
             onPause={() => setPlaying(false)}
             onPlay={() => {
@@ -337,6 +363,7 @@ export function SimulationPage() {
             onReset={handleReset}
             onRunSimulation={runSimulation}
             onStartDateChange={setStartDate}
+            onStartTimeChange={setStartTime}
           />
           <CapacityLegend />
           <section className="panel section">
@@ -421,27 +448,28 @@ type SimulationControlsProps = {
   cancelling: boolean
   simMinute: number
   startDate: string
+  startTime: string
   onCancelFlight: () => void
-  onDaysChange: (days: number) => void
   onFlightToCancelChange: (id: string) => void
   onPause: () => void
   onPlay: () => void
   onReset: () => void
   onRunSimulation: () => void
   onStartDateChange: (date: string) => void
+  onStartTimeChange: (time: string) => void
 }
 
 function SimulationControls({
   days, error, notice, flightToCancel, hasSimulation,
-  loading, fetching, playing, cancelling, simMinute, startDate,
-  onCancelFlight, onDaysChange, onFlightToCancelChange,
-  onPause, onPlay, onReset, onRunSimulation, onStartDateChange,
+  loading, fetching, playing, cancelling, simMinute, startDate, startTime,
+  onCancelFlight, onFlightToCancelChange,
+  onPause, onPlay, onReset, onRunSimulation, onStartDateChange, onStartTimeChange,
 }: SimulationControlsProps) {
   const busy = loading || fetching || cancelling
 
   return (
     <section className="panel section">
-      <h2>Simulador</h2>
+      <h2>Simulación 5 días</h2>
       <div className="control-grid">
         <div className="field">
           <label>Fecha inicial</label>
@@ -454,34 +482,34 @@ function SimulationControls({
         </div>
 
         <div className="field">
-          <label>Días de simulación</label>
-          <div className="segmented">
-            {DAY_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                className={opt === days ? "active" : ""}
-                onClick={() => onDaysChange(opt)}
-                disabled={busy || playing}
-              >
-                {`${opt} días`}
-              </button>
-            ))}
-          </div>
+          <label>Hora inicial</label>
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => onStartTimeChange(e.target.value)}
+            disabled={busy || playing}
+          />
+        </div>
+
+        <div className="metric">
+          <span>Días de simulación</span>
+          <strong>{days}</strong>
+          <span>duración fija</span>
         </div>
 
         <button className="primary" onClick={onRunSimulation} disabled={busy || playing}>
-          {loading ? "Iniciando..." : "Ejecutar simulación"}
+          {loading ? "Iniciando..." : "Ejecutar Simulación 5 días"}
         </button>
 
-        {/* Indicador de estado del lote */}
+        {/* Indicador de estado */}
         <div className="metric">
           <span>Minuto simulado</span>
           <strong>{Math.floor(simMinute)}</strong>
           <span>
             {loading     ? "iniciando sesión..." :
-             fetching    ? "▶ ejecutando ALNS del lote..." :
+             fetching    ? "actualizando simulación..." :
              cancelling  ? "replanificando..." :
-             playing     ? "animando lote..." :
+             playing     ? "reproduciendo simulación..." :
                            "pausado"}
           </span>
         </div>

@@ -22,6 +22,9 @@ public class SimulatorServer {
     private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
     private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
     private static final Pattern STEPS = Pattern.compile("\"steps\"\\s*:\\s*(\\d+)");
+    private static final Pattern EXPECTED_TICK = Pattern.compile("\"expectedTick\"\\s*:\\s*(-?\\d+)");
+    private static final Pattern START_TIME = Pattern.compile("\"startTime\"\\s*:\\s*\"(\\d{2}:\\d{2})\"");
+    private static final Pattern TIME_ZONE = Pattern.compile("\"timeZone\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern FLIGHT_ID = Pattern.compile("\"flightId\"\\s*:\\s*\"([^\"]+)\"");
 
     private final SimulationService simulationService = new SimulationService();
@@ -100,7 +103,7 @@ public class SimulatorServer {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         try {
             String startDate = readString(START_DATE, body, "20260102");
-            int days = readInt(DAYS, body, 3);
+            int days = readInt(DAYS, body, 5);
             String result = simulationService.runAlns(startDate, days);
             send(exchange, 200, "application/json", result);
         } catch (IllegalArgumentException e) {
@@ -194,8 +197,14 @@ public class SimulatorServer {
         try {
             if ("/api/realtime/start".equals(path) && "POST".equalsIgnoreCase(method)) {
                 String startDate = readString(START_DATE, body, "20260102");
-                int days = readInt(DAYS, body, 3);
-                send(exchange, 200, "application/json", realtimeSimulationService.start(startDate, days));
+                int days = readInt(DAYS, body, 5);
+                String timeZone = readString(TIME_ZONE, body, "");
+                send(exchange, 200, "application/json", realtimeSimulationService.start(startDate, days, timeZone));
+                return;
+            }
+
+            if ("/api/realtime/current".equals(path) && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.currentRealtime());
                 return;
             }
 
@@ -208,7 +217,8 @@ public class SimulatorServer {
             Matcher tickMatcher = Pattern.compile("^/api/realtime/([^/]+)/tick$").matcher(path);
             if (tickMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 int steps = readInt(STEPS, body, 1);
-                send(exchange, 200, "application/json", realtimeSimulationService.advance(tickMatcher.group(1), steps));
+                int expectedTick = readInt(EXPECTED_TICK, body, -1);
+                send(exchange, 200, "application/json", realtimeSimulationService.advance(tickMatcher.group(1), steps, expectedTick));
                 return;
             }
 
@@ -238,9 +248,16 @@ public class SimulatorServer {
         try {
             if ("/api/simulations/batch/start".equals(path) && "POST".equalsIgnoreCase(method)) {
                 String startDate = readString(START_DATE, body, "20260102");
-                int days = readInt(DAYS, body, 3);
+                int days = readInt(DAYS, body, 5);
+                String startTime = readString(START_TIME, body, "00:00");
+                String timeZone = readString(TIME_ZONE, body, "");
                 send(exchange, 200, "application/json",
-                        realtimeSimulationService.startBatchSimulation(startDate, days));
+                        realtimeSimulationService.startBatchSimulation(startDate, days, startTime, timeZone));
+                return;
+            }
+
+            if ("/api/simulations/batch/current".equals(path) && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.currentSimulation());
                 return;
             }
 
@@ -252,9 +269,10 @@ public class SimulatorServer {
 
             Matcher advanceMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/advance$").matcher(path);
             if (advanceMatcher.matches() && "POST".equalsIgnoreCase(method)) {
-                int steps = readInt(STEPS, body, 1);
+                int steps = readInt(STEPS, body, RealtimeSimulationService.BATCH_MINUTES);
+                int expectedTick = readInt(EXPECTED_TICK, body, -1);
                 send(exchange, 200, "application/json",
-                        realtimeSimulationService.advance(advanceMatcher.group(1), steps));
+                        realtimeSimulationService.advance(advanceMatcher.group(1), steps, expectedTick));
                 return;
             }
 

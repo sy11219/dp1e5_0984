@@ -4,7 +4,7 @@ export const STATUS_COLOR = {
   red: "#d84545",
 } as const;
 
-export const DAY_OPTIONS = [3, 5, 7];
+export const SIMULATION_DAYS = 5;
 export const DEFAULT_START_DATE = "2026-01-02";
 export const DEFAULT_SPEED = 360;
 export const SPEED_MIN = 60;

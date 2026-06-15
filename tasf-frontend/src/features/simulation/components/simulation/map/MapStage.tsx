@@ -274,7 +274,7 @@ export default function MapStage({
     <div className="map-stage">
       <div className="map-header">
         <span className="badge">{data ? `${data.airports.length} aeropuertos` : "Mapa operativo"}</span>
-        <span className="badge">{data ? `${activeFlights.length} vuelos en aire` : "ALNS"}</span>
+        <span className="badge">{data ? `${activeFlights.length} vuelos en aire` : "Simulación"}</span>
       </div>
       {mapInfo && <MapInfoCard info={mapInfo} onClose={() => setMapInfo(null)} />}
       <div

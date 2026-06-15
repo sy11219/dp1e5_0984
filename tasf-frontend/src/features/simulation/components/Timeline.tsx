@@ -1,5 +1,5 @@
 import type { SimulationData } from "../types";
-import { formatSimMinute } from "../utils/formatters";
+import { formatFlightMoment, formatSimMinute } from "../utils/formatters";
 
 interface TimelineProps {
   simMinute: number;
@@ -14,31 +14,31 @@ export function Timeline({ simMinute, maxMinute, setSimMinute, data, startDate }
     setSimMinute(Number(event.target.value));
   };
 
-  const baseDate = new Date(startDate);
-
-  const currentDay = Math.floor(simMinute / 1440);
-  const currentDate = new Date(baseDate.getTime() + currentDay * 24 * 60 * 60 * 1000);
-
-  const lastDay = Math.floor(maxMinute / 1440);
-  const lastDate = new Date(baseDate.getTime() + lastDay * 24 * 60 * 60 * 1000);
-
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const startOffset = data?.startOffsetMinutes ?? 0;
+  const startLabel = data
+    ? formatFlightMoment(data, startOffset)
+    : `${startDate} ${formatSimMinute(startOffset)}`;
+  const currentLabel = data
+    ? formatFlightMoment(data, simMinute)
+    : formatSimMinute(simMinute);
+  const endLabel = data
+    ? formatFlightMoment(data, maxMinute)
+    : formatSimMinute(maxMinute);
 
   return (
     <div className="timeline">
       <input
         type="range"
-        min="0"
+        min={startOffset}
         max={maxMinute}
         value={Math.floor(simMinute)}
         onChange={handleChange}
         disabled={!data}
       />
       <div className="timeline-meta">
-        <span>{`Día 0 · ${formatDate(baseDate)} · 00:00`}</span>
-        <strong>{`Día ${currentDay} · ${formatDate(currentDate)} · ${formatSimMinute(simMinute)}`}</strong>
-        <span>{`Día ${lastDay} · ${formatDate(lastDate)} · 00:00`}</span>
+        <span>{startLabel}</span>
+        <strong>{currentLabel}</strong>
+        <span>{endLabel}</span>
       </div>
     </div>
   );

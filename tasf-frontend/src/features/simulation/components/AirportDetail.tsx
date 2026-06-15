@@ -29,7 +29,7 @@ interface AirportDetailProps {
 export function AirportDetail({
   airport,
   load,
-  peakLabel = "Pico ALNS",
+  peakLabel = "Pico registrado",
   onStatusUpdated,
 }: AirportDetailProps) {
   const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;

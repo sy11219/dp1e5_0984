@@ -84,7 +84,7 @@ function buildInsights(data: SimulationData) {
     {
       title: `${delayedBags.toLocaleString("es-PE")} maletas requieren seguimiento.`,
       detail:
-        "La cifra agrupa envios fuera de SLA o no planificados en la respuesta ALNS.",
+        "La cifra agrupa envios fuera de SLA o no planificados en la simulación.",
     },
   ];
 }

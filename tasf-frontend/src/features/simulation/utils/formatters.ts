@@ -1,7 +1,7 @@
 import type { SimulationData } from "../types";
 
 type FlightMomentData =
-  | (Pick<SimulationData, "simulationStartDateTime"> & {
+  | (Pick<SimulationData, "simulationStartDateTime" | "startOffsetMinutes"> & {
       simulationStartDate?: string;
     })
   | null
@@ -49,8 +49,9 @@ export function formatFlightMoment(data: FlightMomentData, absoluteMinute: numbe
   if (!data?.simulationStartDateTime && data?.simulationStartDate)
     return formatSimMinute(absoluteMinute);
   if (!data?.simulationStartDateTime) return formatSimMinute(absoluteMinute);
+  const minutesFromStart = absoluteMinute - (data.startOffsetMinutes ?? 0);
   const date = new Date(
-    new Date(data.simulationStartDateTime).getTime() + absoluteMinute * 60000
+    new Date(data.simulationStartDateTime).getTime() + minutesFromStart * 60000
   );
   return `${formatDateOnly(date)}, ${formatTimeOnly(date)}`;
 }

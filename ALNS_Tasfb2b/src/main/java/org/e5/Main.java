@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * Punto de entrada principal del sistema de planificación TASF.B2B.
  *
  * Soporta 3 escenarios según el enunciado:
- *   1. SIMULACION  — período fijo (3, 5 o 7 días). Debe ejecutarse en 30–90 min.
+ *   1. SIMULACION  — período fijo de 5 días. Debe ejecutarse en 30–90 min.
  *   2. TIEMPO_REAL — ejecución continua tick a tick con replanificación ante cancelaciones.
  *   3. COLAPSO     — incrementa demanda hasta que el sistema falle.
  */
@@ -433,7 +433,7 @@ private static void ejecutarTiempoReal(List<Shipment> shipments,
     private static Escenario leerEscenario(Scanner scanner) {
         while (true) {
             System.out.println("Seleccione el escenario:");
-            System.out.println("  1. SIMULACION  — período fijo (3, 5 o 7 días)");
+            System.out.println("  1. SIMULACION  — período fijo de 5 días");
             System.out.println("  2. TIEMPO_REAL — ejecución continua con cancelaciones");
             System.out.println("  3. COLAPSO     — incrementa demanda hasta fallo");
             System.out.print("Opción (1/2/3): ");
@@ -462,31 +462,11 @@ private static void ejecutarTiempoReal(List<Shipment> shipments,
 
     private static int leerDias(Scanner scanner, Escenario escenario) {
         if (escenario == Escenario.TIEMPO_REAL) {
-            System.out.print("Ingrese días de datos a cargar para tiempo real (1–7): ");
-            try {
-                int d = Integer.parseInt(scanner.nextLine().trim());
-                if (d >= 1 && d <= 7) return d;
-            } catch (NumberFormatException ignored) {}
-            return 3; // default
+            return 5;
         }
         if (escenario == Escenario.COLAPSO) {
-            System.out.print("Ingrese días base para colapso (1–7): ");
-            try {
-                int d = Integer.parseInt(scanner.nextLine().trim());
-                if (d >= 1 && d <= 7) return d;
-            } catch (NumberFormatException ignored) {}
-            return 3; // default
+            return 5;
         }
-        while (true) {
-            System.out.print("Ingrese días a simular (3, 5 o 7): ");
-            String input = scanner.nextLine().trim();
-            try {
-                int days = Integer.parseInt(input);
-                if (days == 3 || days == 5 || days == 7) return days;
-                System.out.println("  Para SIMULACION use 3, 5 o 7 días.");
-            } catch (NumberFormatException e) {
-                System.out.println("  Ingrese un número válido.");
-            }
-        }
+        return 5;
     }
 }

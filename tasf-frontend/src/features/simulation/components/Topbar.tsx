@@ -1,5 +1,5 @@
 import type { SimulationData } from "../types";
-import { formatClock, formatDateOnly, formatSimMinute, formatTimeOnly } from "../utils/formatters";
+import { formatClock, formatDateOnly, formatFlightMoment, formatSimMinute, formatTimeOnly } from "../utils/formatters";
 
 interface TopbarProps {
   data: SimulationData | null;
@@ -31,7 +31,7 @@ export function Topbar({
   now,
   simMinute,
   title = "TASF.B2B - Simulador de equipaje",
-  subtitle = "Escenario planificador",
+  subtitle = "Simulación 5 días",
   clockLabel = "Reloj simulado",
 }: TopbarProps) {
   return (
@@ -45,15 +45,15 @@ export function Topbar({
         <StatusItem
           label={clockLabel}
           value={formatSimMinute(simMinute)}
-          sub="avance actual"
+          sub={data ? formatFlightMoment(data, simMinute) : "avance actual"}
         />
         <StatusItem
-          label="ALNS inicio"
+          label="Inicio"
           value={data ? formatTimeOnly(data.realStartedAt) : "--"}
           sub={data ? formatDateOnly(data.realStartedAt) : "--"}
         />
         <StatusItem
-          label="ALNS fin"
+          label="Ultima actualización"
           value={data ? formatTimeOnly(data.realFinishedAt) : "--"}
           sub={data ? formatDateOnly(data.realFinishedAt) : "--"}
         />
@@ -74,7 +74,7 @@ export function Topbar({
         />
         <StatusItem
           label="Escenario"
-          value={data?.scenario || "SIMULACION_LOTES"}
+          value={data?.scenario || "Simulación 5 días"}
           sub="--"
         />
       </div>

@@ -76,8 +76,8 @@ public class SimulationService {
             throw new IllegalArgumentException("La fecha inicial debe tener formato aaaammdd.");
         }
         LocalDate.parse(startDate, RAW_DATE);
-        if (days != 3 && days != 5 && days != 7) {
-            throw new IllegalArgumentException("Solo se permite simular 3, 5 o 7 dias.");
+        if (days != 5) {
+            throw new IllegalArgumentException("Solo se permite simular 5 dias.");
         }
     }
 
@@ -111,7 +111,7 @@ public class SimulationService {
 
         json.objStart();
         json.prop("simulationId", UUID.randomUUID().toString()).comma();
-        json.prop("scenario", "ALNS").comma();
+        json.prop("scenario", "Simulación 5 días").comma();
         json.prop("status", "COMPLETED").comma();
         json.prop("days", days).comma();
         json.prop("simulationStartDateTime", simStart).comma();

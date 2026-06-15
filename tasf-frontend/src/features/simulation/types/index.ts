@@ -90,6 +90,13 @@ export interface SimulationData {
   days?: number;
   tick?: number;
   maxTick?: number;
+  startOffsetMinutes?: number;
+  batchMinutes?: number;
+  batchIntervalMs?: number;
+  batchCount?: number;
+  lastBatchStart?: number;
+  lastBatchEnd?: number;
+  lastBatchRuntimeMs?: number;
   cancelledFlightIds?: string[];
   airports: Airport[];
   flights: Flight[];
