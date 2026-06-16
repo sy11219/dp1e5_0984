@@ -21,11 +21,30 @@ public class SimulatorServer {
     private static final Pattern DAYS = Pattern.compile("\"days\"\\s*:\\s*(\\d+)");
     private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
     private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
+    private static final Pattern AIRPORT_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})$");
+    private static final Pattern FLIGHT_PATH = Pattern.compile("^/api/flights/([^/]+)$");
     private static final Pattern STEPS = Pattern.compile("\"steps\"\\s*:\\s*(\\d+)");
     private static final Pattern EXPECTED_TICK = Pattern.compile("\"expectedTick\"\\s*:\\s*(-?\\d+)");
     private static final Pattern START_TIME = Pattern.compile("\"startTime\"\\s*:\\s*\"(\\d{2}:\\d{2})\"");
     private static final Pattern TIME_ZONE = Pattern.compile("\"timeZone\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern FLIGHT_ID = Pattern.compile("\"flightId\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern CODE = Pattern.compile("\"code\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern CITY = Pattern.compile("\"city\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern COUNTRY = Pattern.compile("\"country\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern CONTINENT = Pattern.compile("\"continent\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern OPERATIONAL_STATUS = Pattern.compile("\"operationalStatus\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern LATITUDE = Pattern.compile("\"latitude\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)");
+    private static final Pattern LONGITUDE = Pattern.compile("\"longitude\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)");
+    private static final Pattern GMT_OFFSET = Pattern.compile("\"gmtOffset\"\\s*:\\s*(-?\\d+)");
+    private static final Pattern MAX_CAPACITY = Pattern.compile("\"maxCapacity\"\\s*:\\s*(\\d+)");
+    private static final Pattern ORIGIN_AIRPORT_CODE = Pattern.compile("\"originAirportCode\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern DESTINATION_AIRPORT_CODE = Pattern.compile("\"destinationAirportCode\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern DEPARTURE_TIME_LOCAL = Pattern.compile("\"departureTimeLocal\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern ARRIVAL_TIME_LOCAL = Pattern.compile("\"arrivalTimeLocal\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern DEPARTURE_TIME_UTC = Pattern.compile("\"departureTimeUtc\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern ARRIVAL_TIME_UTC = Pattern.compile("\"arrivalTimeUtc\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern CAPACITY = Pattern.compile("\"capacity\"\\s*:\\s*(\\d+)");
+    private static final Pattern FLIGHT_STATUS_FIELD = Pattern.compile("\"status\"\\s*:\\s*\"([^\"]*)\"");
 
     private final SimulationService simulationService = new SimulationService();
     private final AirportStatusService airportStatusService = new AirportStatusService();
@@ -119,27 +138,43 @@ public class SimulatorServer {
 
         String path = exchange.getRequestURI().getPath();
         if ("/api/airports".equals(path) || "/api/airports/".equals(path)) {
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                send(exchange, 405, "application/json", "{\"error\":\"Use GET\"}");
-                return;
-            }
             try {
-                send(exchange, 200, "application/json", airportStatusService.listAirportsJson());
+                if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    send(exchange, 200, "application/json", airportStatusService.listAirportsJson());
+                    return;
+                }
+
+                if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    AirportStatusService.AirportUpdate update = new AirportStatusService.AirportUpdate(
+                            readRequiredString(CITY, body, "city"),
+                            readRequiredString(COUNTRY, body, "country"),
+                            readRequiredString(CONTINENT, body, "continent"),
+                            "ACTIVE",
+                            readRequiredDouble(LATITUDE, body, "latitude"),
+                            readRequiredDouble(LONGITUDE, body, "longitude"),
+                            readRequiredInt(GMT_OFFSET, body, "gmtOffset"),
+                            readRequiredInt(MAX_CAPACITY, body, "maxCapacity")
+                    );
+                    send(exchange, 201, "application/json",
+                            airportStatusService.createAirport(readRequiredString(CODE, body, "code"), update));
+                    return;
+                }
+
+                send(exchange, 405, "application/json", "{\"error\":\"Use GET o POST\"}");
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 e.printStackTrace();
-                send(exchange, 500, "application/json", "{\"error\":\"No se pudieron leer los aeropuertos\"}");
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo procesar el aeropuerto\"}");
             }
             return;
         }
 
         Matcher pathMatcher = AIRPORT_STATUS_PATH.matcher(exchange.getRequestURI().getPath());
-        if (!pathMatcher.matches()) {
-            send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
-            return;
-        }
-
-        String code = pathMatcher.group(1);
-        try {
+        if (pathMatcher.matches()) {
+            String code = pathMatcher.group(1);
+            try {
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 send(exchange, 200, "application/json", airportStatusService.getStatus(code).toJson());
                 return;
@@ -157,34 +192,116 @@ public class SimulatorServer {
             }
 
             send(exchange, 405, "application/json", "{\"error\":\"Use GET o PATCH\"}");
-        } catch (IllegalArgumentException e) {
-            send(exchange, 404, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
-        } catch (Exception e) {
-            e.printStackTrace();
-            send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
+            } catch (IllegalArgumentException e) {
+                send(exchange, 404, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
+            }
+            return;
         }
+
+        Matcher airportMatcher = AIRPORT_PATH.matcher(exchange.getRequestURI().getPath());
+        if (airportMatcher.matches()) {
+            if (!"PATCH".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 405, "application/json", "{\"error\":\"Use PATCH\"}");
+                return;
+            }
+
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            try {
+                AirportStatusService.AirportUpdate update = new AirportStatusService.AirportUpdate(
+                        readRequiredString(CITY, body, "city"),
+                        readRequiredString(COUNTRY, body, "country"),
+                        readRequiredString(CONTINENT, body, "continent"),
+                        readRequiredString(OPERATIONAL_STATUS, body, "operationalStatus"),
+                        readRequiredDouble(LATITUDE, body, "latitude"),
+                        readRequiredDouble(LONGITUDE, body, "longitude"),
+                        readRequiredInt(GMT_OFFSET, body, "gmtOffset"),
+                        readRequiredInt(MAX_CAPACITY, body, "maxCapacity")
+                );
+                send(exchange, 200, "application/json",
+                        airportStatusService.updateAirport(airportMatcher.group(1), update));
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el aeropuerto\"}");
+            }
+            return;
+        }
+
+        send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
     }
 
     private void flights(HttpExchange exchange) throws IOException {
         if (preflight(exchange)) return;
 
         String path = exchange.getRequestURI().getPath();
-        if (!"/api/flights".equals(path) && !"/api/flights/".equals(path)) {
-            send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
+        if ("/api/flights".equals(path) || "/api/flights/".equals(path)) {
+            try {
+                if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    send(exchange, 200, "application/json", flightPlanService.listFlightsJson());
+                    return;
+                }
+
+                if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                    FlightPlanService.FlightPlanUpdate update = new FlightPlanService.FlightPlanUpdate(
+                            readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
+                            readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
+                            readRequiredString(DEPARTURE_TIME_LOCAL, body, "departureTimeLocal"),
+                            readRequiredString(ARRIVAL_TIME_LOCAL, body, "arrivalTimeLocal"),
+                            readRequiredString(DEPARTURE_TIME_UTC, body, "departureTimeUtc"),
+                            readRequiredString(ARRIVAL_TIME_UTC, body, "arrivalTimeUtc"),
+                            readRequiredInt(CAPACITY, body, "capacity"),
+                            "SCHEDULED"
+                    );
+                    send(exchange, 201, "application/json", flightPlanService.createFlight(update));
+                    return;
+                }
+
+                send(exchange, 405, "application/json", "{\"error\":\"Use GET o POST\"}");
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo procesar el vuelo\"}");
+            }
             return;
         }
 
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            send(exchange, 405, "application/json", "{\"error\":\"Use GET\"}");
+        Matcher flightMatcher = FLIGHT_PATH.matcher(path);
+        if (flightMatcher.matches()) {
+            if (!"PATCH".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 405, "application/json", "{\"error\":\"Use PATCH\"}");
+                return;
+            }
+
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            try {
+                FlightPlanService.FlightPlanUpdate update = new FlightPlanService.FlightPlanUpdate(
+                        readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
+                        readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
+                        readRequiredString(DEPARTURE_TIME_LOCAL, body, "departureTimeLocal"),
+                        readRequiredString(ARRIVAL_TIME_LOCAL, body, "arrivalTimeLocal"),
+                        readRequiredString(DEPARTURE_TIME_UTC, body, "departureTimeUtc"),
+                        readRequiredString(ARRIVAL_TIME_UTC, body, "arrivalTimeUtc"),
+                        readRequiredInt(CAPACITY, body, "capacity"),
+                        readRequiredString(FLIGHT_STATUS_FIELD, body, "status")
+                );
+                send(exchange, 200, "application/json",
+                        flightPlanService.updateFlight(flightMatcher.group(1), update));
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo actualizar el vuelo\"}");
+            }
             return;
         }
 
-        try {
-            send(exchange, 200, "application/json", flightPlanService.listFlightsJson());
-        } catch (Exception e) {
-            e.printStackTrace();
-            send(exchange, 500, "application/json", "{\"error\":\"No se pudieron leer los vuelos\"}");
-        }
+        send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
     }
 
     private void realtime(HttpExchange exchange) throws IOException {
@@ -362,6 +479,30 @@ public class SimulatorServer {
         return matcher.find() ? Integer.parseInt(matcher.group(1)) : fallback;
     }
 
+    private String readRequiredString(Pattern pattern, String body, String name) {
+        Matcher matcher = pattern.matcher(body);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("Falta campo: " + name);
+        }
+        return unescape(matcher.group(1));
+    }
+
+    private int readRequiredInt(Pattern pattern, String body, String name) {
+        Matcher matcher = pattern.matcher(body);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("Falta campo: " + name);
+        }
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    private double readRequiredDouble(Pattern pattern, String body, String name) {
+        Matcher matcher = pattern.matcher(body);
+        if (!matcher.find()) {
+            throw new IllegalArgumentException("Falta campo: " + name);
+        }
+        return Double.parseDouble(matcher.group(1));
+    }
+
     private Boolean readBoolean(Pattern pattern, String body) {
         Matcher matcher = pattern.matcher(body);
         return matcher.find() ? Boolean.parseBoolean(matcher.group(1)) : null;
@@ -369,5 +510,9 @@ public class SimulatorServer {
 
     private String escape(String message) {
         return message == null ? "" : message.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String unescape(String value) {
+        return value == null ? "" : value.replace("\\\"", "\"").replace("\\\\", "\\");
     }
 }

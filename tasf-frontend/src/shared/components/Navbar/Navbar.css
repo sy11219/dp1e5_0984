@@ -1,6 +1,7 @@
 /* probablemente cambiar luego */
 .navbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   background: #111827;
   padding: 10px 20px;

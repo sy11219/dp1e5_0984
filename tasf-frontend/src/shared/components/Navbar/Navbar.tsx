@@ -7,6 +7,8 @@ export function Navbar() {
     { name: "Simulación", path: "/" },
     { name: "Gestión de Maletas", path: "/baggage" },
     { name: "Estadísticas", path: "/stats" },
+    { name: "Aeropuertos", path: "/airports" },
+    { name: "Vuelos", path: "/flights" },
     { name: "Carga de archivos", path: "/upload" },
   ];
 

@@ -5,13 +5,19 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.UUID;
 
 public class FlightPlanService {
+    private static final DateTimeFormatter FLIGHT_DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public void cancelFlight(String flightCode) throws SQLException {
         updateStatus(flightCode, "CANCELED");
@@ -37,6 +43,100 @@ public class FlightPlanService {
         }
     }
 
+    public String updateFlight(String flightCode, FlightPlanUpdate update) throws SQLException {
+        String normalizedCode = normalizeFlightCode(flightCode);
+        validateUpdate(update);
+
+        try (Connection connection = openConnection()) {
+            UUID originId = findAirportId(connection, update.originAirportCode());
+            UUID destinationId = findAirportId(connection, update.destinationAirportCode());
+
+            if (originId == null) {
+                throw new IllegalArgumentException("Aeropuerto origen no encontrado: " + update.originAirportCode());
+            }
+            if (destinationId == null) {
+                throw new IllegalArgumentException("Aeropuerto destino no encontrado: " + update.destinationAirportCode());
+            }
+
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE flight_plans
+                    SET origin_airport_id = ?,
+                        destination_airport_id = ?,
+                        departure_time_local = ?,
+                        arrival_time_local = ?,
+                        departure_time_utc = ?,
+                        arrival_time_utc = ?,
+                        capacity = ?,
+                        status = ?
+                    WHERE flight_code = ?
+                    """)) {
+                statement.setObject(1, originId);
+                statement.setObject(2, destinationId);
+                statement.setTimestamp(3, Timestamp.valueOf(parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL")));
+                statement.setTimestamp(4, Timestamp.valueOf(parseLocalDateTime(update.arrivalTimeLocal(), "LLEGADA_LOCAL")));
+                statement.setObject(5, parseUtcDateTime(update.departureTimeUtc(), "SALIDA_UTC"));
+                statement.setObject(6, parseUtcDateTime(update.arrivalTimeUtc(), "LLEGADA_UTC"));
+                statement.setInt(7, update.capacity());
+                statement.setString(8, normalizeStatus(update.status()));
+                statement.setString(9, normalizedCode);
+
+                int updated = statement.executeUpdate();
+                if (updated == 0) {
+                    throw new IllegalArgumentException("Vuelo no encontrado en BD: " + normalizedCode);
+                }
+            }
+
+            return getFlightJson(connection, normalizedCode);
+        }
+    }
+
+    public String createFlight(FlightPlanUpdate update) throws SQLException {
+        validateUpdate(update);
+
+        try (Connection connection = openConnection()) {
+            String originCode = normalizeAirportCode(update.originAirportCode());
+            String destinationCode = normalizeAirportCode(update.destinationAirportCode());
+            UUID originId = findAirportId(connection, originCode);
+            UUID destinationId = findAirportId(connection, destinationCode);
+
+            if (originId == null) {
+                throw new IllegalArgumentException("Aeropuerto origen no encontrado: " + originCode);
+            }
+            if (destinationId == null) {
+                throw new IllegalArgumentException("Aeropuerto destino no encontrado: " + destinationCode);
+            }
+
+            LocalDateTime departureLocal = parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL");
+            LocalDateTime arrivalLocal = parseLocalDateTime(update.arrivalTimeLocal(), "LLEGADA_LOCAL");
+            OffsetDateTime departureUtc = parseUtcDateTime(update.departureTimeUtc(), "SALIDA_UTC");
+            OffsetDateTime arrivalUtc = parseUtcDateTime(update.arrivalTimeUtc(), "LLEGADA_UTC");
+            String flightCode = nextFlightCode(connection, originCode, destinationCode, departureLocal);
+
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO flight_plans (
+                      id, flight_code, origin_airport_id, destination_airport_id,
+                      departure_time_local, arrival_time_local,
+                      departure_time_utc, arrival_time_utc,
+                      capacity, status
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+                    """)) {
+                statement.setObject(1, UUID.randomUUID());
+                statement.setString(2, flightCode);
+                statement.setObject(3, originId);
+                statement.setObject(4, destinationId);
+                statement.setTimestamp(5, Timestamp.valueOf(departureLocal));
+                statement.setTimestamp(6, Timestamp.valueOf(arrivalLocal));
+                statement.setObject(7, departureUtc);
+                statement.setObject(8, arrivalUtc);
+                statement.setInt(9, update.capacity());
+                statement.executeUpdate();
+            }
+
+            return getFlightJson(connection, flightCode);
+        }
+    }
+
     public String listFlightsJson() throws SQLException {
         StringBuilder json = new StringBuilder(64 * 1024);
         json.append("[");
@@ -44,8 +144,12 @@ public class FlightPlanService {
         try (Connection connection = openConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT fp.flight_code,
+                            fp.origin_airport_id,
+                            fp.destination_airport_id,
                             oa.code AS origin_code,
                             da.code AS destination_code,
+                            fp.departure_time_local,
+                            fp.arrival_time_local,
                             fp.departure_time_utc,
                             fp.arrival_time_utc,
                             fp.capacity,
@@ -81,8 +185,16 @@ public class FlightPlanService {
 
                 json.append("{");
                 prop(json, "id", result.getString("flight_code")).append(",");
+                prop(json, "flight_code", result.getString("flight_code")).append(",");
                 prop(json, "origin", result.getString("origin_code")).append(",");
+                prop(json, "origin_airport_id", result.getString("origin_airport_id")).append(",");
                 prop(json, "destination", result.getString("destination_code")).append(",");
+                prop(json, "destination_airport_id", result.getString("destination_airport_id")).append(",");
+                prop(json, "departure_time_local", result.getTimestamp("departure_time_local").toLocalDateTime().toString()).append(",");
+                prop(json, "arrival_time_local", result.getTimestamp("arrival_time_local").toLocalDateTime().toString()).append(",");
+                prop(json, "departure_time_utc", departure.toString()).append(",");
+                prop(json, "arrival_time_utc", arrival.toString()).append(",");
+                prop(json, "capacity", capacity).append(",");
                 prop(json, "dayOffset", dayOffset).append(",");
                 prop(json, "departureMinute", departureMinute).append(",");
                 prop(json, "arrivalMinute", arrivalMinute).append(",");
@@ -92,12 +204,82 @@ public class FlightPlanService {
                 prop(json, "maxCapacity", capacity).append(",");
                 prop(json, "utilization", 0.0).append(",");
                 prop(json, "status", "green").append(",");
+                prop(json, "flightStatus", result.getString("status")).append(",");
                 prop(json, "scheduleStatus", result.getString("status"));
                 json.append("}");
             }
         }
 
         json.append("]");
+        return json.toString();
+    }
+
+    private String getFlightJson(Connection connection, String flightCode) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT fp.flight_code,
+                       fp.origin_airport_id,
+                       fp.destination_airport_id,
+                       oa.code AS origin_code,
+                       da.code AS destination_code,
+                       fp.departure_time_local,
+                       fp.arrival_time_local,
+                       fp.departure_time_utc,
+                       fp.arrival_time_utc,
+                       fp.capacity,
+                       fp.status
+                FROM flight_plans fp
+                JOIN airports oa ON oa.id = fp.origin_airport_id
+                JOIN airports da ON da.id = fp.destination_airport_id
+                WHERE fp.flight_code = ?
+                """)) {
+            statement.setString(1, flightCode);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) {
+                    throw new IllegalArgumentException("Vuelo no encontrado en BD: " + flightCode);
+                }
+                Instant departure = result.getTimestamp("departure_time_utc").toInstant();
+                LocalDate baseDate = departure.atZone(ZoneOffset.UTC).toLocalDate();
+                Instant baseInstant = baseDate.atStartOfDay().toInstant(ZoneOffset.UTC);
+                return flightJson(result, baseInstant);
+            }
+        }
+    }
+
+    private String flightJson(ResultSet result, Instant baseInstant) throws SQLException {
+        Instant departure = result.getTimestamp("departure_time_utc").toInstant();
+        Instant arrival = result.getTimestamp("arrival_time_utc").toInstant();
+        int absoluteDeparture = minutesBetween(baseInstant, departure);
+        int absoluteArrival = minutesBetween(baseInstant, arrival);
+        int dayOffset = Math.floorDiv(absoluteDeparture, 1440);
+        int departureMinute = Math.floorMod(absoluteDeparture, 1440);
+        int arrivalMinute = absoluteArrival - (dayOffset * 1440);
+        int capacity = result.getInt("capacity");
+        StringBuilder json = new StringBuilder(1024);
+
+        json.append("{");
+        prop(json, "id", result.getString("flight_code")).append(",");
+        prop(json, "flight_code", result.getString("flight_code")).append(",");
+        prop(json, "origin", result.getString("origin_code")).append(",");
+        prop(json, "origin_airport_id", result.getString("origin_airport_id")).append(",");
+        prop(json, "destination", result.getString("destination_code")).append(",");
+        prop(json, "destination_airport_id", result.getString("destination_airport_id")).append(",");
+        prop(json, "departure_time_local", result.getTimestamp("departure_time_local").toLocalDateTime().toString()).append(",");
+        prop(json, "arrival_time_local", result.getTimestamp("arrival_time_local").toLocalDateTime().toString()).append(",");
+        prop(json, "departure_time_utc", departure.toString()).append(",");
+        prop(json, "arrival_time_utc", arrival.toString()).append(",");
+        prop(json, "capacity", capacity).append(",");
+        prop(json, "dayOffset", dayOffset).append(",");
+        prop(json, "departureMinute", departureMinute).append(",");
+        prop(json, "arrivalMinute", arrivalMinute).append(",");
+        prop(json, "absoluteDepartureMinute", absoluteDeparture).append(",");
+        prop(json, "absoluteArrivalMinute", absoluteArrival).append(",");
+        prop(json, "assignedLoad", 0).append(",");
+        prop(json, "maxCapacity", capacity).append(",");
+        prop(json, "utilization", 0.0).append(",");
+        prop(json, "status", "green").append(",");
+        prop(json, "flightStatus", result.getString("status")).append(",");
+        prop(json, "scheduleStatus", result.getString("status"));
+        json.append("}");
         return json.toString();
     }
 
@@ -112,6 +294,105 @@ public class FlightPlanService {
         String user = requireEnv("DB_USER");
         String password = requireEnv("DB_PASSWORD");
         return DriverManager.getConnection(url, user, password);
+    }
+
+    private UUID findAirportId(Connection connection, String code) throws SQLException {
+        String normalizedCode = normalizeAirportCode(code);
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT id FROM airports WHERE code = ?")) {
+            statement.setString(1, normalizedCode);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? (UUID) result.getObject("id") : null;
+            }
+        }
+    }
+
+    private String nextFlightCode(
+            Connection connection,
+            String originCode,
+            String destinationCode,
+            LocalDateTime departureLocal
+    ) throws SQLException {
+        String prefix = String.format(
+                "%s-%s-%s-%02d%02d",
+                originCode,
+                destinationCode,
+                departureLocal.toLocalDate().format(FLIGHT_DAY_FORMAT),
+                departureLocal.getHour(),
+                departureLocal.getMinute()
+        );
+
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT COUNT(*) FROM flight_plans WHERE flight_code LIKE ?")) {
+            statement.setString(1, prefix + "-%");
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                int next = result.getInt(1) + 1;
+                return String.format("%s-%04d", prefix, next);
+            }
+        }
+    }
+
+    private void validateUpdate(FlightPlanUpdate update) {
+        if (update == null) {
+            throw new IllegalArgumentException("Datos de vuelo invalidos.");
+        }
+        normalizeAirportCode(update.originAirportCode());
+        normalizeAirportCode(update.destinationAirportCode());
+        parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL");
+        parseLocalDateTime(update.arrivalTimeLocal(), "LLEGADA_LOCAL");
+        parseUtcDateTime(update.departureTimeUtc(), "SALIDA_UTC");
+        parseUtcDateTime(update.arrivalTimeUtc(), "LLEGADA_UTC");
+        normalizeStatus(update.status());
+        if (update.capacity() <= 0) {
+            throw new IllegalArgumentException("Capacidad debe ser mayor a cero.");
+        }
+    }
+
+    private String normalizeFlightCode(String flightCode) {
+        if (flightCode == null || flightCode.isBlank()) {
+            throw new IllegalArgumentException("Codigo de vuelo invalido.");
+        }
+        return flightCode.trim();
+    }
+
+    private String normalizeAirportCode(String code) {
+        if (code == null || !code.matches("(?i)[A-Z]{4}")) {
+            throw new IllegalArgumentException("Codigo de aeropuerto invalido.");
+        }
+        return code.toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new IllegalArgumentException("Status es obligatorio.");
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (normalized.equals("CANCELLED")) {
+            return "CANCELED";
+        }
+        if (!normalized.equals("SCHEDULED") && !normalized.equals("CANCELED")) {
+            throw new IllegalArgumentException("Status debe ser SCHEDULED o CANCELED.");
+        }
+        return normalized;
+    }
+
+    private LocalDateTime parseLocalDateTime(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " es obligatorio.");
+        }
+        return LocalDateTime.parse(value.trim());
+    }
+
+    private OffsetDateTime parseUtcDateTime(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " es obligatorio.");
+        }
+        String normalized = value.trim();
+        if (normalized.endsWith("Z")) {
+            return Instant.parse(normalized).atOffset(ZoneOffset.UTC);
+        }
+        return LocalDateTime.parse(normalized).atOffset(ZoneOffset.UTC);
     }
 
     private String requireEnv(String name) {
@@ -142,4 +423,15 @@ public class FlightPlanService {
         if (value == null) return "";
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
+
+    public record FlightPlanUpdate(
+            String originAirportCode,
+            String destinationAirportCode,
+            String departureTimeLocal,
+            String arrivalTimeLocal,
+            String departureTimeUtc,
+            String arrivalTimeUtc,
+            int capacity,
+            String status
+    ) {}
 }

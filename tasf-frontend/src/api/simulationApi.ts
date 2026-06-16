@@ -149,8 +149,87 @@ export async function getAirportsRequest(): Promise<Airport[]> {
   return response.data;
 }
 
+export type AirportUpdatePayload = {
+  city: string;
+  country: string;
+  continent: string;
+  operationalStatus: "ACTIVE" | "INACTIVE";
+  latitude: number;
+  longitude: number;
+  gmtOffset: number;
+  maxCapacity: number;
+};
+
+export type AirportCreatePayload = Omit<AirportUpdatePayload, "operationalStatus"> & {
+  code: string;
+};
+
+export async function createAirportRequest(
+  payload: AirportCreatePayload
+): Promise<Airport> {
+  const response = await api.post<Airport>("/airports", payload);
+  return response.data;
+}
+
+export async function updateAirportRequest(
+  code: string,
+  payload: AirportUpdatePayload
+): Promise<Airport> {
+  const response = await api.patch<Airport>(`/airports/${code}`, payload);
+  return response.data;
+}
+
 export async function getFlightsRequest(): Promise<Flight[]> {
   const response = await api.get<Flight[]>("/flights");
+  return response.data;
+}
+
+export type FlightPlanRecord = Flight & {
+  flight_code: string;
+  origin_airport_id: string;
+  destination_airport_id: string;
+  departure_time_local: string;
+  arrival_time_local: string;
+  departure_time_utc: string;
+  arrival_time_utc: string;
+  capacity: number;
+  flightStatus?: string;
+  scheduleStatus?: string;
+};
+
+export type FlightPlanUpdatePayload = {
+  originAirportCode: string;
+  destinationAirportCode: string;
+  departureTimeLocal: string;
+  arrivalTimeLocal: string;
+  departureTimeUtc: string;
+  arrivalTimeUtc: string;
+  capacity: number;
+  status: "SCHEDULED" | "CANCELED";
+};
+
+export type FlightPlanCreatePayload = Omit<FlightPlanUpdatePayload, "status">;
+
+export async function getFlightPlansRequest(): Promise<FlightPlanRecord[]> {
+  const response = await api.get<FlightPlanRecord[]>("/flights");
+  return response.data;
+}
+
+export async function createFlightPlanRequest(
+  payload: FlightPlanCreatePayload
+): Promise<FlightPlanRecord> {
+  const response = await api.post<FlightPlanRecord>("/flights", payload);
+  return response.data;
+}
+
+export async function updateFlightPlanRequest(
+  flightCode: string,
+  payload: FlightPlanUpdatePayload
+): Promise<FlightPlanRecord> {
+  const response = await api.patch<FlightPlanRecord>(
+    `/flights/${encodeURIComponent(flightCode)}`,
+    payload
+  );
   return response.data;
 }
 
