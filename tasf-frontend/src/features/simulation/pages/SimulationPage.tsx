@@ -511,7 +511,7 @@ function SimulationControls({
         </div>
 
         <button className="primary" onClick={onRunSimulation} disabled={busy || playing}>
-          {loading ? "Iniciando..." : "Ejecutar Simulación 5 días"}
+          {loading ? "Iniciando..." : "Ejecutar Simulación"}
         </button>
 
         {/* Indicador de estado */}

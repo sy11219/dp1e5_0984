@@ -19,12 +19,12 @@ export function FlightListModal({ shipment, onClose }: FlightListModalProps) {
             const departureTime = parts[3] || "0000";
             const arrivalTime = parts[4] || "0000";
             const formattedDeparture = `${departureTime.slice(0, 2)}:${departureTime.slice(2)}`;
-            const formattedArrival = `${arrivalTime.slice(0, 2)}:${arrivalTime.slice(2)}`;
+            //const formattedArrival = `${arrivalTime.slice(0, 2)}:${arrivalTime.slice(2)}`;
 
             return (
               <div key={flightId} className="flight-item">
                 <div>{origin} → {destination}</div>
-                <div>{formattedDeparture} - {formattedArrival}</div>
+                <div>{formattedDeparture} - </div>
               </div>
             );
           })}

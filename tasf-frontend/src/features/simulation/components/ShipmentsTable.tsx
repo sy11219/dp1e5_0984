@@ -8,30 +8,44 @@ interface ShipmentsTableProps {
   simMinute: number;
 }
 
+const ANY = "Cualquiera";
+
 export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
   const [search, setSearch] = useState("");
+  const [originAirport, setOriginAirport] = useState(ANY);
+  const [destinationAirport, setDestinationAirport] = useState(ANY);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+
+  // Opciones únicas de aeropuertos
+  const airportOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of shipments) {
+      set.add(s.origin);
+      set.add(s.destination);
+    }
+    return [...set].sort();
+  }, [shipments]);
 
   const visible = useMemo(() => {
     let result = [...shipments].sort((a, b) => a.requestMinute - b.requestMinute);
 
     if (search.trim()) {
-      const query = search.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.clientId.toLowerCase().includes(query) ||
-          s.origin.toLowerCase().includes(query) ||
-          s.destination.toLowerCase().includes(query) ||
-          s.flightIds.some((id) => id.toLowerCase().includes(query))
+      const q = search.toLowerCase();
+      result = result.filter(s =>
+        s.clientId.toLowerCase().includes(q) ||
+        s.origin.toLowerCase().includes(q) ||
+        s.destination.toLowerCase().includes(q) ||
+        s.flightIds.some(id => id.toLowerCase().includes(q))
       );
     }
 
-    return result.slice(0, 20);
-  }, [shipments, search]);
+    if (originAirport !== ANY) result = result.filter(s => s.origin === originAirport);
+    if (destinationAirport !== ANY) result = result.filter(s => s.destination === destinationAirport);
 
-  if (!shipments.length) {
-    return <div className="empty-state">No hay envíos registrados.</div>;
-  }
+    return result.slice(0, 12);
+  }, [shipments, search, originAirport, destinationAirport]);
+
+  if (!shipments.length) return <div className="empty-state">No hay envíos registrados.</div>;
 
   return (
     <div className="shipments-table">
@@ -40,59 +54,50 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
           type="text"
           placeholder="Buscar por cliente, origen, destino o vuelo..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
           style={{ width: "100%" }}
         />
+      </div>
+
+      <div className="filters" style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+        <label>
+          Origen:
+          <select value={originAirport} onChange={e => setOriginAirport(e.target.value)}>
+            <option value={ANY}>{ANY}</option>
+            {airportOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </label>
+        <label>
+          Destino:
+          <select value={destinationAirport} onChange={e => setDestinationAirport(e.target.value)}>
+            <option value={ANY}>{ANY}</option>
+            {airportOptions.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </label>
       </div>
 
       <div className="table">
         {visible.length === 0 ? (
           <div className="empty-state">No se encontraron resultados.</div>
         ) : (
-          visible.map((shipment) => {
-            const status = !shipment.planned
-              ? "red"
-              : shipment.onTime
-              ? "green"
-              : "yellow";
-
-            const isCompleted = simMinute >= shipment.estimatedArrival;
-
+          visible.map(s => {
+            const status = !s.planned ? "red" : s.onTime ? "green" : "yellow";
+            const isCompleted = simMinute >= s.estimatedArrival;
             return (
-              <div className="row" key={shipment.id}>
+              <div className="row" key={s.id}>
                 <span className={`dot ${status}`}></span>
                 <div className="row-main">
-                  <strong>{shipment.clientId}</strong>
-                  <span>
-                    {`${shipment.origin} → ${shipment.destination} · ${shipment.suitcases} maletas`}
-                  </span>
-                  <span>
-                    {`Pedido: ${formatSimMinute(shipment.requestMinute)} · Llegada: ${formatSimMinute(
-                      shipment.estimatedArrival
-                    )}`}
-                  </span>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.25rem" }}>
+                  <strong>{s.clientId}</strong>
+                  <span>{`${s.origin} → ${s.destination} · ${s.suitcases} maletas`}</span>
+                  <span>{`Pedido: ${formatSimMinute(s.requestMinute)} · Llegada: ${formatSimMinute(s.estimatedArrival)}`}</span>
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
                     <button
-                      onClick={() => setSelectedShipment(shipment)}
-                      style={{
-                        padding: "0.25rem 0.5rem",
-                        fontSize: "0.75rem",
-                        cursor: "pointer",
-                        background: "#4a5568",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: "4px",
-                      }}
+                      onClick={() => setSelectedShipment(s)}
+                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", background: "#4a5568", color: "#fff", border: "none", borderRadius: "4px" }}
                     >
-                      Ver vuelos ({shipment.flightIds.length})
+                      Ver vuelos ({s.flightIds.length})
                     </button>
-                    <span
-                      className="capacity-pill"
-                      style={{
-                        background: isCompleted ? "#2f855a" : "#ffbf00",
-                        color: "#fff",
-                      }}
-                    >
+                    <span className="capacity-pill" style={{ background: isCompleted ? "#2f855a" : "#ffbf00", color: "#fff" }}>
                       {isCompleted ? "Entregado" : "En curso"}
                     </span>
                   </div>
@@ -103,12 +108,7 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
         )}
       </div>
 
-      {selectedShipment && (
-        <FlightListModal
-          shipment={selectedShipment}
-          onClose={() => setSelectedShipment(null)}
-        />
-      )}
+      {selectedShipment && <FlightListModal shipment={selectedShipment} onClose={() => setSelectedShipment(null)} />}
     </div>
   );
 }

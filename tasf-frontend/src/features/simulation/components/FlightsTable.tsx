@@ -11,6 +11,8 @@ export function FlightsTable({ flights }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
   const [destinationFilter, setDestinationFilter] = useState("Cualquiera");
+  const [sortBy, setSortBy] = useState<"utilization" | "departureMinute" | "arrivalMinute">("utilization");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const origins = useMemo(
     () => Array.from(new Set(flights.map((f) => f.origin))),
@@ -21,13 +23,8 @@ export function FlightsTable({ flights }: FlightsTableProps) {
     [flights]
   );
 
-  const sortedFlights = useMemo(
-    () => [...flights].sort((a, b) => b.utilization - a.utilization),
-    [flights]
-  );
-
-  const filteredFlights = useMemo(() => {
-    let result = sortedFlights;
+  const filteredAndSortedFlights = useMemo(() => {
+    let result = [...flights];
 
     if (search.trim()) {
       const query = search.toLowerCase();
@@ -47,10 +44,16 @@ export function FlightsTable({ flights }: FlightsTableProps) {
       result = result.filter((f) => f.destination === destinationFilter);
     }
 
-    return result;
-  }, [search, originFilter, destinationFilter, sortedFlights]);
+    result.sort((a, b) => {
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
+      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+    });
 
-  const visibleFlights = filteredFlights.slice(0, 10);
+    return result;
+  }, [flights, search, originFilter, destinationFilter, sortBy, sortOrder]);
+
+  const visibleFlights = filteredAndSortedFlights.slice(0, 10);
 
   if (!flights.length) {
     return <div className="empty-state">No hay vuelos activos en este minuto.</div>;
@@ -104,6 +107,39 @@ export function FlightsTable({ flights }: FlightsTableProps) {
                 {d}
               </option>
             ))}
+          </select>
+        </label>
+      </div>
+
+      <div
+        className="filters"
+        style={{
+          display: "flex",
+          gap: "1rem",
+          alignItems: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <label>
+          Ordenar por:
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "utilization" | "departureMinute" | "arrivalMinute")}
+          >
+            <option value="utilization">Ocupación</option>
+            <option value="departureMinute">Hora de salida</option>
+            <option value="arrivalMinute">Hora de llegada</option>
+          </select>
+        </label>
+
+        <label>
+          Dirección:
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+          >
+            <option value="asc">Ascendente</option>
+            <option value="desc">Descendente</option>
           </select>
         </label>
       </div>
