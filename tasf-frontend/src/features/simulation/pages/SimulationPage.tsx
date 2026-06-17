@@ -11,6 +11,7 @@ import { Navbar } from "../../../shared/components/Navbar/Navbar"
 import { AirportDetail } from "../components/AirportDetail"
 import { AirportsTable } from "../components/AirportsTable"
 import { FlightsTable } from "../components/FlightsTable"
+import { ShipmentsTable } from "../components/ShipmentsTable"
 import { Metrics } from "../components/Metrics"
 import MapStage from "../components/simulation/map/MapStage"
 import { Timeline } from "../components/Timeline"
@@ -297,6 +298,13 @@ export function SimulationPage() {
     () => computeActiveFlights(displayData, simMinute),
     [displayData, simMinute]
   )
+  const visibleShipments = useMemo(
+    () =>
+      (displayData.shipments ?? []).filter(
+        (s) => s.requestMinute <= simMinute && simMinute <= s.estimatedArrival + 60
+      ),
+    [displayData, simMinute]
+  )
   const selected = displayData.airports.find((a) => a.code === selectedAirport)
 
   const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
@@ -412,6 +420,11 @@ export function SimulationPage() {
             <h3>Vuelos activos</h3>
             {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
             <FlightsTable flights={activeFlights} />
+          </section>
+          <section className="panel section">
+            <h3>Envíos</h3>
+            {loadingFlights && <div className="empty-state">Cargando envíos...</div>}
+            <ShipmentsTable shipments={visibleShipments} simMinute={simMinute}/>
           </section>
           <section className="panel section">
             <h3>Aeropuertos críticos</h3>
