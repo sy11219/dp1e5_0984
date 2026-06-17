@@ -291,11 +291,24 @@ select {
 }
 
 .workspace {
+  position: relative;
   display: grid;
   grid-template-columns: 320px 1fr 340px;
   gap: 14px;
   padding: 14px;
   min-height: 0;
+}
+
+.workspace.sim-left-collapsed {
+  grid-template-columns: 44px 1fr 340px;
+}
+
+.workspace.sim-right-collapsed {
+  grid-template-columns: 320px 1fr 44px;
+}
+
+.workspace.sim-left-collapsed.sim-right-collapsed {
+  grid-template-columns: 44px 1fr 44px;
 }
 
 .panel {
@@ -308,9 +321,65 @@ select {
 
 .side-panel,
 .right-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.panel-rail {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  padding-top: 10px;
+}
+
+.panel-collapse-button,
+.panel-toggle-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 8px;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.panel-collapse-button:hover,
+.panel-toggle-button:hover {
+  color: #111827;
+  border-color: #94a3b8;
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.panel-collapse-button {
+  position: absolute;
+  z-index: 5;
+}
+
+.panel-collapse-button-left {
+  top: 10px;
+  right: 10px;
+}
+
+.panel-collapse-button-right {
+  position: static;
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+
+.panel-runtime {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .section {
@@ -522,6 +591,7 @@ select {
 }
 
 .map-panel {
+  position: relative;
   display: grid;
   grid-template-rows: 1fr auto;
   min-height: 720px;
@@ -1194,6 +1264,15 @@ select {
   .workspace {
     grid-template-columns: 300px 1fr;
   }
+  .workspace.sim-left-collapsed {
+    grid-template-columns: 44px 1fr;
+  }
+  .workspace.sim-right-collapsed {
+    grid-template-columns: 300px 1fr 44px;
+  }
+  .workspace.sim-left-collapsed.sim-right-collapsed {
+    grid-template-columns: 44px 1fr 44px;
+  }
   .right-panel {
     grid-column: 1 / -1;
     display: grid;
@@ -1216,6 +1295,11 @@ select {
     flex-direction: column;
   }
   .workspace {
+    grid-template-columns: 1fr;
+  }
+  .workspace.sim-left-collapsed,
+  .workspace.sim-right-collapsed,
+  .workspace.sim-left-collapsed.sim-right-collapsed {
     grid-template-columns: 1fr;
   }
   .right-panel {

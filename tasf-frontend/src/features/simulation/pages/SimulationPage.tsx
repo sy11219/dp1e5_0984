@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react"
 import {
   getAirportsRequest,
   getFlightsRequest,
@@ -58,6 +59,8 @@ export function SimulationPage() {
   const [reportDismissed, setReportDismissed] = useState(false)
   const [now, setNow]                 = useState(new Date())
   const [realTimeMs, setRealTimeMs]   = useState(0)
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true)
+  const [rightPanelOpen, setRightPanelOpen] = useState(true)
 
   const accumulatedRef  = useRef(0)
   const playStartRef    = useRef<number | null>(null)
@@ -89,6 +92,13 @@ export function SimulationPage() {
     const t = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    const timers = [0, 120, 320].map((delay) =>
+      window.setTimeout(() => window.dispatchEvent(new Event("resize")), delay)
+    )
+    return () => timers.forEach(window.clearTimeout)
+  }, [leftPanelOpen, rightPanelOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -341,8 +351,24 @@ export function SimulationPage() {
       <Navbar />
       <Topbar data={data} now={now} simMinute={simMinute} />
 
-      <main className="workspace">
+      <main
+        className={[
+          "workspace",
+          !leftPanelOpen ? "sim-left-collapsed" : "",
+          !rightPanelOpen ? "sim-right-collapsed" : "",
+        ].filter(Boolean).join(" ")}
+      >
+        {leftPanelOpen ? (
         <aside className="side-panel">
+          <button
+            type="button"
+            className="panel-collapse-button panel-collapse-button-left"
+            onClick={() => setLeftPanelOpen(false)}
+            aria-label="Ocultar panel izquierdo"
+            title="Ocultar panel izquierdo"
+          >
+            <PanelLeftClose size={18} />
+          </button>
           <SimulationControls
             days={days}
             error={error}
@@ -383,6 +409,19 @@ export function SimulationPage() {
             )}
           </section>
         </aside>
+        ) : (
+        <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
+          <button
+            type="button"
+            className="panel-toggle-button"
+            onClick={() => setLeftPanelOpen(true)}
+            aria-label="Mostrar panel izquierdo"
+            title="Mostrar panel izquierdo"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        </aside>
+        )}
 
         <section className="panel map-panel">
           <MapStage
@@ -401,9 +440,19 @@ export function SimulationPage() {
           />
         </section>
 
+        {rightPanelOpen ? (
         <aside className="right-panel">
-          <div className="panel section">
-            Tiempo de ejecución: <strong>{formatRealTime(realTimeMs)}</strong>
+          <div className="panel section panel-runtime">
+            <span>Tiempo de ejecución: <strong>{formatRealTime(realTimeMs)}</strong></span>
+            <button
+              type="button"
+              className="panel-collapse-button panel-collapse-button-right"
+              onClick={() => setRightPanelOpen(false)}
+              aria-label="Ocultar panel derecho"
+              title="Ocultar panel derecho"
+            >
+              <PanelRightClose size={18} />
+            </button>
           </div>
           <section className="panel section">
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
@@ -435,6 +484,19 @@ export function SimulationPage() {
             )}
           </section>
         </aside>
+        ) : (
+        <aside className="panel-rail panel-rail-right" aria-label="Panel derecho oculto">
+          <button
+            type="button"
+            className="panel-toggle-button"
+            onClick={() => setRightPanelOpen(true)}
+            aria-label="Mostrar panel derecho"
+            title="Mostrar panel derecho"
+          >
+            <PanelRightOpen size={18} />
+          </button>
+        </aside>
+        )}
       </main>
 
       <SimulationResultModal
