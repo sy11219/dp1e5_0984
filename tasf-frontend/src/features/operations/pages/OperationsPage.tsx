@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
   advanceRealtimeSessionRequest,
   cancelRealtimeFlightRequest,
@@ -8,10 +9,12 @@ import {
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import { AirportDetail } from "../../simulation/components/AirportDetail";
 import { AirportsTable } from "../../simulation/components/AirportsTable";
+import { CapacityLegend } from "../../simulation/components/CapacityLegend";
 import { FlightsTable } from "../../simulation/components/FlightsTable";
+import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
 import MapStage from "../../simulation/components/simulation/map/MapStage";
 import type { AirportLoads, SimulationData } from "../../simulation/types";
-import { computeActiveFlights } from "../../simulation/utils/calculations";
+import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import {
   formatClock,
   formatDateOnly,
@@ -161,12 +164,24 @@ export const OperationsPage = () => {
   const [notice, setNotice] = useState("");
   const [flightToCancel, setFlightToCancel] = useState("");
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [now, setNow] = useState(new Date());
 
   const operationalMinute = useMemo(() => {
-    if (!data?.tick || !data.realFinishedAt) return data?.tick || 0;
-    const elapsedMinutes = (now.getTime() - new Date(data.realFinishedAt).getTime()) / 60000;
-    return Math.min(data.maxTick || Number.POSITIVE_INFINITY, data.tick + Math.max(0, elapsedMinutes));
+    if (!data) return 0;
+    const visualStart = data.visualStartTick ?? data.tick ?? 0;
+    const visualEnd = data.visualEndTick ?? Math.min(visualStart + 1, data.maxTick || visualStart + 1);
+    const visualStartedAt = data.visualStartedAt || data.realFinishedAt;
+
+    if (!visualStartedAt || visualEnd <= visualStart) return data.tick || visualStart;
+
+    const elapsedMs = Math.max(0, now.getTime() - new Date(visualStartedAt).getTime());
+    const progress = Math.min(elapsedMs / 60_000, 1);
+    return Math.min(
+      data.maxTick || Number.POSITIVE_INFINITY,
+      visualStart + (visualEnd - visualStart) * progress
+    );
   }, [data, now]);
 
   useEffect(() => {
@@ -243,23 +258,21 @@ export const OperationsPage = () => {
   }, [data?.simulationId, data?.status, data?.tick, advancing, selectedAirport]);
 
   const airportLoads = useMemo<AirportLoads>(() => {
-    if (!data) return {};
-    return Object.fromEntries(
-      data.airports.map((airport) => [airport.code, airport.finalLoad || 0])
-    );
-  }, [data]);
+    return computeAirportLoads(data, operationalMinute);
+  }, [data, operationalMinute]);
   const activeFlights = useMemo(
     () => computeActiveFlights(data, operationalMinute),
     [data, operationalMinute]
   );
-  const cancellableFlights = useMemo(() => {
-    if (!data) return [];
-    const cancelled = new Set(data.cancelledFlightIds || []);
-    return data.flights
-      .filter((flight) => flight.absoluteDepartureMinute > operationalMinute)
-      .filter((flight) => !cancelled.has(flight.id))
-      .slice(0, 100);
-  }, [data, operationalMinute]);
+  const visibleShipments = useMemo(
+    () =>
+      (data?.shipments ?? []).filter(
+        (shipment) =>
+          shipment.requestMinute <= operationalMinute &&
+          operationalMinute <= shipment.estimatedArrival + 60
+      ),
+    [data, operationalMinute]
+  );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
 
   const cancelFlight = async () => {
@@ -284,8 +297,24 @@ export const OperationsPage = () => {
       <Navbar />
       <OperationsTopbar data={data} now={now} operationalMinute={operationalMinute} />
 
-      <main className="workspace">
+      <main
+        className={[
+          "workspace",
+          !leftPanelOpen ? "sim-left-collapsed" : "",
+          !rightPanelOpen ? "sim-right-collapsed" : "",
+        ].filter(Boolean).join(" ")}
+      >
+        {leftPanelOpen ? (
         <aside className="side-panel">
+          <button
+            type="button"
+            className="panel-collapse-button panel-collapse-button-left"
+            onClick={() => setLeftPanelOpen(false)}
+            aria-label="Ocultar panel izquierdo"
+            title="Ocultar panel izquierdo"
+          >
+            <PanelLeftClose size={18} />
+          </button>
           <section className="panel section">
             <h2>Tiempo real</h2>
             <div className="control-grid">
@@ -313,18 +342,13 @@ export const OperationsPage = () => {
 
               <div className="field">
                 <label>Cancelar vuelo</label>
-                <select
+                <input
+                  type="text"
+                  placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
                   value={flightToCancel}
                   onChange={(event) => setFlightToCancel(event.target.value)}
-                  disabled={!cancellableFlights.length || cancelling}
-                >
-                  <option value="">Selecciona un vuelo futuro</option>
-                  {cancellableFlights.map((flight) => (
-                    <option key={flight.id} value={flight.id}>
-                      {`${flight.id} · ${flight.origin}-${flight.destination}`}
-                    </option>
-                  ))}
-                </select>
+                  disabled={!data?.simulationId || cancelling}
+                />
               </div>
 
               <button
@@ -340,6 +364,8 @@ export const OperationsPage = () => {
             </div>
           </section>
 
+          <CapacityLegend />
+
           <section className="panel section">
             <h3>Indicadores</h3>
             {data ? (
@@ -349,6 +375,19 @@ export const OperationsPage = () => {
             )}
           </section>
         </aside>
+        ) : (
+        <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
+          <button
+            type="button"
+            className="panel-toggle-button"
+            onClick={() => setLeftPanelOpen(true)}
+            aria-label="Mostrar panel izquierdo"
+            title="Mostrar panel izquierdo"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        </aside>
+        )}
 
         <section className="panel map-panel live-map-panel">
           <MapStage
@@ -360,7 +399,20 @@ export const OperationsPage = () => {
           />
         </section>
 
+        {rightPanelOpen ? (
         <aside className="right-panel">
+          <div className="panel section panel-runtime">
+            <span>Tiempo real</span>
+            <button
+              type="button"
+              className="panel-collapse-button panel-collapse-button-right"
+              onClick={() => setRightPanelOpen(false)}
+              aria-label="Ocultar panel derecho"
+              title="Ocultar panel derecho"
+            >
+              <PanelRightClose size={18} />
+            </button>
+          </div>
           <section className="panel section">
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
             {selected ? (
@@ -380,6 +432,11 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
+            <h3>Envios</h3>
+            <ShipmentsTable shipments={visibleShipments} simMinute={operationalMinute} />
+          </section>
+
+          <section className="panel section">
             <h3>Aeropuertos criticos</h3>
             {data ? (
               <AirportsTable airports={data.airports} loads={airportLoads} />
@@ -388,6 +445,19 @@ export const OperationsPage = () => {
             )}
           </section>
         </aside>
+        ) : (
+        <aside className="panel-rail panel-rail-right" aria-label="Panel derecho oculto">
+          <button
+            type="button"
+            className="panel-toggle-button"
+            onClick={() => setRightPanelOpen(true)}
+            aria-label="Mostrar panel derecho"
+            title="Mostrar panel derecho"
+          >
+            <PanelRightOpen size={18} />
+          </button>
+        </aside>
+        )}
       </main>
     </div>
   );

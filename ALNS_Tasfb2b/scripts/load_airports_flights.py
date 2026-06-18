@@ -28,8 +28,8 @@ from typing import Any
 
 
 AIRPORT_LINE_RE = re.compile(r"^\s*\d+\s+([A-Z]{4})\s+.*$")
-LAT_RE = re.compile(r"Latitude:\s*(\d+)[°º]\s*(\d+)'\s*([\d.]+)\"\s*([NS])")
-LON_RE = re.compile(r"Longitude:\s*(\d+)[°º]\s*(\d+)'\s*([\d.]+)\"\s*([EW])")
+LAT_RE = re.compile(r"Latitude:\s*(\d+)[^\d]+\s*(\d+)'\s*([\d.]+)['\"]\s*([NS])")
+LON_RE = re.compile(r"Longitude:\s*(\d+)[^\d]+\s*(\d+)'\s*([\d.]+)['\"]\s*([EW])")
 FLIGHT_RE = re.compile(r"^([A-Z]{4})-([A-Z]{4})-(\d{2}):(\d{2})-(\d{2}):(\d{2})-(\d{4})\s*$")
 
 

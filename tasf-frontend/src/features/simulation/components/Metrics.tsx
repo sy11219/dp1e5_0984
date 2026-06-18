@@ -48,16 +48,6 @@ export function Metrics({ data }: MetricsProps) {
         value={metrics.usedFlights}
         sub={`${metrics.iterations} iter.`}
       />
-      <Metric
-        label="Fitness final"
-        value={Math.round(metrics.fitnessFinal)}
-        sub={`ini ${Math.round(metrics.fitnessInitial)}`}
-      />
-      <Metric
-        label="Aceptadas SA"
-        value={metrics.acceptedBySa}
-        sub={`${metrics.globalImprovements} mejoras`}
-      />
     </div>
   );
 }

@@ -44,11 +44,15 @@ export function useSimulationPlayer(maxMinute: number) {
    * @param fromMinute  minuto simulado de inicio (tick anterior)
    * @param toMinute    minuto simulado de fin (tick nuevo del backend)
    */
-  const animateBatch = useCallback((fromMinute: number, toMinute: number) => {
+  const animateBatch = useCallback((fromMinute: number, toMinute: number, startedAt?: string | number) => {
     cancelFrame();
     startMinuteRef.current   = Math.min(Math.max(0, fromMinute), maxMinute);
     targetMinuteRef.current  = Math.min(Math.max(0, toMinute), maxMinute);
-    batchStartTimeRef.current = null; // se fija en el primer frame
+    const startedAtMs = typeof startedAt === "string" ? Date.parse(startedAt) : startedAt;
+    batchStartTimeRef.current =
+      typeof startedAtMs === "number" && Number.isFinite(startedAtMs)
+        ? performance.now() - Math.max(0, Date.now() - startedAtMs)
+        : null; // se fija en el primer frame
 
     const tick = (now: number) => {
       if (batchStartTimeRef.current === null) {

@@ -11,6 +11,7 @@ import {
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
 import { AirportDetail } from "../components/AirportDetail"
 import { AirportsTable } from "../components/AirportsTable"
+import { CapacityLegend } from "../components/CapacityLegend"
 import { FlightsTable } from "../components/FlightsTable"
 import { ShipmentsTable } from "../components/ShipmentsTable"
 import { Metrics } from "../components/Metrics"
@@ -87,6 +88,25 @@ export function SimulationPage() {
     data?.status === "COMPLETED" && simMinute >= maxMinute && !reportDismissed
   )
 
+  const syncSharedVisualWindow = useCallback((payload: SimulationData) => {
+    const visualStart =
+      payload.visualStartTick ??
+      payload.lastBatchStart ??
+      payload.startOffsetMinutes ??
+      0
+    const visualEnd = payload.visualEndTick ?? payload.tick ?? visualStart
+    const cap = payload.maxTick ?? maxMinute
+
+    if (payload.status !== "COMPLETED" && payload.visualStartedAt && visualEnd > visualStart) {
+      animatingRef.current = true
+      animateBatch(visualStart, Math.min(visualEnd, cap), payload.visualStartedAt)
+      return
+    }
+
+    animatingRef.current = false
+    setSimMinute(payload.tick ?? payload.startOffsetMinutes ?? 0)
+  }, [animateBatch, maxMinute, setSimMinute])
+
   // ── Reloj de pared ─────────────────────────────────────────────────────────
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 1000)
@@ -159,7 +179,7 @@ export function SimulationPage() {
       if (toTick > fromTick) {
         // Hay datos nuevos: animar desde el tick anterior hasta el nuevo
         animatingRef.current = true
-        animateBatch(fromTick, Math.min(toTick, maxMinute))
+        animateBatch(fromTick, Math.min(toTick, maxMinute), payload.visualStartedAt)
       } else {
         // No avanzó (ya completado)
         animatingRef.current = false
@@ -203,7 +223,7 @@ export function SimulationPage() {
         if (cancelled || !payload) return
         setData(payload)
         setSelectedAirport(payload.airports[0]?.code || airportCatalog[0]?.code || null)
-        setSimMinute(payload.tick ?? payload.startOffsetMinutes ?? 0)
+        syncSharedVisualWindow(payload)
         setPlaying(payload.status !== "COMPLETED")
       })
       .catch(() => {
@@ -212,7 +232,7 @@ export function SimulationPage() {
     return () => {
       cancelled = true
     }
-  }, [airportCatalog, setPlaying, setSimMinute])
+  }, [airportCatalog, setPlaying, syncSharedVisualWindow])
 
   useEffect(() => {
     if (!data?.simulationId || data.status === "COMPLETED") return
@@ -226,15 +246,15 @@ export function SimulationPage() {
           setData(payload)
           if (nextTick > previousTick) {
             animatingRef.current = true
-            animateBatch(previousTick, Math.min(nextTick, maxMinute))
+            animateBatch(previousTick, Math.min(nextTick, maxMinute), payload.visualStartedAt)
           } else {
-            setSimMinute(nextTick)
+            syncSharedVisualWindow(payload)
           }
         })
         .catch(() => {})
     }, 5_000)
     return () => window.clearInterval(timer)
-  }, [data, fetching, animateBatch, maxMinute, setSimMinute])
+  }, [data, fetching, animateBatch, maxMinute, syncSharedVisualWindow])
 
   // ── Iniciar simulación ─────────────────────────────────────────────────────
   const runSimulation = async () => {
@@ -616,19 +636,6 @@ function SimulationControls({
           <button onClick={onPause} disabled={busy}>Pausa</button>
           <button onClick={onReset} disabled={busy}>Reset</button>
         </div>
-      </div>
-    </section>
-  )
-}
-
-function CapacityLegend() {
-  return (
-    <section className="panel section">
-      <h3>Colores por capacidad</h3>
-      <div className="legend">
-        <div className="legend-row"><span className="dot green"></span>Menor a 70%</div>
-        <div className="legend-row"><span className="dot yellow"></span>Desde 70% hasta menor a 90%</div>
-        <div className="legend-row"><span className="dot red"></span>90% o más</div>
       </div>
     </section>
   )

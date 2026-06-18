@@ -27,10 +27,10 @@ import java.util.regex.Pattern;
 public class AirportParser {
 
     private static final Pattern LAT_PATTERN = Pattern.compile(
-            "Latitude:\\s*(\\d+)[°º]\\s*(\\d+)'\\s*([\\d.]+)\"\\s*([NS])"
+            "Latitude:\\s*(\\d+)\\D+\\s*(\\d+)'\\s*([\\d.]+)['\"]\\s*([NS])"
     );
     private static final Pattern LON_PATTERN = Pattern.compile(
-            "Longitude:\\s*(\\d+)[°º]\\s*(\\d+)'\\s*([\\d.]+)\"\\s*([EW])"
+            "Longitude:\\s*(\\d+)\\D+\\s*(\\d+)'\\s*([\\d.]+)['\"]\\s*([EW])"
     );
     private static final Pattern UTC_OFFSET_PATTERN = Pattern.compile("([+-])(\\d{1,2})(?::\\d{2})?");
 

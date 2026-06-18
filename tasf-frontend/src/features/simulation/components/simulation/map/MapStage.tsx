@@ -38,6 +38,7 @@ export default function MapStage({
   const airportLayerRef = useRef<L.LayerGroup | null>(null);
   const airportLoadsRef = useRef<AirportLoads>({});
   const airportMarkersRef = useRef(new Map<string, AirportMarkerItem>());
+  const didFitBoundsRef = useRef(false);
 
   const airports = useMemo(() => data?.airports || [], [data]);
   const airportByCode = useMemo(
@@ -105,7 +106,6 @@ export default function MapStage({
     const timers = [0, 100, 350].map((delay) =>
       window.setTimeout(() => {
         mapRef.current?.invalidateSize();
-        mapRef.current?.setView(MAP_CENTER, MAP_CONFIG.zoom, { animate: false });
       }, delay)
     );
 
@@ -206,6 +206,22 @@ export default function MapStage({
   }, [activeFlights, drawFlights]);
 
   useEffect(() => {
+    const resizeAndRedraw = () => {
+      window.requestAnimationFrame(() => {
+        if (!mapRef.current || !canvasRef.current) return;
+        mapRef.current.invalidateSize({ pan: false });
+        const size = mapRef.current.getSize();
+        canvasRef.current.width = size.x;
+        canvasRef.current.height = size.y;
+        drawFlights();
+      });
+    };
+
+    window.addEventListener("resize", resizeAndRedraw);
+    return () => window.removeEventListener("resize", resizeAndRedraw);
+  }, [drawFlights]);
+
+  useEffect(() => {
     if (!mapRef.current) return;
 
     const redraw = () => drawFlights();
@@ -258,7 +274,7 @@ export default function MapStage({
   }, [activeFlights, airportByCode, data]);
 
   useEffect(() => {
-    if (!data || !mapRef.current || !airports.length) return;
+    if (!data || !mapRef.current || !airports.length || didFitBoundsRef.current) return;
 
     const bounds = L.latLngBounds(
       airports.map((airport) => [airport.latitude, airport.longitude])
@@ -267,6 +283,7 @@ export default function MapStage({
     window.setTimeout(() => {
       mapRef.current?.invalidateSize();
       mapRef.current?.fitBounds(bounds.pad(0.16), { maxZoom: 3, animate: false });
+      didFitBoundsRef.current = true;
     }, 0);
   }, [data, airports]);
 

@@ -50,7 +50,8 @@ export interface AirportEvent {
     | "batch_complete"
     | "replan"
     | "flight_cancelled"
-    | "flight_cancelled_pending";
+    | "flight_cancelled_pending"
+    | "flight_cancel_redirected";
 }
 
 export interface Metrics {
@@ -100,6 +101,9 @@ export interface SimulationData {
   lastBatchStart?: number;
   lastBatchEnd?: number;
   lastBatchRuntimeMs?: number;
+  visualStartTick?: number;
+  visualEndTick?: number;
+  visualStartedAt?: string;
   realtimeWindowMinutes?: number;
   realtimeExecutionIntervalMs?: number;
   flightQueueSize?: number;
