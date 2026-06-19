@@ -1,5 +1,7 @@
 package org.e5.model;
 
+import org.e5.config.OperationParameters;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,9 +31,8 @@ public class Route {
     private final int suitcaseCount;           // Maletas que viajan por esta ruta
     private final int startMinute;             // Minuto desde el que el envío está disponible
 
-    // Tiempo en minutos que las maletas deben esperar en cada aeropuerto intermedio
-    // antes de cargar en el siguiente vuelo (carga + descarga = 10 minutos)
-    public static final int TRANSIT_TIME_MINUTES = 10;
+    // Alias historico para reportes y compatibilidad interna.
+    public static final int TRANSIT_TIME_MINUTES = OperationParameters.CONNECTION_WAIT_MINUTES;
 
     /**
      * Constructor de ruta.
@@ -84,7 +85,7 @@ public class Route {
 
             // Si hay más vuelos (escala), sumar 10 minutos de carga/descarga
             if (i < flights.size() - 1) {
-                currentReadyMinute += TRANSIT_TIME_MINUTES;
+                currentReadyMinute += OperationParameters.CONNECTION_WAIT_MINUTES;
             }
         }
 

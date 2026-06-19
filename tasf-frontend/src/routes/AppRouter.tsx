@@ -11,11 +11,14 @@ import { AirportsPage } from "../features/airports/pages/AirportsPage";
 import { FlightsPage } from "../features/flights/pages/FlightsPage";
 import { StatsPage } from "../features/stats/pages/StatsPage";
 import { UploadPage } from "@/features/upload/pages/UploadPage";
+import { BatchSimulationCoordinator } from "../features/simulation/components/BatchSimulationCoordinator";
 
 
 export default function AppRouter() {
   return (
     <BrowserRouter>
+
+      <BatchSimulationCoordinator />
 
       <Routes>
 

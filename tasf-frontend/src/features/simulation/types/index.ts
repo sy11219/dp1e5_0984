@@ -47,6 +47,7 @@ export interface AirportEvent {
     | "connection_arrival"
     | "connection_departure"
     | "final_arrival"
+    | "final_pickup"
     | "batch_complete"
     | "replan"
     | "flight_cancelled"
@@ -97,6 +98,8 @@ export interface SimulationData {
   startOffsetMinutes?: number;
   batchMinutes?: number;
   batchIntervalMs?: number;
+  connectionWaitMinutes?: number;
+  finalPickupWaitMinutes?: number;
   batchCount?: number;
   lastBatchStart?: number;
   lastBatchEnd?: number;

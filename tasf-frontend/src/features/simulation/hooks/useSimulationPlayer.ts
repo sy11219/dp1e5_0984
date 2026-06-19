@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const BATCH_MINUTES = 180;          // minutos simulados por lote (3 horas)
 const BATCH_DURATION_MS = 120_000;  // duración real de cada lote (2 minutos)
+const VISUAL_UPDATE_INTERVAL_MS = 200;
 
 export function useSimulationPlayer(maxMinute: number) {
   const [simMinute, setSimMinute] = useState(0);
@@ -30,6 +31,7 @@ export function useSimulationPlayer(maxMinute: number) {
   const onBatchCompleteRef = useRef<(() => void) | null>(null);
 
   const frame = useRef<number | null>(null);
+  const lastVisualUpdateRef = useRef(0);
 
   // Cancela el frame activo
   const cancelFrame = useCallback(() => {
@@ -48,6 +50,7 @@ export function useSimulationPlayer(maxMinute: number) {
     cancelFrame();
     startMinuteRef.current   = Math.min(Math.max(0, fromMinute), maxMinute);
     targetMinuteRef.current  = Math.min(Math.max(0, toMinute), maxMinute);
+    lastVisualUpdateRef.current = 0;
     const startedAtMs = typeof startedAt === "string" ? Date.parse(startedAt) : startedAt;
     batchStartTimeRef.current =
       typeof startedAtMs === "number" && Number.isFinite(startedAtMs)
@@ -64,7 +67,14 @@ export function useSimulationPlayer(maxMinute: number) {
       const interpolated = startMinuteRef.current +
         progress * (targetMinuteRef.current - startMinuteRef.current);
 
-      setSimMinute(interpolated);
+      if (
+        progress >= 1 ||
+        lastVisualUpdateRef.current === 0 ||
+        now - lastVisualUpdateRef.current >= VISUAL_UPDATE_INTERVAL_MS
+      ) {
+        lastVisualUpdateRef.current = now;
+        setSimMinute(interpolated);
+      }
 
       if (progress < 1) {
         frame.current = requestAnimationFrame(tick);

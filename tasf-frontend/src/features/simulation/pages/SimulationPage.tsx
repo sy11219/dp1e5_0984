@@ -25,6 +25,34 @@ import { computeActiveFlights, computeAirportLoads } from "../utils/calculations
 import { formatRealTime } from "../utils/timeUtils"
 import { SimulationResultModal } from "../components/SimulationResultModal"
 
+const BATCH_SIMULATION_PAUSED_KEY = "tasf.simulation5d.paused"
+
+function setBatchSimulationPaused(paused: boolean) {
+  try {
+    if (paused) {
+      window.localStorage.setItem(BATCH_SIMULATION_PAUSED_KEY, "true")
+    } else {
+      window.localStorage.removeItem(BATCH_SIMULATION_PAUSED_KEY)
+    }
+  } catch {
+    // Local storage can be unavailable in some browser privacy modes.
+  }
+}
+
+function elapsedRealTimeMs(data: SimulationData | null) {
+  if (!data?.realStartedAt) return 0
+
+  const startedAt = Date.parse(data.realStartedAt)
+  if (!Number.isFinite(startedAt)) return 0
+
+  const finishedAt =
+    data.status === "COMPLETED" && data.realFinishedAt
+      ? Date.parse(data.realFinishedAt)
+      : Date.now()
+
+  return Math.max(0, (Number.isFinite(finishedAt) ? finishedAt : Date.now()) - startedAt)
+}
+
 /**
  * SimulationPage — Simulación por lotes sincronizada con el backend.
  *
@@ -58,13 +86,14 @@ export function SimulationPage() {
   const [flightToCancel, setFlightToCancel] = useState("")
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
   const [reportDismissed, setReportDismissed] = useState(false)
+  const [stopSummaryOpen, setStopSummaryOpen] = useState(false)
+  const [stoppedSummaryData, setStoppedSummaryData] = useState<SimulationData | null>(null)
+  const [stoppedSummaryRealTimeMs, setStoppedSummaryRealTimeMs] = useState(0)
   const [now, setNow]                 = useState(new Date())
   const [realTimeMs, setRealTimeMs]   = useState(0)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
 
-  const accumulatedRef  = useRef(0)
-  const playStartRef    = useRef<number | null>(null)
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
   // para pasar el "from" correcto a animateBatch cuando llega la respuesta.
   const prevTickRef     = useRef(0)
@@ -87,6 +116,7 @@ export function SimulationPage() {
   const showReport = Boolean(
     data?.status === "COMPLETED" && simMinute >= maxMinute && !reportDismissed
   )
+  const modalOpen = showReport || stopSummaryOpen
 
   const syncSharedVisualWindow = useCallback((payload: SimulationData) => {
     const visualStart =
@@ -149,20 +179,16 @@ export function SimulationPage() {
 
   // ── Contador de tiempo real de ejecución ───────────────────────────────────
   useEffect(() => {
-    if (playing) {
-      if (!playStartRef.current) playStartRef.current = Date.now()
-      const t = window.setInterval(() => {
-        setRealTimeMs(accumulatedRef.current + (Date.now() - (playStartRef.current ?? 0)))
-      }, 100)
-      return () => window.clearInterval(t)
-    } else {
-      if (playStartRef.current) {
-        accumulatedRef.current += Date.now() - playStartRef.current
-        playStartRef.current = null
-        setRealTimeMs(accumulatedRef.current)
-      }
-    }
-  }, [playing])
+    setRealTimeMs(elapsedRealTimeMs(data))
+
+    if (!playing || !data?.realStartedAt || data.status === "COMPLETED") return
+
+    const t = window.setInterval(() => {
+      setRealTimeMs(elapsedRealTimeMs(data))
+    }, 1000)
+
+    return () => window.clearInterval(t)
+  }, [data?.realStartedAt, data?.realFinishedAt, data?.status, playing])
 
   // ── Pedir siguiente lote ───────────────────────────────────────────────────
   const fetchNextBatch = useCallback(async (sessionId: string, fromTick: number) => {
@@ -235,7 +261,7 @@ export function SimulationPage() {
   }, [airportCatalog, setPlaying, syncSharedVisualWindow])
 
   useEffect(() => {
-    if (!data?.simulationId || data.status === "COMPLETED") return
+    if (!data?.simulationId || data.status === "COMPLETED" || !playing) return
     const timer = window.setInterval(() => {
       if (fetching || animatingRef.current) return
       void getCurrentBatchSimulationRequest()
@@ -254,7 +280,7 @@ export function SimulationPage() {
         .catch(() => {})
     }, 5_000)
     return () => window.clearInterval(timer)
-  }, [data, fetching, animateBatch, maxMinute, syncSharedVisualWindow])
+  }, [data, fetching, animateBatch, maxMinute, syncSharedVisualWindow, playing])
 
   // ── Iniciar simulación ─────────────────────────────────────────────────────
   const runSimulation = async () => {
@@ -262,8 +288,7 @@ export function SimulationPage() {
     setError("")
     setNotice("")
     setReportDismissed(false)
-    accumulatedRef.current = 0
-    playStartRef.current   = null
+    setBatchSimulationPaused(false)
     prevTickRef.current    = 0
     animatingRef.current   = false
     setRealTimeMs(0)
@@ -350,7 +375,7 @@ export function SimulationPage() {
     )
   }
 
-  const handleReset = () => {
+  const clearSimulationView = () => {
     setPlaying(false)
     setSimMinute(0)
     setData(null)
@@ -359,11 +384,45 @@ export function SimulationPage() {
     setFlightToCancel("")
     setSelectedAirport(null)
     setReportDismissed(false)
-    accumulatedRef.current = 0
-    playStartRef.current   = null
+    setBatchSimulationPaused(true)
+    prevTickRef.current    = 0
     setRealTimeMs(0)
     animatingRef.current   = false
     reset()
+  }
+
+  const handlePause = () => {
+    setBatchSimulationPaused(true)
+    setPlaying(false)
+    animatingRef.current = false
+  }
+
+  const handleRestart = async () => {
+    setBatchSimulationPaused(false)
+    setPlaying(false)
+    animatingRef.current = false
+    await runSimulation()
+  }
+
+  const handleStop = () => {
+    if (!data) return
+
+    const elapsed = realTimeMs || elapsedRealTimeMs(data)
+    setBatchSimulationPaused(true)
+    setRealTimeMs(elapsed)
+    setPlaying(false)
+    animatingRef.current = false
+    setStoppedSummaryData(data)
+    setStoppedSummaryRealTimeMs(elapsed)
+    setStopSummaryOpen(true)
+  }
+
+  const handleStopSummaryOpenChange = (open: boolean) => {
+    setStopSummaryOpen(open)
+    if (!open) {
+      setStoppedSummaryData(null)
+      clearSimulationView()
+    }
   }
 
   return (
@@ -390,7 +449,6 @@ export function SimulationPage() {
             <PanelLeftClose size={18} />
           </button>
           <SimulationControls
-            days={days}
             error={error}
             notice={notice}
             flightToCancel={flightToCancel}
@@ -404,8 +462,9 @@ export function SimulationPage() {
             startTime={startTime}
             onCancelFlight={cancelFlight}
             onFlightToCancelChange={setFlightToCancel}
-            onPause={() => setPlaying(false)}
+            onPause={handlePause}
             onPlay={() => {
+              setBatchSimulationPaused(false)
               // Reanudar: pedir el siguiente lote si no hay animación en curso
               if (!animatingRef.current && data?.simulationId && data.status !== "COMPLETED") {
                 setPlaying(true)
@@ -414,7 +473,8 @@ export function SimulationPage() {
                 setPlaying(true)
               }
             }}
-            onReset={handleReset}
+            onReset={handleRestart}
+            onStop={handleStop}
             onRunSimulation={runSimulation}
             onStartDateChange={setStartDate}
             onStartTimeChange={setStartTime}
@@ -446,7 +506,7 @@ export function SimulationPage() {
         <section className="panel map-panel">
           <MapStage
             data={displayData}
-            activeFlights={activeFlights}
+            activeFlights={modalOpen ? [] : activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
             onSelectAirport={setSelectedAirport}
@@ -525,6 +585,15 @@ export function SimulationPage() {
         data={data}
         realTimeMs={realTimeMs}
       />
+      <SimulationResultModal
+        open={stopSummaryOpen}
+        onOpenChange={handleStopSummaryOpenChange}
+        data={stoppedSummaryData}
+        realTimeMs={stoppedSummaryRealTimeMs}
+        title="Resumen de simulación actual"
+        description=""
+        showFooter={false}
+      />
     </div>
   )
 }
@@ -532,7 +601,6 @@ export function SimulationPage() {
 // ── Controles ─────────────────────────────────────────────────────────────────
 
 type SimulationControlsProps = {
-  days: number
   error: string
   notice: string
   flightToCancel: string
@@ -549,16 +617,17 @@ type SimulationControlsProps = {
   onPause: () => void
   onPlay: () => void
   onReset: () => void
+  onStop: () => void
   onRunSimulation: () => void
   onStartDateChange: (date: string) => void
   onStartTimeChange: (time: string) => void
 }
 
 function SimulationControls({
-  days, error, notice, flightToCancel, hasSimulation,
+  error, notice, flightToCancel, hasSimulation,
   loading, fetching, playing, cancelling, simMinute, startDate, startTime,
   onCancelFlight, onFlightToCancelChange,
-  onPause, onPlay, onReset, onRunSimulation, onStartDateChange, onStartTimeChange,
+  onPause, onPlay, onReset, onStop, onRunSimulation, onStartDateChange, onStartTimeChange,
 }: SimulationControlsProps) {
   const busy = loading || fetching || cancelling
 
@@ -572,7 +641,7 @@ function SimulationControls({
             type="date"
             value={startDate}
             onChange={(e) => onStartDateChange(e.target.value)}
-            disabled={busy || playing}
+            disabled={busy || hasSimulation}
           />
         </div>
 
@@ -582,19 +651,23 @@ function SimulationControls({
             type="time"
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
-            disabled={busy || playing}
+            disabled={busy || hasSimulation}
           />
         </div>
 
-        <div className="metric">
-          <span>Días de simulación</span>
-          <strong>{days}</strong>
-          <span>duración fija</span>
-        </div>
-
-        <button className="primary" onClick={onRunSimulation} disabled={busy || playing}>
+        <button
+          className="primary"
+          onClick={hasSimulation && !playing ? onPlay : onRunSimulation}
+          disabled={busy || (hasSimulation && playing)}
+        >
           {loading ? "Iniciando..." : "Ejecutar Simulación"}
         </button>
+
+        <div className="segmented">
+          <button onClick={onPause} disabled={!hasSimulation || busy || !playing}>Pausar</button>
+          <button onClick={onReset} disabled={!hasSimulation || busy}>Reiniciar</button>
+          <button className="danger" onClick={onStop} disabled={!hasSimulation || busy}>Detener</button>
+        </div>
 
         {/* Indicador de estado */}
         <div className="metric">
@@ -611,7 +684,7 @@ function SimulationControls({
 
         {/* Cancelar vuelo futuro */}
         <div className="field">
-          <label>Cancelar vuelo futuro</label>
+          <label>Cancelar vuelo</label>
           <input
             type="text"
             placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
@@ -625,17 +698,11 @@ function SimulationControls({
           onClick={onCancelFlight}
           disabled={!hasSimulation || busy}
         >
-          {cancelling ? "Replanificando..." : "Cancelar y replanificar"}
+          {cancelling ? "Registrando..." : "Registrar cancelación"}
         </button>
 
         {notice && <div className="success">{notice}</div>}
         {error  && <div className="error">{error}</div>}
-
-        <div className="segmented">
-          <button onClick={onPlay}  className={playing ? "active" : ""} disabled={busy}>Play</button>
-          <button onClick={onPause} disabled={busy}>Pausa</button>
-          <button onClick={onReset} disabled={busy}>Reset</button>
-        </div>
       </div>
     </section>
   )

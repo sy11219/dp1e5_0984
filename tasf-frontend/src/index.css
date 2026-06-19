@@ -460,6 +460,17 @@ select {
   border-color: #2563eb;
 }
 
+.segmented button.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.segmented button.danger:hover:not(:disabled) {
+  color: #fff;
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
 .primary {
   background: #111827;
   color: #fff;

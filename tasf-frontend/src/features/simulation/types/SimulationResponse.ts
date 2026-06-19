@@ -8,6 +8,8 @@ export interface SimulationResponse {
   realStartedAt: string;
   realFinishedAt: string;
   runtimeMs: number;
+  connectionWaitMinutes?: number;
+  finalPickupWaitMinutes?: number;
   metrics: {
     shipments: number;
     plannedShipments: number;
@@ -70,6 +72,6 @@ export interface SimulationResponse {
     minute: number;
     airport: string;
     delta: number;
-    type: "shipment_created" | "flight_departure" | "connection_arrival" | "connection_departure" | "final_arrival";
+    type: "shipment_created" | "flight_departure" | "connection_arrival" | "connection_departure" | "final_arrival" | "final_pickup";
   }[];
 }

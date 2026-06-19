@@ -261,7 +261,7 @@ public class ALNS {
 
         for (Shipment s : aRutar) {
             // 1. Intentar ruta completa
-            Route rutaCompleta = finder.findBestRoute(s, flights);
+            Route rutaCompleta = finder.findBestRouteCached(s, flights);
             if (rutaCompleta != null) {
                 solucion.put(s.getShipmentId(), rutaCompleta);
                 reservarCapacidad(rutaCompleta, s.getSuitcaseCount(), airportMap);
@@ -471,7 +471,7 @@ public class ALNS {
                                Map<String, Airport> airportMap) {
         for (Shipment s : ordenados) {
             // Si es sub-envío ya creado, buscar ruta directamente para su lote
-            Route ruta = finder.findBestRoute(s, flights);
+            Route ruta = finder.findBestRouteCached(s, flights);
             if (ruta != null) {
                 sol.put(s.getShipmentId(), ruta);
                 reservarCapacidad(ruta, s.getSuitcaseCount(), airportMap);

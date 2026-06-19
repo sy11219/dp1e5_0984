@@ -170,13 +170,16 @@ export default function MapStage({
     // Limpiar canvas
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    // Dibujar líneas de rutas
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
     for (const flight of activeFlights) {
       const origin = airportByCode[flight.origin];
       const destination = airportByCode[flight.destination];
       if (!origin || !destination) continue;
 
-      const { originPixel, destPixel } = getRouteGeometry(mapRef.current, origin, destination, flight.progress);
+      const { originPixel, destPixel, planePixel, angle } =
+        getRouteGeometry(mapRef.current, origin, destination, flight.progress);
 
       ctx.strokeStyle = STATUS_COLOR[flight.status];
       ctx.lineWidth = 2.5;
@@ -186,15 +189,6 @@ export default function MapStage({
       ctx.lineTo(destPixel.x, destPixel.y);
       ctx.stroke();
       ctx.globalAlpha = 1;
-    }
-
-    // Dibujar aviones
-    for (const flight of activeFlights) {
-      const origin = airportByCode[flight.origin];
-      const destination = airportByCode[flight.destination];
-      if (!origin || !destination) continue;
-
-      const { planePixel, angle } = getRouteGeometry(mapRef.current, origin, destination, flight.progress);
 
       drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, STATUS_COLOR[flight.status]);
     }

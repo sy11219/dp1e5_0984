@@ -15,20 +15,38 @@ interface SimulationModalProps {
   onOpenChange: (open: boolean) => void
   data: SimulationData | null
   realTimeMs: number
+  title?: string
+  description?: string
+  showFooter?: boolean
 }
 
-export function SimulationResultModal({ open, onOpenChange, data, realTimeMs }: SimulationModalProps) {
+export function SimulationResultModal({
+  open,
+  onOpenChange,
+  data,
+  realTimeMs,
+  title = "Simulación finalizada",
+  description = 'Más información en "Estadísticas"',
+  showFooter = true,
+}: SimulationModalProps) {
   if (!data) return null
-  const bagCompletionRate = ((data.metrics.plannedBags / data.metrics.totalBags) * 100).toFixed(0)
-  const onTimeRate = ((data.metrics.onTimeShipments / data.metrics.shipments) * 100).toFixed(0)
-  const bagsPerFlight = (data.metrics.totalBags / data.metrics.usedFlights).toFixed(1)
+
+  const bagCompletionRate = data.metrics.totalBags
+    ? ((data.metrics.plannedBags / data.metrics.totalBags) * 100).toFixed(0)
+    : "0"
+  const onTimeRate = data.metrics.shipments
+    ? ((data.metrics.onTimeShipments / data.metrics.shipments) * 100).toFixed(0)
+    : "0"
+  const bagsPerFlight = data.metrics.usedFlights
+    ? (data.metrics.totalBags / data.metrics.usedFlights).toFixed(1)
+    : "0.0"
   const executionTimeSec = (data.runtimeMs / 1000).toFixed(2)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="text-center max-w-md z-[500]">
+      <DialogContent className="text-center max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Simulación finalizada</DialogTitle>
+          <DialogTitle className="text-2xl font-semibold">{title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-6 text-left md:text-center">
@@ -49,13 +67,17 @@ export function SimulationResultModal({ open, onOpenChange, data, realTimeMs }: 
           </p>
         </div>
 
-        <DialogDescription className="text-center text-muted-foreground">
-          Más información en "Estadísticas"
-        </DialogDescription>
+        {description && (
+          <DialogDescription className="text-center text-muted-foreground">
+            {description}
+          </DialogDescription>
+        )}
 
-        <DialogFooter className="justify-center sm:justify-center mt-4">
-          <Button onClick={() => onOpenChange(false)}>Aceptar</Button>
-        </DialogFooter>
+        {showFooter && (
+          <DialogFooter className="justify-center sm:justify-center mt-4">
+            <Button onClick={() => onOpenChange(false)}>Aceptar</Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

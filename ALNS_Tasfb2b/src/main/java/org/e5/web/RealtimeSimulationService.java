@@ -1,5 +1,6 @@
 package org.e5.web;
 
+import org.e5.config.OperationParameters;
 import org.e5.db.FlightPlanService;
 import org.e5.model.Airport;
 import org.e5.model.Flight;
@@ -207,6 +208,9 @@ public class RealtimeSimulationService {
         FlightPlanParser flightParser = new FlightPlanParser();
         List<Flight> flights = flightParser.parseScheduledFromDatabase(startDate, days + 2, airportMap);
         for (Flight flight : flights) flight.resetLoad();
+        flights.sort(Comparator
+                .comparingInt(Flight::absoluteDepartureMinute)
+                .thenComparing(Flight::getFlightId));
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
         int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
@@ -453,14 +457,21 @@ public class RealtimeSimulationService {
             for (int i = 0; i < rutaVuelos.size(); i++) {
                 Flight f = rutaVuelos.get(i);
                 boolean last = (i == rutaVuelos.size() - 1);
-                events.add(new RealtimeEvent(f.absoluteArrivalMinute(),
-                        f.getDestCode(), s.getSuitcaseCount(),
-                        last ? "final_arrival" : "connection_arrival"));
-                if (!last) {
-                    Flight next = rutaVuelos.get(i + 1);
-                    events.add(new RealtimeEvent(next.absoluteDepartureMinute(),
-                            f.getDestCode(), -s.getSuitcaseCount(), "connection_departure"));
+                if (last) {
+                    int arrivalMinute = f.absoluteArrivalMinute();
+                    events.add(new RealtimeEvent(arrivalMinute,
+                            f.getDestCode(), s.getSuitcaseCount(), "final_arrival"));
+                    events.add(new RealtimeEvent(
+                            arrivalMinute + OperationParameters.FINAL_PICKUP_WAIT_MINUTES,
+                            f.getDestCode(), -s.getSuitcaseCount(), "final_pickup"));
+                    continue;
                 }
+
+                events.add(new RealtimeEvent(f.absoluteArrivalMinute(),
+                        f.getDestCode(), s.getSuitcaseCount(), "connection_arrival"));
+                Flight next = rutaVuelos.get(i + 1);
+                events.add(new RealtimeEvent(next.absoluteDepartureMinute(),
+                        f.getDestCode(), -s.getSuitcaseCount(), "connection_departure"));
             }
         }
 
@@ -535,9 +546,11 @@ public class RealtimeSimulationService {
         private void loadRealtimeFlights(int windowStart, int windowEnd) {
             if (windowStart >= windowEnd) return;
             int added = 0;
-            for (Flight f : flights) {
+            int start = firstFlightAtOrAfter(flights, windowStart);
+            for (int i = start; i < flights.size(); i++) {
+                Flight f = flights.get(i);
                 int departure = f.absoluteDepartureMinute();
-                if (departure < windowStart || departure >= windowEnd) continue;
+                if (departure >= windowEnd) break;
                 if (cancellations.contains(f.getFlightId()) || pendingCancellations.contains(f.getFlightId())) continue;
                 if (loadedRealtimeFlightIds.add(f.getFlightId())) {
                     flightQueue.add(f);
@@ -567,10 +580,20 @@ public class RealtimeSimulationService {
                     }
                     String arrKey = s.getShipmentId() + ":" + f.getFlightId() + ":arr";
                     if (f.absoluteArrivalMinute() == tick && processedFlightEvents.add(arrKey)) {
+                        boolean finalLeg = idx == route.getFlights().size() - 1;
                         Airport dest = airportMap.get(f.getDestCode());
                         if (dest != null) dest.addLoad(s.getSuitcaseCount());
-                        String type = idx == route.getFlights().size() - 1 ? "final_arrival" : "connection_arrival";
-                        events.add(new RealtimeEvent(tick, f.getDestCode(), s.getSuitcaseCount(), type));
+                        events.add(new RealtimeEvent(tick, f.getDestCode(), s.getSuitcaseCount(),
+                                finalLeg ? "final_arrival" : "connection_arrival"));
+                    }
+                    String pickupKey = s.getShipmentId() + ":" + f.getFlightId() + ":pickup";
+                    int pickupMinute = f.absoluteArrivalMinute() + OperationParameters.FINAL_PICKUP_WAIT_MINUTES;
+                    if (idx == route.getFlights().size() - 1
+                            && pickupMinute == tick
+                            && processedFlightEvents.add(pickupKey)) {
+                        Airport dest = airportMap.get(f.getDestCode());
+                        if (dest != null) dest.removeLoad(s.getSuitcaseCount());
+                        events.add(new RealtimeEvent(tick, f.getDestCode(), -s.getSuitcaseCount(), "final_pickup"));
                     }
                 }
             }
@@ -807,13 +830,28 @@ public class RealtimeSimulationService {
         private List<Flight> availableFlightsFrom(int fromMinute) {
             List<Flight> available = new ArrayList<>();
             List<Flight> source = "TIEMPO_REAL".equals(scenario) ? flightQueue : flights;
-            for (Flight f : source) {
+            int start = firstFlightAtOrAfter(source, fromMinute);
+            for (int i = start; i < source.size(); i++) {
+                Flight f = source.get(i);
                 if (!cancellations.contains(f.getFlightId())
-                        && !pendingCancellations.contains(f.getFlightId())
-                        && f.absoluteDepartureMinute() >= fromMinute)
+                        && !pendingCancellations.contains(f.getFlightId()))
                     available.add(f);
             }
             return available;
+        }
+
+        private int firstFlightAtOrAfter(List<Flight> source, int fromMinute) {
+            int low = 0;
+            int high = source.size();
+            while (low < high) {
+                int mid = (low + high) >>> 1;
+                if (source.get(mid).absoluteDepartureMinute() < fromMinute) {
+                    low = mid + 1;
+                } else {
+                    high = mid;
+                }
+            }
+            return low;
         }
 
         private Flight findFlight(String flightId) {
@@ -852,6 +890,8 @@ public class RealtimeSimulationService {
             json.prop("startOffsetMinutes", startOffsetMinutes).comma();
             json.prop("batchMinutes", BATCH_MINUTES).comma();
             json.prop("batchIntervalMs", BATCH_INTERVAL_MS).comma();
+            json.prop("connectionWaitMinutes", OperationParameters.CONNECTION_WAIT_MINUTES).comma();
+            json.prop("finalPickupWaitMinutes", OperationParameters.FINAL_PICKUP_WAIT_MINUTES).comma();
             json.prop("batchCount", batchCount).comma();
             json.prop("lastBatchStart", lastBatchStart).comma();
             json.prop("lastBatchEnd", lastBatchEnd).comma();
@@ -976,6 +1016,7 @@ public class RealtimeSimulationService {
             sortedEvents.sort(Comparator
                     .comparingInt(RealtimeEvent::minute)
                     .thenComparing(RealtimeEvent::airport)
+                    .thenComparingInt(e -> eventPriority(e.type))
                     .thenComparing(RealtimeEvent::type));
             json.name("airportEvents").arrayStart();
             for (int i = 0; i < sortedEvents.size(); i++) {
@@ -992,6 +1033,14 @@ public class RealtimeSimulationService {
 
             json.objEnd();
             return json.toString();
+        }
+
+        private int eventPriority(String type) {
+            return switch (type) {
+                case "flight_departure", "connection_departure", "final_pickup" -> 0;
+                case "shipment_created", "connection_arrival", "final_arrival" -> 1;
+                default -> 2;
+            };
         }
 
         private void writeShipment(Json json, Shipment s) {

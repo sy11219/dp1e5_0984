@@ -15,13 +15,15 @@ export function computeActiveFlights(
   minute: number
 ): ActiveFlight[] {
   if (!data) return [];
-  return data.flights
-    .filter(
-      (flight) =>
-        minute >= flight.absoluteDepartureMinute &&
-        minute <= flight.absoluteArrivalMinute
-    )
-    .map((flight) => ({
+  const active: ActiveFlight[] = [];
+
+  for (const flight of data.flights) {
+    if (flight.assignedLoad <= 0) continue;
+    if (flight.scheduleStatus?.toUpperCase().startsWith("CANCEL")) continue;
+    if (minute < flight.absoluteDepartureMinute) continue;
+    if (minute > flight.absoluteArrivalMinute) continue;
+
+    active.push({
       ...flight,
       progress: clamp(
         (minute - flight.absoluteDepartureMinute) /
@@ -29,7 +31,10 @@ export function computeActiveFlights(
         0,
         1
       ),
-    }));
+    });
+  }
+
+  return active;
 }
 
 export function computeAirportLoads(

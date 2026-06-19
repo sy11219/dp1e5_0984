@@ -1,5 +1,6 @@
 package org.e5.web;
 
+import org.e5.config.OperationParameters;
 import org.e5.model.Airport;
 import org.e5.model.Flight;
 import org.e5.model.Route;
@@ -119,6 +120,8 @@ public class SimulationService {
         json.prop("realStartedAt", realStartedAt.format(ISO_DATE_TIME)).comma();
         json.prop("realFinishedAt", realFinishedAt.format(ISO_DATE_TIME)).comma();
         json.prop("runtimeMs", runtimeMs).comma();
+        json.prop("connectionWaitMinutes", OperationParameters.CONNECTION_WAIT_MINUTES).comma();
+        json.prop("finalPickupWaitMinutes", OperationParameters.FINAL_PICKUP_WAIT_MINUTES).comma();
 
         json.name("metrics").objStart();
         json.prop("shipments", shipments.size()).comma();
@@ -264,16 +267,34 @@ public class SimulationService {
             for (int i = 0; i < routeFlights.size(); i++) {
                 Flight flight = routeFlights.get(i);
                 boolean finalLeg = i == routeFlights.size() - 1;
-                events.add(new AirportEvent(flight.absoluteArrivalMinute(), flight.getDestCode(), bags,
-                        finalLeg ? "final_arrival" : "connection_arrival"));
-                if (!finalLeg) {
-                    Flight next = routeFlights.get(i + 1);
-                    events.add(new AirportEvent(next.absoluteDepartureMinute(), flight.getDestCode(), -bags, "connection_departure"));
+                if (finalLeg) {
+                    int arrivalMinute = flight.absoluteArrivalMinute();
+                    events.add(new AirportEvent(arrivalMinute, flight.getDestCode(), bags, "final_arrival"));
+                    events.add(new AirportEvent(
+                            arrivalMinute + OperationParameters.FINAL_PICKUP_WAIT_MINUTES,
+                            flight.getDestCode(), -bags, "final_pickup"));
+                    continue;
                 }
+
+                events.add(new AirportEvent(flight.absoluteArrivalMinute(), flight.getDestCode(), bags, "connection_arrival"));
+                Flight next = routeFlights.get(i + 1);
+                events.add(new AirportEvent(next.absoluteDepartureMinute(), flight.getDestCode(), -bags, "connection_departure"));
             }
         }
-        events.sort(Comparator.comparingInt((AirportEvent e) -> e.minute).thenComparing(e -> e.airportCode));
+        events.sort(Comparator
+                .comparingInt((AirportEvent e) -> e.minute)
+                .thenComparing(e -> e.airportCode)
+                .thenComparingInt(e -> eventPriority(e.type))
+                .thenComparing(e -> e.type));
         return events;
+    }
+
+    private int eventPriority(String type) {
+        return switch (type) {
+            case "flight_departure", "connection_departure", "final_pickup" -> 0;
+            case "shipment_created", "connection_arrival", "final_arrival" -> 1;
+            default -> 2;
+        };
     }
 
     private double ratio(int value, int total) {

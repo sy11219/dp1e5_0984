@@ -284,7 +284,7 @@ export const OperationsPage = () => {
       const updated = await cancelRealtimeFlightRequest(data.simulationId, flightToCancel.trim());
       setData(updated);
       setFlightToCancel("");
-      setNotice("Cancelacion registrada. Se aplicara en la siguiente ejecucion de Tiempo real.");
+      setNotice("Cancelación registrada. Se aplicará en la siguiente ejecución de Tiempo real.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo.");
     } finally {
@@ -327,17 +327,17 @@ export const OperationsPage = () => {
               <div className="metric">
                 <span>Cola de vuelos</span>
                 <strong>{data?.flightQueueSize ?? data?.metrics.flightQueueSize ?? 0}</strong>
-                <span>{`${data?.realtimeWindowMinutes ?? 60} min por ejecucion`}</span>
+                <span>{`${data?.realtimeWindowMinutes ?? 60} min por ejecución`}</span>
               </div>
 
               <div className="metric">
                 <span>Cancelaciones pendientes</span>
                 <strong>{data?.pendingCancellationCount ?? data?.metrics.pendingCancellations ?? 0}</strong>
-                <span>siguiente ejecucion</span>
+                <span>siguiente ejecución</span>
               </div>
 
-              <button className="primary" onClick={connectOperation} disabled={loading}>
-                {loading ? "Conectando..." : "Reconectar operacion"}
+              <button className="primary" onClick={connectOperation} disabled={loading || Boolean(data?.simulationId)}>
+                {loading ? "Conectando..." : data?.simulationId ? "Conectado" : "Conectar operación"}
               </button>
 
               <div className="field">
@@ -352,11 +352,11 @@ export const OperationsPage = () => {
               </div>
 
               <button
-                className="secondary"
+                className="primary"
                 onClick={cancelFlight}
-                disabled={!flightToCancel || cancelling}
+                disabled={!data?.simulationId || !flightToCancel || cancelling}
               >
-                {cancelling ? "Registrando..." : "Registrar cancelacion"}
+                {cancelling ? "Registrando..." : "Registrar cancelación"}
               </button>
 
               {error && <div className="error">{error}</div>}
@@ -371,7 +371,7 @@ export const OperationsPage = () => {
             {data ? (
               <LiveMetrics data={data} airportLoads={airportLoads} />
             ) : (
-              <div className="empty-state">Conecta la operacion para ver indicadores.</div>
+              <div className="empty-state">Conecta la operación para ver indicadores.</div>
             )}
           </section>
         </aside>
