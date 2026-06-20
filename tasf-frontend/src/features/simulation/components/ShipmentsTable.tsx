@@ -59,14 +59,14 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
       </div>
 
       <div className="filters" style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
-        <label>
+        <label className="text-sm">
           Origen:
           <select value={originAirport} onChange={e => setOriginAirport(e.target.value)}>
             <option value={ANY}>{ANY}</option>
             {airportOptions.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </label>
-        <label>
+        <label className="text-sm">
           Destino:
           <select value={destinationAirport} onChange={e => setDestinationAirport(e.target.value)}>
             <option value={ANY}>{ANY}</option>

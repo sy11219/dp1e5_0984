@@ -80,7 +80,7 @@ export function FlightsTable({ flights }: FlightsTableProps) {
           marginBottom: "1rem",
         }}
       >
-        <label>
+        <label className="text-sm">
           Origen:
           <select
             value={originFilter}
@@ -95,7 +95,7 @@ export function FlightsTable({ flights }: FlightsTableProps) {
           </select>
         </label>
 
-        <label>
+        <label className="text-sm">
           Destino:
           <select
             value={destinationFilter}
@@ -120,7 +120,7 @@ export function FlightsTable({ flights }: FlightsTableProps) {
           marginBottom: "1rem",
         }}
       >
-        <label>
+        <label className="text-sm">
           Ordenar por:
           <select
             value={sortBy}
@@ -132,7 +132,7 @@ export function FlightsTable({ flights }: FlightsTableProps) {
           </select>
         </label>
 
-        <label>
+        <label className="text-sm">
           Dirección:
           <select
             value={sortOrder}

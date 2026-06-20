@@ -558,7 +558,7 @@ export function SimulationPage() {
           <section className="panel section">
             <h3>Aeropuertos críticos</h3>
             {displayData.airports.length ? (
-              <AirportsTable airports={displayData.airports} loads={airportLoads} />
+              <AirportsTable airports={displayData.airports} loads={airportLoads} flights={displayData.flights} shipments={displayData.shipments} />
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}
