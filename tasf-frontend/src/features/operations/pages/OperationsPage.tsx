@@ -439,7 +439,7 @@ export const OperationsPage = () => {
           <section className="panel section">
             <h3>Aeropuertos criticos</h3>
             {data ? (
-              <AirportsTable airports={data.airports} loads={airportLoads} />
+              <AirportsTable airports={data.airports} loads={airportLoads} flights={data.flights} shipments={data.shipments}/>
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}
