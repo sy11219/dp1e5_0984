@@ -28,7 +28,6 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
 
   const visible = useMemo(() => {
     let result = [...shipments].sort((a, b) => a.requestMinute - b.requestMinute);
-
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(s =>
@@ -84,7 +83,7 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
             const status = !s.planned ? "red" : s.onTime ? "green" : "yellow";
             const isCompleted = simMinute >= s.estimatedArrival;
             return (
-              <div className="row" key={s.id}>
+              <div className="row" key={`${s.id}-${s.requestMinute}`}>
                 <span className={`dot ${status}`}></span>
                 <div className="row-main">
                   <strong>{s.clientId}</strong>
