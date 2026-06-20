@@ -11,10 +11,10 @@ interface MetricProps {
 
 function Metric({ label, value, sub }: MetricProps) {
   return (
-    <div className="metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <span>{sub}</span>
+    <div className="metric flex flex-col text-sm">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <strong className="text-sm">{value}</strong>
+      <span className="text-xs text-muted-foreground">{sub}</span>
     </div>
   );
 }
@@ -63,10 +63,10 @@ export function AirportDetail({
 
   return (
     <>
-      <div className="airport-status-control">
-        <div>
-          <span>Estado operativo</span>
-          <strong>{active ? "Activo" : "Inactivo"}</strong>
+      <div className="airport-status-control flex items-center justify-between gap-3 text-sm">
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">Estado operativo</span>
+          <strong className="text-sm">{active ? "Activo" : "Inactivo"}</strong>
         </div>
         <button
           type="button"
@@ -76,24 +76,18 @@ export function AirportDetail({
           onClick={handleStatusChange}
           disabled={savingStatus}
           title={active ? "Desactivar aeropuerto" : "Activar aeropuerto"}
+          style={{ padding: 6 }}
         >
           <span />
         </button>
       </div>
-      {statusError && <div className="inline-error">{statusError}</div>}
 
-      <div className="metrics">
+      {statusError && <div className="inline-error text-xs text-destructive">{statusError}</div>}
+
+      <div className="metrics grid grid-cols-2 gap-2 mt-2 text-sm">
         <Metric label="Carga actual" value={load} sub={`cap. ${airport.maxCapacity}`} />
-        <Metric
-          label="Uso actual"
-          value={`${Math.round(utilization * 100)}%`}
-          sub={status.toUpperCase()}
-        />
-        <Metric
-          label={peakLabel}
-          value={airport.peakLoad}
-          sub={`${Math.round(airport.utilization * 100)}%`}
-        />
+        <Metric label="Uso actual" value={`${Math.round(utilization * 100)}%`} sub={status.toUpperCase()} />
+        <Metric label={peakLabel} value={airport.peakLoad} sub={`${Math.round(airport.utilization * 100)}%`} />
         <Metric label="Ubicación" value={airport.country} sub={airport.continent} />
       </div>
     </>
