@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
   advanceRealtimeSessionRequest,
@@ -12,7 +12,7 @@ import { AirportsTable } from "../../simulation/components/AirportsTable";
 import { CapacityLegend } from "../../simulation/components/CapacityLegend";
 import { FlightsTable } from "../../simulation/components/FlightsTable";
 import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
-import MapStage from "../../simulation/components/simulation/map/MapStage";
+import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
 import type { AirportLoads, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import {
@@ -164,9 +164,12 @@ export const OperationsPage = () => {
   const [notice, setNotice] = useState("");
   const [flightToCancel, setFlightToCancel] = useState("");
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [now, setNow] = useState(new Date());
+  const focusTokenRef = useRef(0);
 
   const operationalMinute = useMemo(() => {
     if (!data) return 0;
@@ -274,6 +277,17 @@ export const OperationsPage = () => {
     [data, operationalMinute]
   );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
+
+  const focusAirport = (code: string) => {
+    setSelectedAirport(code);
+    setSelectedFlightId(null);
+    setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current });
+  };
+
+  const focusFlight = (id: string) => {
+    setSelectedFlightId(id);
+    setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current });
+  };
 
   const cancelFlight = async () => {
     if (!data?.simulationId || !flightToCancel.trim()) return;
@@ -395,7 +409,9 @@ export const OperationsPage = () => {
             activeFlights={activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
-            onSelectAirport={setSelectedAirport}
+            focusTarget={mapFocusTarget}
+            onSelectAirport={focusAirport}
+            onSelectFlight={focusFlight}
           />
         </section>
 
@@ -413,7 +429,11 @@ export const OperationsPage = () => {
               <PanelRightClose size={18} />
             </button>
           </div>
-          <section className="panel section">
+          <section
+            className="panel section"
+            onClick={selected ? () => focusAirport(selected.code) : undefined}
+            style={selected ? { cursor: "pointer" } : undefined}
+          >
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
             {selected ? (
               <AirportDetail
@@ -428,7 +448,11 @@ export const OperationsPage = () => {
 
           <section className="panel section">
             <h3>Vuelos activos</h3>
-            <FlightsTable flights={activeFlights} />
+            <FlightsTable
+              flights={activeFlights}
+              selectedFlightId={selectedFlightId}
+              onSelectFlight={focusFlight}
+            />
           </section>
 
           <section className="panel section">
@@ -439,7 +463,14 @@ export const OperationsPage = () => {
           <section className="panel section">
             <h3>Aeropuertos criticos</h3>
             {data ? (
-              <AirportsTable airports={data.airports} loads={airportLoads} flights={data.flights} shipments={data.shipments}/>
+              <AirportsTable
+                airports={data.airports}
+                loads={airportLoads}
+                flights={data.flights}
+                shipments={data.shipments}
+                selectedAirport={selectedAirport}
+                onSelectAirport={focusAirport}
+              />
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}

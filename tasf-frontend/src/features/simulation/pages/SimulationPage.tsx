@@ -15,7 +15,7 @@ import { CapacityLegend } from "../components/CapacityLegend"
 import { FlightsTable } from "../components/FlightsTable"
 import { ShipmentsTable } from "../components/ShipmentsTable"
 import { Metrics } from "../components/Metrics"
-import MapStage from "../components/simulation/map/MapStage"
+import MapStage, { type MapFocusTarget } from "../components/simulation/map/MapStage"
 import { Timeline } from "../components/Timeline"
 import { Topbar } from "../components/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
@@ -85,6 +85,8 @@ export function SimulationPage() {
   const [notice, setNotice]           = useState("")
   const [flightToCancel, setFlightToCancel] = useState("")
   const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null)
+  const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null)
   const [reportDismissed, setReportDismissed] = useState(false)
   const [stopSummaryOpen, setStopSummaryOpen] = useState(false)
   const [stoppedSummaryData, setStoppedSummaryData] = useState<SimulationData | null>(null)
@@ -97,6 +99,7 @@ export function SimulationPage() {
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
   // para pasar el "from" correcto a animateBatch cuando llega la respuesta.
   const prevTickRef     = useRef(0)
+  const focusTokenRef   = useRef(0)
   // true mientras la animación del lote está corriendo
   const animatingRef    = useRef(false)
 
@@ -249,6 +252,8 @@ export function SimulationPage() {
         if (cancelled || !payload) return
         setData(payload)
         setSelectedAirport(payload.airports[0]?.code || airportCatalog[0]?.code || null)
+        setSelectedFlightId(null)
+        setMapFocusTarget(null)
         syncSharedVisualWindow(payload)
         setPlaying(payload.status !== "COMPLETED")
       })
@@ -300,6 +305,8 @@ export function SimulationPage() {
       setData(initial)
       setSimMinute(initial.tick ?? initial.startOffsetMinutes ?? 0)
       setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
+      setSelectedFlightId(null)
+      setMapFocusTarget(null)
       setPlaying(true)
 
       // 2. Pedir inmediatamente el primer lote
@@ -330,6 +337,8 @@ export function SimulationPage() {
       setFlightToCancel("")
       setData(updated)
       setSelectedAirport(updated.airports[0]?.code || airportCatalog[0]?.code || null)
+      setSelectedFlightId(null)
+      setMapFocusTarget(null)
       setNotice(`Vuelo ${id} cancelado. Replanificacion aplicada sobre el estado actual.`)
       setPlaying(true)
     } catch (err) {
@@ -375,6 +384,29 @@ export function SimulationPage() {
     )
   }
 
+  const focusAirport = (code: string) => {
+    // Si es el mismo aeropuerto, deseleccionar
+    if (selectedAirport === code) {
+      setSelectedAirport(null)
+      setMapFocusTarget(null)
+    } else {
+      setSelectedAirport(code)
+      setSelectedFlightId(null)
+      setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current })
+    }
+  }
+
+  const focusFlight = (id: string) => {
+    // Si es el mismo vuelo, deseleccionar
+    if (selectedFlightId === id) {
+      setSelectedFlightId(null)
+      setMapFocusTarget(null)
+    } else {
+      setSelectedFlightId(id)
+      setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current })
+    }
+  }
+
   const clearSimulationView = () => {
     setPlaying(false)
     setSimMinute(0)
@@ -383,6 +415,8 @@ export function SimulationPage() {
     setNotice("")
     setFlightToCancel("")
     setSelectedAirport(null)
+    setSelectedFlightId(null)
+    setMapFocusTarget(null)
     setReportDismissed(false)
     setBatchSimulationPaused(true)
     prevTickRef.current    = 0
@@ -509,7 +543,9 @@ export function SimulationPage() {
             activeFlights={modalOpen ? [] : activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
-            onSelectAirport={setSelectedAirport}
+            focusTarget={mapFocusTarget}
+            onSelectAirport={focusAirport}
+            onSelectFlight={focusFlight}
           />
           <Timeline
             simMinute={simMinute}
@@ -534,7 +570,11 @@ export function SimulationPage() {
               <PanelRightClose size={18} />
             </button>
           </div>
-          <section className="panel section">
+          <section
+            className="panel section"
+            onClick={selected ? () => focusAirport(selected.code) : undefined}
+            style={selected ? { cursor: "pointer" } : undefined}
+          >
             <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
             {loadingAirports && <div className="empty-state">Cargando aeropuertos...</div>}
             {selected && (
@@ -548,7 +588,11 @@ export function SimulationPage() {
           <section className="panel section">
             <h3>Vuelos activos</h3>
             {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
-            <FlightsTable flights={activeFlights} />
+            <FlightsTable
+              flights={activeFlights}
+              selectedFlightId={selectedFlightId}
+              onSelectFlight={focusFlight}
+            />
           </section>
           <section className="panel section">
             <h3>Envíos</h3>
@@ -558,7 +602,14 @@ export function SimulationPage() {
           <section className="panel section">
             <h3>Aeropuertos críticos</h3>
             {displayData.airports.length ? (
-              <AirportsTable airports={displayData.airports} loads={airportLoads} flights={displayData.flights} shipments={displayData.shipments} />
+              <AirportsTable
+                airports={displayData.airports}
+                loads={airportLoads}
+                flights={displayData.flights}
+                shipments={displayData.shipments}
+                selectedAirport={selectedAirport}
+                onSelectAirport={focusAirport}
+              />
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}

@@ -1,5 +1,5 @@
 import type { SimulationData } from "../types";
-import { formatClock, formatDateOnly, formatFlightMoment, formatSimMinute, formatTimeOnly } from "../utils/formatters";
+import { formatClock, formatDateOnly, formatSimMinute, formatTimeOnly } from "../utils/formatters";
 
 interface TopbarProps {
   data: SimulationData | null;
@@ -34,6 +34,17 @@ export function Topbar({
   subtitle = "Simulación 5 días",
   clockLabel = "Reloj simulado",
 }: TopbarProps) {
+  let simulatedDateStr = "--";
+  let simulatedDayLabel = "--";
+  if (data?.simulationStartDateTime) {
+    const minutesFromStart = simMinute - (data.startOffsetMinutes ?? 0);
+    const simulatedDate = new Date(
+      new Date(data.simulationStartDateTime).getTime() + minutesFromStart * 60000
+    );
+    simulatedDateStr = formatDateOnly(simulatedDate);
+    simulatedDayLabel = `Día ${Math.floor(simMinute / 1440) + 1}`;
+  }
+
   return (
     <header className="topbar">
       <div className="brand">
@@ -45,7 +56,12 @@ export function Topbar({
         <StatusItem
           label={clockLabel}
           value={formatSimMinute(simMinute)}
-          sub={data ? formatFlightMoment(data, simMinute) : "avance actual"}
+          sub={data ? `minuto ${simMinute}` : "avance actual"}
+        />
+        <StatusItem
+          label="Fecha simulada"
+          value={simulatedDateStr}
+          sub={simulatedDayLabel}
         />
         <StatusItem
           label="Inicio"
@@ -71,11 +87,6 @@ export function Topbar({
           label="Duración"
           value={data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--"}
           sub="ejecución real"
-        />
-        <StatusItem
-          label="Escenario"
-          value={data?.scenario || "Simulación 5 días"}
-          sub="--"
         />
       </div>
     </header>

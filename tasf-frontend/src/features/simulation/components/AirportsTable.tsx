@@ -11,12 +11,21 @@ interface AirportsTableProps {
   loads: AirportLoads;
   flights: Flight[];
   shipments: Shipment[];
+  selectedAirport?: string | null;
+  onSelectAirport?: (code: string) => void;
 }
 
-export function AirportsTable({ airports, loads, flights, shipments }: AirportsTableProps) {
+export function AirportsTable({
+  airports,
+  loads,
+  flights,
+  shipments,
+  selectedAirport: selectedAirportProp,
+  onSelectAirport,
+}: AirportsTableProps) {
   const [search, setSearch] = useState("");
   const [continentFilter, setContinentFilter] = useState("Cualquiera");
-  const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
+  const [localSelectedAirport, setLocalSelectedAirport] = useState<string | null>(null);
   const [flightsModalAirport, setFlightsModalAirport] = useState<string | null>(null);
   const [modalShowFlights, setModalShowFlights] = useState(true);
   const [modalShowShipments, setModalShowShipments] = useState(true);
@@ -98,13 +107,17 @@ export function AirportsTable({ airports, loads, flights, shipments }: AirportsT
             const load = loads[airport.code] || 0;
             const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
             const status = capacityStatus(utilization);
-            const isSelected = selectedAirport === airport.code;
+            const currentSelectedAirport = selectedAirportProp ?? localSelectedAirport;
+            const isSelected = currentSelectedAirport === airport.code;
 
             return (
               <div
                 className={`row ${isSelected ? "selected" : ""}`}
                 key={airport.code}
-                onClick={() => setSelectedAirport(isSelected ? null : airport.code)}
+                onClick={() => {
+                  setLocalSelectedAirport(isSelected ? null : airport.code);
+                  onSelectAirport?.(airport.code);
+                }}
                 style={{ cursor: "pointer" }}
               >
                 <span className={`dot ${status}`}></span>

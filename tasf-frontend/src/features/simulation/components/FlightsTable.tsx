@@ -5,9 +5,11 @@ import { hhmm } from "../utils/formatters";
 
 interface FlightsTableProps {
   flights: Flight[];
+  selectedFlightId?: string | null;
+  onSelectFlight?: (id: string) => void;
 }
 
-export function FlightsTable({ flights }: FlightsTableProps) {
+export function FlightsTable({ flights, selectedFlightId, onSelectFlight }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
   const [destinationFilter, setDestinationFilter] = useState("Cualquiera");
@@ -149,7 +151,12 @@ export function FlightsTable({ flights }: FlightsTableProps) {
           <div className="empty-state">No se encontraron resultados.</div>
         ) : (
           visibleFlights.map((flight) => (
-            <div className="row" key={flight.id}>
+            <div
+              className={`row ${selectedFlightId === flight.id ? "selected" : ""}`}
+              key={flight.id}
+              onClick={() => onSelectFlight?.(flight.id)}
+              style={onSelectFlight ? { cursor: "pointer" } : undefined}
+            >
               <span className={`dot ${flight.status}`}></span>
               <div className="row-main">
                 <strong>{`${flight.origin} -> ${flight.destination}`}</strong>
