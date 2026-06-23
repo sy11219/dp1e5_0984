@@ -16,7 +16,9 @@ type MapStageProps = {
   activeFlights: ActiveFlight[];
   airportLoads: AirportLoads;
   selectedAirport: string | null;
+  focusTarget?: MapFocusTarget | null;
   onSelectAirport: (code: string) => void;
+  onSelectFlight?: (id: string) => void;
 };
 
 type AirportMarkerItem = {
@@ -24,12 +26,22 @@ type AirportMarkerItem = {
   marker: L.Marker;
 };
 
+export type MapFocusTarget = {
+  type: "airport" | "flight";
+  id: string;
+  token: number;
+};
+
+const FOCUS_ZOOM = 5;
+
 export default function MapStage({
   data,
   activeFlights,
   airportLoads,
   selectedAirport,
+  focusTarget,
   onSelectAirport,
+  onSelectFlight,
 }: MapStageProps) {
   const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
   const mapElement = useRef<HTMLDivElement>(null);
@@ -182,7 +194,7 @@ export default function MapStage({
         getRouteGeometry(mapRef.current, origin, destination, flight.progress);
 
       ctx.strokeStyle = STATUS_COLOR[flight.status];
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 1.6;
       ctx.globalAlpha = 0.7;
       ctx.beginPath();
       ctx.moveTo(originPixel.x, originPixel.y);
@@ -198,6 +210,36 @@ export default function MapStage({
   useEffect(() => {
     drawFlights();
   }, [activeFlights, drawFlights]);
+
+  useEffect(() => {
+    if (!mapRef.current || !focusTarget?.id) return;
+
+    const map = mapRef.current;
+    if (focusTarget.type === "airport") {
+      const airport = airportByCode[focusTarget.id];
+      if (!airport) return;
+
+      map.flyTo([airport.latitude, airport.longitude], Math.max(map.getZoom(), FOCUS_ZOOM), {
+        animate: true,
+        duration: 0.75,
+      });
+      return;
+    }
+
+    const flight = activeFlights.find((item) => item.id === focusTarget.id);
+    if (!flight) return;
+
+    const origin = airportByCode[flight.origin];
+    const destination = airportByCode[flight.destination];
+    if (!origin || !destination) return;
+
+    const lat = origin.latitude + (destination.latitude - origin.latitude) * flight.progress;
+    const lng = origin.longitude + (destination.longitude - origin.longitude) * flight.progress;
+    map.flyTo([lat, lng], Math.max(map.getZoom(), FOCUS_ZOOM), {
+      animate: true,
+      duration: 0.75,
+    });
+  }, [activeFlights, airportByCode, focusTarget]);
 
   useEffect(() => {
     const resizeAndRedraw = () => {
@@ -254,6 +296,7 @@ export default function MapStage({
 
         const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
         if (dist < 15) {
+          onSelectFlight?.(flight.id);
           setMapInfo(createFlightInfo(data, flight, origin, destination));
           return;
         }
@@ -265,7 +308,7 @@ export default function MapStage({
     return () => {
       mapContainer.removeEventListener("click", handleClick);
     };
-  }, [activeFlights, airportByCode, data]);
+  }, [activeFlights, airportByCode, data, onSelectFlight]);
 
   useEffect(() => {
     if (!data || !mapRef.current || !airports.length || didFitBoundsRef.current) return;
