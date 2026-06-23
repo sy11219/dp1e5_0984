@@ -233,6 +233,31 @@ export async function updateFlightPlanRequest(
   return response.data;
 }
 
+export type ShipmentCreatePayload = {
+  originAirportCode: string;
+  destinationAirportCode: string;
+  departureDate: string;
+  baggageCount: number;
+  shipmentId: string;
+};
+
+export type ShipmentRecord = {
+  shipment_code: string;
+  origin_airport_code: string;
+  destination_airport_code: string;
+  baggage_count: number;
+  registered_at: string;
+  max_delivery_at: string;
+  status: string;
+};
+
+export async function createShipmentRequest(
+  payload: ShipmentCreatePayload
+): Promise<ShipmentRecord> {
+  const response = await api.post<ShipmentRecord>("/shipments", payload);
+  return response.data;
+}
+
 export async function getAirportStatus(
   code: string
 ): Promise<AirportOperationalStatus> {

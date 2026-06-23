@@ -1094,11 +1094,13 @@ select {
 }
 
 .flights-workspace,
+.shipments-workspace,
 .airports-workspace {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .flights-panel,
+.shipments-panel,
 .airports-panel {
   display: grid;
   gap: 14px;

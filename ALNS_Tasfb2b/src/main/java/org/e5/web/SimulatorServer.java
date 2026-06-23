@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.e5.db.AirportStatusService;
 import org.e5.db.FlightPlanService;
+import org.e5.db.ShipmentService;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,10 +46,14 @@ public class SimulatorServer {
     private static final Pattern ARRIVAL_TIME_UTC = Pattern.compile("\"arrivalTimeUtc\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CAPACITY = Pattern.compile("\"capacity\"\\s*:\\s*(\\d+)");
     private static final Pattern FLIGHT_STATUS_FIELD = Pattern.compile("\"status\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern DEPARTURE_DATE = Pattern.compile("\"departureDate\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern BAGGAGE_COUNT = Pattern.compile("\"baggageCount\"\\s*:\\s*(\\d+)");
+    private static final Pattern SHIPMENT_ID = Pattern.compile("\"shipmentId\"\\s*:\\s*\"?([0-9]{1,9})\"?");
 
     private final SimulationService simulationService = new SimulationService();
     private final AirportStatusService airportStatusService = new AirportStatusService();
     private final FlightPlanService flightPlanService = new FlightPlanService();
+    private final ShipmentService shipmentService = new ShipmentService();
     private final RealtimeSimulationService realtimeSimulationService = new RealtimeSimulationService();
 
     public static void main(String[] args) throws IOException {
@@ -82,6 +87,7 @@ public class SimulatorServer {
         server.createContext("/api/simulations/alns", this::runAlns);
         server.createContext("/api/airports", this::airportStatus);
         server.createContext("/api/flights", this::flights);
+        server.createContext("/api/shipments", this::shipments);
         server.createContext("/api/simulations/batch", this::batchSimulation);
         server.createContext("/api/realtime", this::realtime);
         server.createContext("/api/upload", this::upload);
@@ -302,6 +308,38 @@ public class SimulatorServer {
         }
 
         send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
+    }
+
+    private void shipments(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        String path = exchange.getRequestURI().getPath();
+        if (!"/api/shipments".equals(path) && !"/api/shipments/".equals(path)) {
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
+            return;
+        }
+
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            send(exchange, 405, "application/json", "{\"error\":\"Use POST\"}");
+            return;
+        }
+
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            ShipmentService.ShipmentCreateRequest request = new ShipmentService.ShipmentCreateRequest(
+                    readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
+                    readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
+                    readRequiredString(DEPARTURE_DATE, body, "departureDate"),
+                    readRequiredInt(BAGGAGE_COUNT, body, "baggageCount"),
+                    readRequiredString(SHIPMENT_ID, body, "shipmentId")
+            );
+            send(exchange, 201, "application/json", shipmentService.createShipment(request));
+        } catch (IllegalArgumentException e) {
+            send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo registrar el envio\"}");
+        }
     }
 
     private void realtime(HttpExchange exchange) throws IOException {
