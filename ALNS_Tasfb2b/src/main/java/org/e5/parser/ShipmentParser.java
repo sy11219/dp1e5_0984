@@ -7,6 +7,16 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +53,7 @@ import java.util.regex.Pattern;
 public class ShipmentParser {
 
     private static final String ENVIOS_FOLDER = "data/envios";
+    private static final DateTimeFormatter BASIC_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
 
     // Patrón del nombre de archivo: _envios_SKBO_.txt  (o _envio_SKBO_.txt - ambos aceptados)
     private static final Pattern FILE_PATTERN = Pattern.compile(
@@ -95,12 +106,18 @@ public class ShipmentParser {
         File folder = new File(folderPath);
         if (!folder.exists() || !folder.isDirectory()) {
             System.err.printf("[ShipmentParser] ERROR: La carpeta '%s' no existe.%n", folderPath);
+            List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
+            allShipments.addAll(databaseShipments);
+            System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
             return allShipments;
         }
 
         File[] files = folder.listFiles();
         if (files == null || files.length == 0) {
             System.err.printf("[ShipmentParser] AVISO: No se encontraron archivos en '%s'.%n", folderPath);
+            List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
+            allShipments.addAll(databaseShipments);
+            System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
             return allShipments;
         }
 
@@ -120,9 +137,85 @@ public class ShipmentParser {
                     airportCode, shipments.size(), file.getName());
         }
 
-        System.out.printf("[ShipmentParser] Total: %d envios cargados de %d archivos.%n",
+        System.out.printf("[ShipmentParser] Total TXT: %d envios cargados de %d archivos.%n",
                 allShipments.size(), fileCount);
+
+        List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
+        allShipments.addAll(databaseShipments);
+        System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
         return allShipments;
+    }
+
+    private List<Shipment> loadRegisteredShipmentsFromDatabase(String simulationStartDate, int maxSimulationDays) {
+        List<Shipment> shipments = new ArrayList<>();
+
+        String dbUrl = env("DB_URL");
+        String dbUser = env("DB_USER");
+        String dbPassword = env("DB_PASSWORD");
+        if (dbUrl == null || dbUser == null || dbPassword == null) {
+            System.err.println("[ShipmentParser] BD omitida: faltan DB_URL, DB_USER o DB_PASSWORD.");
+            return shipments;
+        }
+
+        LocalDate startDate = LocalDate.parse(simulationStartDate, BASIC_DATE_FORMATTER);
+        OffsetDateTime rangeStart = startDate.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime rangeEnd = startDate.plusDays(maxSimulationDays).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        String sql = """
+                SELECT s.shipment_code,
+                       oa.code AS origin_code,
+                       da.code AS destination_code,
+                       s.baggage_count,
+                       s.registered_at
+                FROM shipments s
+                JOIN airports oa ON oa.id = s.origin_airport_id
+                JOIN airports da ON da.id = s.destination_airport_id
+                WHERE UPPER(s.status) = 'REGISTERED'
+                  AND s.registered_at >= ?
+                  AND s.registered_at < ?
+                ORDER BY s.registered_at, s.shipment_code
+                """;
+
+        try (Connection connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, rangeStart);
+            statement.setObject(2, rangeEnd);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    OffsetDateTime registeredAt = resultSet.getObject("registered_at", OffsetDateTime.class)
+                            .withOffsetSameInstant(ZoneOffset.UTC);
+                    int requestMinute = (int) ChronoUnit.MINUTES.between(rangeStart, registeredAt);
+                    if (requestMinute < 0 || requestMinute >= maxSimulationDays * 1440) {
+                        continue;
+                    }
+
+                    Shipment shipment = new Shipment(
+                            resultSet.getString("shipment_code"),
+                            resultSet.getString("origin_code"),
+                            resultSet.getString("destination_code"),
+                            requestMinute,
+                            resultSet.getInt("baggage_count"),
+                            "DB",
+                            registeredAt.format(BASIC_DATE_FORMATTER),
+                            String.format("%02d", registeredAt.getHour()),
+                            String.format("%02d", registeredAt.getMinute())
+                    );
+                    shipments.add(shipment);
+                }
+            }
+        } catch (SQLException | RuntimeException e) {
+            System.err.printf("[ShipmentParser] BD omitida por error cargando envios: %s%n", e.getMessage());
+            return new ArrayList<>();
+        }
+
+        System.out.printf("[ShipmentParser] BD: %d envios REGISTERED cargados.%n", shipments.size());
+        return shipments;
+    }
+
+    private String env(String name) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? null : value;
     }
 
     /**

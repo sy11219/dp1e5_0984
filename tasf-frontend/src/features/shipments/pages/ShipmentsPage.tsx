@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  createShipmentBatchRequest,
   createShipmentRequest,
   getAirportsRequest,
+  type ShipmentBatchResult,
   type ShipmentCreatePayload,
   type ShipmentRecord,
 } from "../../../api/simulationApi";
@@ -18,10 +20,17 @@ function emptyForm(defaultAirportCode = ""): ShipmentCreatePayload {
   };
 }
 
+type ShipmentBatchForm = {
+  originAirportCode: string;
+  file: File | null;
+};
+
 export function ShipmentsPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
   const [form, setForm] = useState<ShipmentCreatePayload | null>(null);
+  const [batchForm, setBatchForm] = useState<ShipmentBatchForm | null>(null);
   const [created, setCreated] = useState<ShipmentRecord | null>(null);
+  const [createdBatch, setCreatedBatch] = useState<ShipmentBatchResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -55,13 +64,22 @@ export function ShipmentsPage() {
 
   const openCreator = () => {
     setCreated(null);
+    setCreatedBatch(null);
     setModalError("");
     setForm(emptyForm(airportOptions[0]?.code || ""));
+  };
+
+  const openBatchCreator = () => {
+    setCreated(null);
+    setCreatedBatch(null);
+    setModalError("");
+    setBatchForm({ originAirportCode: airportOptions[0]?.code || "", file: null });
   };
 
   const closeCreator = () => {
     if (saving) return;
     setForm(null);
+    setBatchForm(null);
     setModalError("");
   };
 
@@ -95,6 +113,32 @@ export function ShipmentsPage() {
     }
   };
 
+  const saveShipmentBatch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!batchForm) return;
+    if (!batchForm.file) {
+      setModalError("Selecciona un archivo de texto.");
+      return;
+    }
+
+    setSaving(true);
+    setModalError("");
+
+    try {
+      const fileContent = await batchForm.file.text();
+      const result = await createShipmentBatchRequest({
+        originAirportCode: batchForm.originAirportCode.toUpperCase(),
+        fileContent,
+      });
+      setCreatedBatch(result);
+      setBatchForm(null);
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "No se pudo registrar el lote.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="app-shell">
       <Navbar />
@@ -105,15 +149,25 @@ export function ShipmentsPage() {
             <h1>Envíos</h1>
             <p>Registro manual de envios en la base de datos.</p>
           </div>
-          <button className="primary" onClick={openCreator} disabled={loading || !airportOptions.length}>
-            Nuevo
-          </button>
+          <div className="toolbar-actions">
+            <button className="ghost" onClick={openBatchCreator} disabled={loading || !airportOptions.length}>
+              Nuevo lote
+            </button>
+            <button className="primary" onClick={openCreator} disabled={loading || !airportOptions.length}>
+              Nuevo
+            </button>
+          </div>
         </section>
 
         {error && <div className="error">{error}</div>}
 
         <section className="panel section shipments-panel">
-          {created ? (
+          {createdBatch ? (
+            <div className="success">
+              {`Lote registrado: ${createdBatch.inserted} envios insertados de ${createdBatch.parsed} lineas validas.`}
+              {createdBatch.skipped > 0 ? ` Duplicados omitidos: ${createdBatch.skipped}.` : ""}
+            </div>
+          ) : created ? (
             <div className="success">
               {`Envio registrado: ${created.shipment_code} (${created.baggage_count} maletas).`}
             </div>
@@ -217,6 +271,73 @@ export function ShipmentsPage() {
                 </button>
                 <button className="primary" type="submit" disabled={saving}>
                   {saving ? "Registrando..." : "Registrar envío"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {batchForm && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeCreator}>
+          <div
+            className="airport-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shipment-batch-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h2 id="shipment-batch-title">Nuevo lote</h2>
+                <span>Se guardara cada linea con status REGISTERED</span>
+              </div>
+              <button className="icon-button" type="button" onClick={closeCreator} disabled={saving}>
+                x
+              </button>
+            </div>
+
+            <form className="airport-form" onSubmit={saveShipmentBatch}>
+              <div className="field">
+                <label>Aeropuerto origen</label>
+                <select
+                  value={batchForm.originAirportCode}
+                  onChange={(event) =>
+                    setBatchForm((current) =>
+                      current ? { ...current, originAirportCode: event.target.value } : current
+                    )
+                  }
+                  required
+                >
+                  {airportOptions.map((airport) => (
+                    <option key={airport.code} value={airport.code}>
+                      {airport.code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Archivo de texto</label>
+                <input
+                  type="file"
+                  accept=".txt,text/plain"
+                  onChange={(event) =>
+                    setBatchForm((current) =>
+                      current ? { ...current, file: event.target.files?.[0] ?? null } : current
+                    )
+                  }
+                  required
+                />
+              </div>
+
+              {modalError && <div className="error modal-error">{modalError}</div>}
+
+              <div className="modal-actions">
+                <button className="ghost" type="button" onClick={closeCreator} disabled={saving}>
+                  Cancelar
+                </button>
+                <button className="primary" type="submit" disabled={saving}>
+                  {saving ? "Registrando..." : "Registrar lote"}
                 </button>
               </div>
             </form>

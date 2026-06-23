@@ -9,10 +9,17 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ShipmentService {
+    private static final Pattern SHIPMENT_LINE = Pattern.compile(
+            "^(\\d{1,9})-(\\d{8})-(\\d{2})-(\\d{2})-([A-Za-z]{4})-(\\d{3})-(\\d{7})$"
+    );
 
     public String createShipment(ShipmentCreateRequest request) throws SQLException {
         validateRequest(request);
@@ -54,6 +61,105 @@ public class ShipmentService {
                 }
             }
         }
+    }
+
+    public String createShipmentsBatch(ShipmentBatchCreateRequest request) throws SQLException {
+        if (request == null) {
+            throw new IllegalArgumentException("Datos de lote invalidos.");
+        }
+        String originCode = normalizeAirportCode(request.originAirportCode());
+        if (request.fileContent() == null || request.fileContent().isBlank()) {
+            throw new IllegalArgumentException("El archivo de envios esta vacio.");
+        }
+
+        String[] lines = request.fileContent().split("\\R");
+        int inserted = 0;
+        int skipped = 0;
+        int parsed = 0;
+
+        try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+
+            UUID originId = findAirportId(connection, originCode);
+            if (originId == null) {
+                throw new IllegalArgumentException("Aeropuerto origen no encontrado: " + originCode);
+            }
+
+            Map<String, UUID> airportCache = new HashMap<>();
+            airportCache.put(originCode, originId);
+
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO shipments (
+                      id, shipment_code, origin_airport_id, destination_airport_id,
+                      baggage_count, registered_at, max_delivery_at, status
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'REGISTERED')
+                    ON CONFLICT (shipment_code) DO NOTHING
+                    """)) {
+                for (int index = 0; index < lines.length; index++) {
+                    String line = lines[index].trim();
+                    if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) {
+                        continue;
+                    }
+
+                    Matcher matcher = SHIPMENT_LINE.matcher(line);
+                    if (!matcher.matches()) {
+                        throw new IllegalArgumentException("Linea " + (index + 1) + " invalida: " + line);
+                    }
+
+                    String shipmentCode = originCode + "-" + normalizeShipmentId(matcher.group(1));
+                    OffsetDateTime departureDate = parseShipmentLineDate(
+                            matcher.group(2), matcher.group(3), matcher.group(4), index + 1);
+                    String destinationCode = normalizeAirportCode(matcher.group(5));
+                    int baggageCount = Integer.parseInt(matcher.group(6));
+                    if (baggageCount <= 0) {
+                        throw new IllegalArgumentException("Linea " + (index + 1) + ": la cantidad de maletas debe ser mayor a cero.");
+                    }
+
+                    UUID destinationId = airportCache.computeIfAbsent(destinationCode, code -> {
+                        try {
+                            return findAirportId(connection, code);
+                        } catch (SQLException e) {
+                            throw new IllegalStateException(e);
+                        }
+                    });
+                    if (destinationId == null) {
+                        throw new IllegalArgumentException("Linea " + (index + 1) + ": aeropuerto destino no encontrado: " + destinationCode);
+                    }
+
+                    statement.setObject(1, UUID.randomUUID());
+                    statement.setString(2, shipmentCode);
+                    statement.setObject(3, originId);
+                    statement.setObject(4, destinationId);
+                    statement.setInt(5, baggageCount);
+                    statement.setObject(6, departureDate);
+                    statement.setObject(7, departureDate);
+
+                    int affected = statement.executeUpdate();
+                    parsed++;
+                    if (affected == 1) {
+                        inserted++;
+                    } else {
+                        skipped++;
+                    }
+                }
+            } catch (RuntimeException | SQLException e) {
+                connection.rollback();
+                if (e instanceof IllegalArgumentException illegalArgumentException) {
+                    throw illegalArgumentException;
+                }
+                throw e;
+            }
+
+            if (parsed == 0) {
+                connection.rollback();
+                throw new IllegalArgumentException("El archivo no contiene lineas de envios validas.");
+            }
+
+            connection.commit();
+        }
+
+        return batchJson(parsed, inserted, skipped);
     }
 
     private Connection openConnection() throws SQLException {
@@ -125,6 +231,17 @@ public class ShipmentService {
         return LocalDateTime.parse(normalized).atOffset(ZoneOffset.UTC);
     }
 
+    private OffsetDateTime parseShipmentLineDate(String date, String hour, String minute, int lineNumber) {
+        try {
+            return LocalDateTime.parse(
+                    date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8)
+                            + "T" + hour + ":" + minute
+            ).atOffset(ZoneOffset.UTC);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("Linea " + lineNumber + ": fecha de salida invalida.");
+        }
+    }
+
     private String shipmentJson(ResultSet result, String originCode, String destinationCode) throws SQLException {
         StringBuilder json = new StringBuilder(512);
         json.append("{");
@@ -135,6 +252,16 @@ public class ShipmentService {
         prop(json, "registered_at", result.getObject("registered_at", OffsetDateTime.class).toString()).append(",");
         prop(json, "max_delivery_at", result.getObject("max_delivery_at", OffsetDateTime.class).toString()).append(",");
         prop(json, "status", result.getString("status"));
+        json.append("}");
+        return json.toString();
+    }
+
+    private String batchJson(int parsed, int inserted, int skipped) {
+        StringBuilder json = new StringBuilder(128);
+        json.append("{");
+        prop(json, "parsed", parsed).append(",");
+        prop(json, "inserted", inserted).append(",");
+        prop(json, "skipped", skipped);
         json.append("}");
         return json.toString();
     }
@@ -158,5 +285,10 @@ public class ShipmentService {
             String departureDate,
             int baggageCount,
             String shipmentId
+    ) {}
+
+    public record ShipmentBatchCreateRequest(
+            String originAirportCode,
+            String fileContent
     ) {}
 }

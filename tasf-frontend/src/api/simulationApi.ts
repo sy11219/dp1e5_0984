@@ -251,10 +251,40 @@ export type ShipmentRecord = {
   status: string;
 };
 
+export type ShipmentBatchCreatePayload = {
+  originAirportCode: string;
+  fileContent: string;
+};
+
+export type ShipmentBatchResult = {
+  parsed: number;
+  inserted: number;
+  skipped: number;
+};
+
 export async function createShipmentRequest(
   payload: ShipmentCreatePayload
 ): Promise<ShipmentRecord> {
   const response = await api.post<ShipmentRecord>("/shipments", payload);
+  return response.data;
+}
+
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+export async function createShipmentBatchRequest(
+  payload: ShipmentBatchCreatePayload
+): Promise<ShipmentBatchResult> {
+  const response = await api.post<ShipmentBatchResult>("/shipments/batch", {
+    originAirportCode: payload.originAirportCode,
+    fileContentBase64: toBase64(payload.fileContent),
+  });
   return response.data;
 }
 

@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.CountDownLatch;
@@ -49,6 +50,7 @@ public class SimulatorServer {
     private static final Pattern DEPARTURE_DATE = Pattern.compile("\"departureDate\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern BAGGAGE_COUNT = Pattern.compile("\"baggageCount\"\\s*:\\s*(\\d+)");
     private static final Pattern SHIPMENT_ID = Pattern.compile("\"shipmentId\"\\s*:\\s*\"?([0-9]{1,9})\"?");
+    private static final Pattern FILE_CONTENT_BASE64 = Pattern.compile("\"fileContentBase64\"\\s*:\\s*\"([^\"]*)\"");
 
     private final SimulationService simulationService = new SimulationService();
     private final AirportStatusService airportStatusService = new AirportStatusService();
@@ -314,7 +316,7 @@ public class SimulatorServer {
         if (preflight(exchange)) return;
 
         String path = exchange.getRequestURI().getPath();
-        if (!"/api/shipments".equals(path) && !"/api/shipments/".equals(path)) {
+        if (!"/api/shipments".equals(path) && !"/api/shipments/".equals(path) && !"/api/shipments/batch".equals(path)) {
             send(exchange, 404, "application/json", "{\"error\":\"Endpoint no encontrado\"}");
             return;
         }
@@ -326,6 +328,15 @@ public class SimulatorServer {
 
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         try {
+            if ("/api/shipments/batch".equals(path)) {
+                ShipmentService.ShipmentBatchCreateRequest request = new ShipmentService.ShipmentBatchCreateRequest(
+                        readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
+                        readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
+                );
+                send(exchange, 201, "application/json", shipmentService.createShipmentsBatch(request));
+                return;
+            }
+
             ShipmentService.ShipmentCreateRequest request = new ShipmentService.ShipmentCreateRequest(
                     readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
                     readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
@@ -531,6 +542,15 @@ public class SimulatorServer {
             throw new IllegalArgumentException("Falta campo: " + name);
         }
         return Integer.parseInt(matcher.group(1));
+    }
+
+    private String readRequiredBase64String(Pattern pattern, String body, String name) {
+        String encoded = readRequiredString(pattern, body, name);
+        try {
+            return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Campo invalido: " + name);
+        }
     }
 
     private double readRequiredDouble(Pattern pattern, String body, String name) {
