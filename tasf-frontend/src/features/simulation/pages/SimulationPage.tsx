@@ -364,11 +364,15 @@ export function SimulationPage() {
   )
   const visibleShipments = useMemo(
     () =>
-      (displayData.shipments ?? []).filter(
-        (s) => s.requestMinute <= simMinute && simMinute <= s.estimatedArrival + 60
-      ),
+      (displayData.shipments ?? [])
+        .filter(
+          (s) =>
+            s.requestMinute <= simMinute &&
+            simMinute <= s.estimatedArrival + 60
+        )
+        .sort((a, b) => a.estimatedArrival - b.estimatedArrival),
     [displayData, simMinute]
-  )
+  );
   const selected = displayData.airports.find((a) => a.code === selectedAirport)
 
   const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
