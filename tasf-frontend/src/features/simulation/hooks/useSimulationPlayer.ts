@@ -25,6 +25,7 @@ export function useSimulationPlayer(maxMinute: number) {
   const startMinuteRef   = useRef(0);
   // Timestamp real en que empezó a animar el lote actual
   const batchStartTimeRef = useRef<number | null>(null);
+  const batchDurationMsRef = useRef(BATCH_DURATION_MS);
 
   // Callback que el componente padre registra para recibir el aviso
   // "terminé de animar este lote, pide el siguiente"
@@ -46,10 +47,20 @@ export function useSimulationPlayer(maxMinute: number) {
    * @param fromMinute  minuto simulado de inicio (tick anterior)
    * @param toMinute    minuto simulado de fin (tick nuevo del backend)
    */
-  const animateBatch = useCallback((fromMinute: number, toMinute: number, startedAt?: string | number) => {
+  const animateBatch = useCallback((
+    fromMinute: number,
+    toMinute: number,
+    startedAt?: string | number,
+    durationMs?: number
+  ) => {
     cancelFrame();
-    startMinuteRef.current   = Math.min(Math.max(0, fromMinute), maxMinute);
-    targetMinuteRef.current  = Math.min(Math.max(0, toMinute), maxMinute);
+    const animationMaxMinute = Math.max(maxMinute, fromMinute, toMinute);
+    startMinuteRef.current   = Math.min(Math.max(0, fromMinute), animationMaxMinute);
+    targetMinuteRef.current  = Math.min(Math.max(0, toMinute), animationMaxMinute);
+    batchDurationMsRef.current =
+      typeof durationMs === "number" && Number.isFinite(durationMs) && durationMs > 0
+        ? durationMs
+        : BATCH_DURATION_MS;
     lastVisualUpdateRef.current = 0;
     const startedAtMs = typeof startedAt === "string" ? Date.parse(startedAt) : startedAt;
     batchStartTimeRef.current =
@@ -63,7 +74,7 @@ export function useSimulationPlayer(maxMinute: number) {
       }
 
       const elapsed = now - batchStartTimeRef.current;
-      const progress = Math.min(elapsed / BATCH_DURATION_MS, 1);
+      const progress = Math.min(elapsed / batchDurationMsRef.current, 1);
       const interpolated = startMinuteRef.current +
         progress * (targetMinuteRef.current - startMinuteRef.current);
 
@@ -101,6 +112,7 @@ export function useSimulationPlayer(maxMinute: number) {
     targetMinuteRef.current   = 0;
     startMinuteRef.current    = 0;
     batchStartTimeRef.current = null;
+    batchDurationMsRef.current = BATCH_DURATION_MS;
   }, [cancelFrame]);
 
   return {

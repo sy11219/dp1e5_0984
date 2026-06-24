@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
-  advanceRealtimeSessionRequest,
   cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
   startRealtimeSessionRequest,
@@ -15,6 +14,7 @@ import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
 import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
 import type { AirportLoads, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
+import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import {
   formatClock,
   formatDateOnly,
@@ -22,6 +22,9 @@ import {
   formatTimeOnly,
   percent,
 } from "../../simulation/utils/formatters";
+
+const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
+const REALTIME_STATUS_POLL_MS = 5_000;
 
 function formatOperationalMinute(value: number) {
   const minute = Math.max(0, Math.floor(value));
@@ -53,11 +56,9 @@ function StatusItem({
 
 function OperationsTopbar({
   data,
-  now,
   operationalMinute,
 }: {
   data: SimulationData | null;
-  now: Date;
   operationalMinute: number;
 }) {
   return (
@@ -67,7 +68,6 @@ function OperationsTopbar({
         <span>Tiempo real</span>
       </div>
       <div className="status-strip">
-        <StatusItem label="Hora actual" value={formatClock(now)} sub={formatDateOnly(now)} />
         <StatusItem
           label="Minuto operativo"
           value={formatOperationalMinute(operationalMinute)}
@@ -97,11 +97,6 @@ function OperationsTopbar({
           label="Vuelos usados"
           value={String(data?.metrics.usedFlights || 0)}
           sub="con carga asignada"
-        />
-        <StatusItem
-          label="Backend"
-          value={data?.simulationId ? "Conectado" : "--"}
-          sub="Tiempo real"
         />
       </div>
     </header>
@@ -157,19 +152,24 @@ function LiveMetrics({
 
 export const OperationsPage = () => {
   const [data, setData] = useState<SimulationData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [advancing, setAdvancing] = useState(false);
+  const [, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [flightToCancel, setFlightToCancel] = useState("");
-  const [selectedAirport, setSelectedAirport] = useState<string | null>(null);
-  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const initialMapFocusRef = useRef(readMapFocus(OPERATIONS_MAP_FOCUS_KEY));
+  const [selectedAirport, setSelectedAirport] = useState<string | null>(
+    () => initialMapFocusRef.current?.type === "airport" ? initialMapFocusRef.current.id : null
+  );
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
+    () => initialMapFocusRef.current?.type === "flight" ? initialMapFocusRef.current.id : null
+  );
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [now, setNow] = useState(new Date());
   const focusTokenRef = useRef(0);
+  const refreshingRef = useRef(false);
 
   const operationalMinute = useMemo(() => {
     if (!data) return 0;
@@ -179,34 +179,46 @@ export const OperationsPage = () => {
 
     if (!visualStartedAt || visualEnd <= visualStart) return data.tick || visualStart;
 
+    const intervalMs =
+      data.realtimeExecutionIntervalMs ??
+      data.planningIntervalMs ??
+      data.batchIntervalMs ??
+      120_000;
     const elapsedMs = Math.max(0, now.getTime() - new Date(visualStartedAt).getTime());
-    const progress = Math.min(elapsedMs / 60_000, 1);
+    const progress = Math.min(elapsedMs / Math.max(1, intervalMs), 1);
     return Math.min(
       data.maxTick || Number.POSITIVE_INFINITY,
       visualStart + (visualEnd - visualStart) * progress
     );
   }, [data, now]);
 
+  const restoreMapFocus = useCallback((payload: SimulationData) => {
+    const stored = readMapFocus(OPERATIONS_MAP_FOCUS_KEY);
+
+    if (stored?.type === "airport" && payload.airports.some((airport) => airport.code === stored.id)) {
+      setSelectedAirport(stored.id);
+      setSelectedFlightId(null);
+      setMapFocusTarget({ type: "airport", id: stored.id, token: ++focusTokenRef.current });
+      return;
+    }
+
+    if (stored?.type === "flight" && payload.flights.some((flight) => flight.id === stored.id)) {
+      setSelectedAirport(null);
+      setSelectedFlightId(stored.id);
+      setMapFocusTarget({ type: "flight", id: stored.id, token: ++focusTokenRef.current });
+      return;
+    }
+
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
+    setSelectedAirport(null);
+    setSelectedFlightId(null);
+    setMapFocusTarget(null);
+  }, []);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-
-  const connectOperation = async () => {
-      setLoading(true);
-      setError("");
-      setNotice("");
-
-    try {
-      const payload = await startRealtimeSessionRequest();
-      setData(payload);
-      setSelectedAirport(payload.airports[0]?.code || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo conectar la operacion.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     let ignore = false;
@@ -216,13 +228,13 @@ export const OperationsPage = () => {
         if (ignore) return;
         if (payload) {
           setData(payload);
-          setSelectedAirport(payload.airports[0]?.code || null);
+          restoreMapFocus(payload);
           return;
         }
         return startRealtimeSessionRequest().then((created) => {
           if (ignore) return;
           setData(created);
-          setSelectedAirport(created.airports[0]?.code || null);
+          restoreMapFocus(created);
         });
       })
       .catch((err) => {
@@ -237,28 +249,46 @@ export const OperationsPage = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [restoreMapFocus]);
 
   useEffect(() => {
-    if (!data?.simulationId || data.status === "COMPLETED" || advancing) return;
-    const simulationId = data.simulationId;
-    const timer = window.setInterval(() => {
-      setAdvancing(true);
-      setError("");
-      void advanceRealtimeSessionRequest(simulationId, 1, data.tick ?? 0)
+    if (!data?.simulationId || data.status === "COMPLETED") return;
+
+    let cancelled = false;
+
+    const refreshCurrentState = () => {
+      if (refreshingRef.current) return;
+      refreshingRef.current = true;
+      void getCurrentRealtimeSessionRequest()
         .then((payload) => {
+          if (cancelled || !payload) return;
           setData(payload);
-          if (!selectedAirport) {
-            setSelectedAirport(payload.airports[0]?.code || null);
+          if (selectedAirport && !payload.airports.some((airport) => airport.code === selectedAirport)) {
+            setSelectedAirport(null);
+            writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
+          }
+          if (selectedFlightId && !payload.flights.some((flight) => flight.id === selectedFlightId)) {
+            setSelectedFlightId(null);
+            writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
           }
         })
         .catch((err) => {
-          setError(err instanceof Error ? err.message : "No se pudo actualizar la operacion.");
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "No se pudo sincronizar la operacion.");
+          }
         })
-        .finally(() => setAdvancing(false));
-    }, 60_000);
-    return () => window.clearInterval(timer);
-  }, [data?.simulationId, data?.status, data?.tick, advancing, selectedAirport]);
+        .finally(() => {
+          refreshingRef.current = false;
+        });
+    };
+
+    refreshCurrentState();
+    const timer = window.setInterval(refreshCurrentState, REALTIME_STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId]);
 
   const airportLoads = useMemo<AirportLoads>(() => {
     return computeAirportLoads(data, operationalMinute);
@@ -272,21 +302,41 @@ export const OperationsPage = () => {
       (data?.shipments ?? []).filter(
         (shipment) =>
           shipment.requestMinute <= operationalMinute &&
-          operationalMinute <= shipment.estimatedArrival + 60
+          (!shipment.planned || operationalMinute <= shipment.estimatedArrival + 60)
       ),
     [data, operationalMinute]
   );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
 
+  const clearMapSelection = useCallback(() => {
+    setSelectedAirport(null);
+    setSelectedFlightId(null);
+    setMapFocusTarget(null);
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
+  }, []);
+
   const focusAirport = (code: string) => {
+    if (selectedAirport === code) {
+      clearMapSelection();
+      return;
+    }
+
     setSelectedAirport(code);
     setSelectedFlightId(null);
     setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current });
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "airport", id: code });
   };
 
   const focusFlight = (id: string) => {
+    if (selectedFlightId === id) {
+      clearMapSelection();
+      return;
+    }
+
+    setSelectedAirport(null);
     setSelectedFlightId(id);
     setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current });
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "flight", id });
   };
 
   const cancelFlight = async () => {
@@ -309,7 +359,7 @@ export const OperationsPage = () => {
   return (
     <div className="app-shell">
       <Navbar />
-      <OperationsTopbar data={data} now={now} operationalMinute={operationalMinute} />
+      <OperationsTopbar data={data} operationalMinute={operationalMinute} />
 
       <main
         className={[
@@ -330,30 +380,8 @@ export const OperationsPage = () => {
             <PanelLeftClose size={18} />
           </button>
           <section className="panel section">
-            <h2>Tiempo real</h2>
+            <h2>Panel de control</h2>
             <div className="control-grid">
-              <div className="metric">
-                <span>Reloj operativo</span>
-                <strong>{formatClock(now)}</strong>
-                <span>{advancing ? "actualizando desde backend" : "sin adelanto manual"}</span>
-              </div>
-
-              <div className="metric">
-                <span>Cola de vuelos</span>
-                <strong>{data?.flightQueueSize ?? data?.metrics.flightQueueSize ?? 0}</strong>
-                <span>{`${data?.realtimeWindowMinutes ?? 60} min por ejecución`}</span>
-              </div>
-
-              <div className="metric">
-                <span>Cancelaciones pendientes</span>
-                <strong>{data?.pendingCancellationCount ?? data?.metrics.pendingCancellations ?? 0}</strong>
-                <span>siguiente ejecución</span>
-              </div>
-
-              <button className="primary" onClick={connectOperation} disabled={loading || Boolean(data?.simulationId)}>
-                {loading ? "Conectando..." : data?.simulationId ? "Conectado" : "Conectar operación"}
-              </button>
-
               <div className="field">
                 <label>Cancelar vuelo</label>
                 <input
@@ -370,9 +398,8 @@ export const OperationsPage = () => {
                 onClick={cancelFlight}
                 disabled={!data?.simulationId || !flightToCancel || cancelling}
               >
-                {cancelling ? "Registrando..." : "Registrar cancelación"}
+                {cancelling ? "Registrando..." : "Registrar cancelacion"}
               </button>
-
               {error && <div className="error">{error}</div>}
               {notice && <div className="success">{notice}</div>}
             </div>
@@ -385,7 +412,7 @@ export const OperationsPage = () => {
             {data ? (
               <LiveMetrics data={data} airportLoads={airportLoads} />
             ) : (
-              <div className="empty-state">Conecta la operación para ver indicadores.</div>
+              <div className="empty-state">Esperando datos de tiempo real.</div>
             )}
           </section>
         </aside>
@@ -409,16 +436,18 @@ export const OperationsPage = () => {
             activeFlights={activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
+            selectedFlightId={selectedFlightId}
             focusTarget={mapFocusTarget}
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
+            onClearSelection={clearMapSelection}
           />
         </section>
 
         {rightPanelOpen ? (
         <aside className="right-panel">
           <div className="panel section panel-runtime">
-            <span>Tiempo real</span>
+            <span>Panel de operaciones</span>
             <button
               type="button"
               className="panel-collapse-button panel-collapse-button-right"
@@ -429,12 +458,21 @@ export const OperationsPage = () => {
               <PanelRightClose size={18} />
             </button>
           </div>
-          <section
-            className="panel section"
-            onClick={selected ? () => focusAirport(selected.code) : undefined}
-            style={selected ? { cursor: "pointer" } : undefined}
-          >
-            <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
+          <section className="panel section">
+            <div className="section-header">
+              <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
+              {selected && (
+                <button
+                  type="button"
+                  className="icon-button section-close"
+                  onClick={clearMapSelection}
+                  aria-label="Quitar aeropuerto seleccionado"
+                  title="Quitar seleccion"
+                >
+                  x
+                </button>
+              )}
+            </div>
             {selected ? (
               <AirportDetail
                 airport={selected}
@@ -474,6 +512,18 @@ export const OperationsPage = () => {
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}
+          </section>
+          <section className="panel section operations-bottom-status">
+            <div className="metrics">
+              <div className="metric">
+                <span>Fecha actual</span>
+                <strong>{formatDateOnly(now)}</strong>
+              </div>
+              <div className="metric">
+                <span>Hora actual</span>
+                <strong>{formatClock(now)}</strong>
+              </div>
+            </div>
           </section>
         </aside>
         ) : (

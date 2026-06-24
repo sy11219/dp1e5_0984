@@ -65,6 +65,12 @@ export async function advanceBatchSimulationRequest(
 /**
  * Cancela un vuelo futuro dentro de la sesión por lotes y replanifica.
  */
+export async function stopBatchSimulationRequest(
+  simulationId: string
+): Promise<void> {
+  await api.post(`/simulations/batch/${simulationId}/stop`, {});
+}
+
 export async function cancelBatchFlightRequest(
   simulationId: string,
   flightId: string
@@ -98,13 +104,17 @@ export async function refreshRealtimeOperationRequest(): Promise<SimulationData>
 }
 
 export async function startRealtimeSessionRequest(
-  startDate = DEFAULT_START_DATE,
+  startDate?: string,
   days = SIMULATION_DAYS
 ): Promise<SimulationData> {
-  const response = await api.post<SimulationData>("/realtime/start", {
-    startDate: startDate.replaceAll("-", ""),
+  const payload: { startDate?: string; days: number; timeZone: string } = {
     days,
     timeZone: clientTimeZone(),
+  };
+  if (startDate) payload.startDate = startDate.replaceAll("-", "");
+
+  const response = await api.post<SimulationData>("/realtime/start", {
+    ...payload,
   });
   return response.data;
 }
@@ -241,6 +251,12 @@ export type ShipmentCreatePayload = {
   shipmentId: string;
 };
 
+function toUtcIsoIfLocalDateTime(value: string): string {
+  if (!value || /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return value;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : value;
+}
+
 export type ShipmentRecord = {
   shipment_code: string;
   origin_airport_code: string;
@@ -265,7 +281,10 @@ export type ShipmentBatchResult = {
 export async function createShipmentRequest(
   payload: ShipmentCreatePayload
 ): Promise<ShipmentRecord> {
-  const response = await api.post<ShipmentRecord>("/shipments", payload);
+  const response = await api.post<ShipmentRecord>("/shipments", {
+    ...payload,
+    departureDate: toUtcIsoIfLocalDateTime(payload.departureDate),
+  });
   return response.data;
 }
 

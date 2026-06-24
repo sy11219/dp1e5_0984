@@ -10,11 +10,17 @@ import {
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
 
+function currentDateTimeLocalValue() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 19);
+}
+
 function emptyForm(defaultAirportCode = ""): ShipmentCreatePayload {
   return {
     originAirportCode: defaultAirportCode,
     destinationAirportCode: defaultAirportCode,
-    departureDate: "",
+    departureDate: currentDateTimeLocalValue(),
     baggageCount: 1,
     shipmentId: "",
   };

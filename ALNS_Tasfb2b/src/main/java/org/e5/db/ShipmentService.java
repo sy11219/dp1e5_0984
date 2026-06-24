@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Locale;
@@ -228,7 +229,7 @@ public class ShipmentService {
         if (normalized.endsWith("Z")) {
             return Instant.parse(normalized).atOffset(ZoneOffset.UTC);
         }
-        return LocalDateTime.parse(normalized).atOffset(ZoneOffset.UTC);
+        return LocalDateTime.parse(normalized).atZone(inputZone()).toOffsetDateTime();
     }
 
     private OffsetDateTime parseShipmentLineDate(String date, String hour, String minute, int lineNumber) {
@@ -236,9 +237,19 @@ public class ShipmentService {
             return LocalDateTime.parse(
                     date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8)
                             + "T" + hour + ":" + minute
-            ).atOffset(ZoneOffset.UTC);
+            ).atZone(inputZone()).toOffsetDateTime();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Linea " + lineNumber + ": fecha de salida invalida.");
+        }
+    }
+
+    private ZoneId inputZone() {
+        String raw = System.getenv("TASF_SHIPMENT_INPUT_TIME_ZONE");
+        if (raw == null || raw.isBlank()) return ZoneId.systemDefault();
+        try {
+            return ZoneId.of(raw.trim());
+        } catch (RuntimeException ignored) {
+            return ZoneId.systemDefault();
         }
     }
 

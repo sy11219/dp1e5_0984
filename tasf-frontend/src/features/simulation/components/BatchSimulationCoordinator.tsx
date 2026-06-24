@@ -7,6 +7,7 @@ import {
 import type { SimulationData } from "../types"
 
 const PAUSED_KEY = "tasf.simulation5d.paused"
+const STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
 const POLL_MS = 5_000
 const DEFAULT_BATCH_MINUTES = 180
 const DEFAULT_BATCH_INTERVAL_MS = 120_000
@@ -14,6 +15,16 @@ const DEFAULT_BATCH_INTERVAL_MS = 120_000
 function isPausedLocally() {
   try {
     return window.localStorage.getItem(PAUSED_KEY) === "true"
+  } catch {
+    return false
+  }
+}
+
+function isStoppedLocally(data: SimulationData) {
+  if (!data.simulationId) return false
+
+  try {
+    return window.localStorage.getItem(STOPPED_KEY) === data.simulationId
   } catch {
     return false
   }
@@ -32,7 +43,7 @@ function shouldAdvanceBatch(data: SimulationData) {
   const visualStartedAt = data.visualStartedAt ? Date.parse(data.visualStartedAt) : Number.NaN
   if (!Number.isFinite(visualStartedAt)) return false
 
-  const intervalMs = data.batchIntervalMs ?? DEFAULT_BATCH_INTERVAL_MS
+  const intervalMs = data.planningIntervalMs ?? data.batchIntervalMs ?? DEFAULT_BATCH_INTERVAL_MS
   return Date.now() - visualStartedAt >= intervalMs
 }
 
@@ -50,12 +61,13 @@ export function BatchSimulationCoordinator() {
 
       try {
         const current = await getCurrentBatchSimulationRequest()
+        if (current && isStoppedLocally(current)) return
         if (cancelled || !current || !shouldAdvanceBatch(current) || !current.simulationId) return
 
         advancingRef.current = true
         await advanceBatchSimulationRequest(
           current.simulationId,
-          current.batchMinutes ?? DEFAULT_BATCH_MINUTES,
+          current.planningWindowMinutes ?? current.batchMinutes ?? DEFAULT_BATCH_MINUTES,
           current.tick ?? current.startOffsetMinutes ?? 0
         )
       } catch {

@@ -19,6 +19,10 @@ import java.util.concurrent.CountDownLatch;
 
 public class SimulatorServer {
     private static final int DEFAULT_PORT = 8080;
+    private static final int DEFAULT_REALTIME_DAYS =
+            envPositiveInt("TASF_REALTIME_DAYS", 5);
+    private static final String DEFAULT_REALTIME_TIME_ZONE =
+            envString("TASF_REALTIME_TIME_ZONE", java.time.ZoneId.systemDefault().getId());
     private static final Pattern START_DATE = Pattern.compile("\"startDate\"\\s*:\\s*\"(\\d{8})\"");
     private static final Pattern DAYS = Pattern.compile("\"days\"\\s*:\\s*(\\d+)");
     private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
@@ -64,6 +68,22 @@ public class SimulatorServer {
         app.start(port);
     }
 
+    private static String envString(String name, String fallback) {
+        String value = System.getenv(name);
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private static int envPositiveInt(String name, int fallback) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) return fallback;
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            return parsed > 0 ? parsed : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
     private static int resolvePort(String[] args) {
         if (args.length > 0) {
             try {
@@ -98,11 +118,22 @@ public class SimulatorServer {
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
         server.start();
         System.out.printf("Simulador ALNS listo en http://localhost:%d/%n", port);
+        startRealtimeOnBoot();
         try {
             new CountDownLatch(1).await();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             server.stop(0);
+        }
+    }
+
+    private void startRealtimeOnBoot() {
+        try {
+            realtimeSimulationService.startAtCurrentTime(DEFAULT_REALTIME_DAYS, DEFAULT_REALTIME_TIME_ZONE);
+            System.out.printf("[Tiempo real] Scheduler iniciado en fecha/hora actual (%s) por %d dias.%n",
+                    DEFAULT_REALTIME_TIME_ZONE, DEFAULT_REALTIME_DAYS);
+        } catch (Exception e) {
+            System.err.printf("[Tiempo real] No se pudo iniciar automaticamente: %s%n", e.getMessage());
         }
     }
 
@@ -362,10 +393,17 @@ public class SimulatorServer {
 
         try {
             if ("/api/realtime/start".equals(path) && "POST".equalsIgnoreCase(method)) {
-                String startDate = readString(START_DATE, body, "20260102");
+                String startDate = readString(START_DATE, body, "");
+                String startTime = readString(START_TIME, body, "00:00");
                 int days = readInt(DAYS, body, 5);
                 String timeZone = readString(TIME_ZONE, body, "");
-                send(exchange, 200, "application/json", realtimeSimulationService.start(startDate, days, timeZone));
+                if (startDate.isBlank()) {
+                    send(exchange, 200, "application/json",
+                            realtimeSimulationService.startAtCurrentTime(days, timeZone));
+                } else {
+                    send(exchange, 200, "application/json",
+                            realtimeSimulationService.start(startDate, days, startTime, timeZone));
+                }
                 return;
             }
 
@@ -439,6 +477,13 @@ public class SimulatorServer {
                 int expectedTick = readInt(EXPECTED_TICK, body, -1);
                 send(exchange, 200, "application/json",
                         realtimeSimulationService.advance(advanceMatcher.group(1), steps, expectedTick));
+                return;
+            }
+
+            Matcher stopMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/stop$").matcher(path);
+            if (stopMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.stopBatchSimulation(stopMatcher.group(1)));
                 return;
             }
 

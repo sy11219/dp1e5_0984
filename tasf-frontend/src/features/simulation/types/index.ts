@@ -64,7 +64,6 @@ export interface Metrics {
   plannedBags: number;
   totalBags: number;
   usedFlights: number;
-  flightQueueSize?: number;
   pendingCancellations?: number;
   iterations: number;
   fitnessFinal: number;
@@ -98,6 +97,13 @@ export interface SimulationData {
   startOffsetMinutes?: number;
   batchMinutes?: number;
   batchIntervalMs?: number;
+  planningMode?: string;
+  planningExecutionMs?: number;
+  planningIntervalMs?: number;
+  planningIntervalMinutes?: number;
+  planningTimeScale?: number;
+  planningWindowMinutes?: number;
+  planningStable?: boolean;
   connectionWaitMinutes?: number;
   finalPickupWaitMinutes?: number;
   batchCount?: number;
@@ -107,9 +113,7 @@ export interface SimulationData {
   visualStartTick?: number;
   visualEndTick?: number;
   visualStartedAt?: string;
-  realtimeWindowMinutes?: number;
   realtimeExecutionIntervalMs?: number;
-  flightQueueSize?: number;
   pendingCancellationCount?: number;
   cancelledFlightIds?: string[];
   airports: Airport[];
@@ -128,6 +132,7 @@ export type AirportLoads = Record<string, number>;
 
 export interface MapInfoCard {
   type: "airport" | "flight";
+  id?: string;
   title: string;
   subtitle?: string;
   rows: Array<[string, string | number]>;

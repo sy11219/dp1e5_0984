@@ -16,9 +16,11 @@ type MapStageProps = {
   activeFlights: ActiveFlight[];
   airportLoads: AirportLoads;
   selectedAirport: string | null;
+  selectedFlightId?: string | null;
   focusTarget?: MapFocusTarget | null;
   onSelectAirport: (code: string) => void;
   onSelectFlight?: (id: string) => void;
+  onClearSelection?: () => void;
 };
 
 type AirportMarkerItem = {
@@ -39,9 +41,11 @@ export default function MapStage({
   activeFlights,
   airportLoads,
   selectedAirport,
+  selectedFlightId,
   focusTarget,
   onSelectAirport,
   onSelectFlight,
+  onClearSelection,
 }: MapStageProps) {
   const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
   const mapElement = useRef<HTMLDivElement>(null);
@@ -51,6 +55,9 @@ export default function MapStage({
   const airportLoadsRef = useRef<AirportLoads>({});
   const airportMarkersRef = useRef(new Map<string, AirportMarkerItem>());
   const didFitBoundsRef = useRef(false);
+  const lastDrawKeyRef = useRef("");
+  const autoCloseTimerRef = useRef<number | null>(null);
+  const autoCloseFlightIdRef = useRef<string | null>(null);
 
   const airports = useMemo(() => data?.airports || [], [data]);
   const airportByCode = useMemo(
@@ -145,7 +152,8 @@ export default function MapStage({
         keyboard: false,
         zIndexOffset: 900,
       })
-        .on("click", () => {
+        .on("click", (event) => {
+          L.DomEvent.stopPropagation(event);
           const currentLoad = airportLoadsRef.current[airport.code] || 0;
           onSelectAirport(airport.code);
           setMapInfo(createAirportInfo(airport, currentLoad));
@@ -173,11 +181,23 @@ export default function MapStage({
   }, [airports, airportLoads, selectedAirport]);
 
   // Función para dibujar en canvas
-  const drawFlights = useCallback(() => {
+  const drawFlights = useCallback((force = false) => {
     if (!canvasRef.current || !mapRef.current) return;
 
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
+
+    const drawKey = [
+      canvasRef.current.width,
+      canvasRef.current.height,
+      selectedFlightId ?? "",
+      activeFlights
+        .map((flight) => `${flight.id}:${Math.round(flight.progress * 1000)}:${flight.status}`)
+        .join("|"),
+    ].join(":");
+
+    if (!force && drawKey === lastDrawKeyRef.current) return;
+    lastDrawKeyRef.current = drawKey;
 
     // Limpiar canvas
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -190,21 +210,26 @@ export default function MapStage({
       const destination = airportByCode[flight.destination];
       if (!origin || !destination) continue;
 
-      const { originPixel, destPixel, planePixel, angle } =
+      const { destPixel, planePixel, angle } =
         getRouteGeometry(mapRef.current, origin, destination, flight.progress);
+      const isSelected = flight.id === selectedFlightId;
 
       ctx.strokeStyle = STATUS_COLOR[flight.status];
-      ctx.lineWidth = 1.6;
-      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = isSelected ? 4 : 1.8;
+      ctx.globalAlpha = isSelected ? 0.95 : 0.62;
+      ctx.shadowColor = isSelected ? "rgba(15, 23, 42, 0.36)" : "transparent";
+      ctx.shadowBlur = isSelected ? 10 : 0;
       ctx.beginPath();
-      ctx.moveTo(originPixel.x, originPixel.y);
+      ctx.moveTo(planePixel.x, planePixel.y);
       ctx.lineTo(destPixel.x, destPixel.y);
       ctx.stroke();
       ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "transparent";
 
-      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, STATUS_COLOR[flight.status]);
+      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, STATUS_COLOR[flight.status], isSelected);
     }
-  }, [activeFlights, airportByCode, mapRef]);
+  }, [activeFlights, airportByCode, selectedFlightId]);
 
   // Redibujar cuando cambian vuelos o mapa se mueve
   useEffect(() => {
@@ -249,7 +274,7 @@ export default function MapStage({
         const size = mapRef.current.getSize();
         canvasRef.current.width = size.x;
         canvasRef.current.height = size.y;
-        drawFlights();
+        drawFlights(true);
       });
     };
 
@@ -260,7 +285,7 @@ export default function MapStage({
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const redraw = () => drawFlights();
+    const redraw = () => drawFlights(true);
     mapRef.current.on("move", redraw);
     mapRef.current.on("zoom", redraw);
     mapRef.current.on("zoomend", redraw);
@@ -285,6 +310,9 @@ export default function MapStage({
       const rect = canvasRef.current!.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      const target = e.target as HTMLElement | null;
+
+      if (target?.closest(".airport-marker, .leaflet-control")) return;
 
       // Buscar avión cerca del click (hitarea de 15px)
       for (const flight of activeFlights) {
@@ -301,6 +329,9 @@ export default function MapStage({
           return;
         }
       }
+
+      onClearSelection?.();
+      setMapInfo(null);
     };
 
     mapContainer.addEventListener("click", handleClick);
@@ -308,7 +339,51 @@ export default function MapStage({
     return () => {
       mapContainer.removeEventListener("click", handleClick);
     };
-  }, [activeFlights, airportByCode, data, onSelectFlight]);
+  }, [activeFlights, airportByCode, data, onClearSelection, onSelectFlight]);
+
+  useEffect(() => {
+    const clearAutoCloseTimer = () => {
+      if (autoCloseTimerRef.current) {
+        window.clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
+      autoCloseFlightIdRef.current = null;
+    };
+
+    if (mapInfo?.type !== "flight" || !mapInfo.id) {
+      clearAutoCloseTimer();
+      return;
+    }
+
+    const stillActive = activeFlights.some((flight) => flight.id === mapInfo.id);
+    if (stillActive) {
+      clearAutoCloseTimer();
+      return;
+    }
+
+    if (autoCloseFlightIdRef.current === mapInfo.id && autoCloseTimerRef.current) return;
+
+    clearAutoCloseTimer();
+    autoCloseFlightIdRef.current = mapInfo.id;
+    autoCloseTimerRef.current = window.setTimeout(() => {
+      setMapInfo((current) =>
+        current?.type === "flight" && current.id === mapInfo.id ? null : current
+      );
+      if (selectedFlightId === mapInfo.id) onClearSelection?.();
+      autoCloseTimerRef.current = null;
+      autoCloseFlightIdRef.current = null;
+    }, 5000);
+  }, [activeFlights, mapInfo, onClearSelection, selectedFlightId]);
+
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current) {
+        window.clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = null;
+      }
+      autoCloseFlightIdRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!data || !mapRef.current || !airports.length || didFitBoundsRef.current) return;
@@ -375,6 +450,7 @@ function createAirportIcon(airport: Airport, load: number, isSelected: boolean) 
 function createAirportInfo(airport: Airport, load: number): MapInfo {
   return {
     type: "airport",
+    id: airport.code,
     title: `${airport.code} - ${airport.city}`,
     subtitle: `${airport.country} / ${airport.continent}`,
     rows: [
@@ -395,6 +471,7 @@ function createFlightInfo(
 ): MapInfo {
   return {
     type: "flight",
+    id: flight.id,
     title: `Vuelo ${flight.id}`,
     subtitle: `${origin.code} ${origin.city} -> ${destination.code} ${destination.city}`,
     rows: [
@@ -431,22 +508,37 @@ function getRouteGeometry(map: L.Map, origin: Airport, destination: Airport, pro
   };
 }
 
-function drawPlaneIcon(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, color: string) {
+function drawPlaneIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  color: string,
+  selected = false
+) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((angle * Math.PI) / 180);
-  ctx.scale(0.54, 0.54);
+  ctx.scale(selected ? 0.68 : 0.54, selected ? 0.68 : 0.54);
+
+  if (selected) {
+    ctx.shadowColor = "rgba(15, 23, 42, 0.46)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 3;
+  }
 
   drawPlanePath(ctx);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  ctx.lineWidth = 5.5;
+  ctx.lineWidth = selected ? 7 : 5.5;
   ctx.lineJoin = "round";
   ctx.stroke();
 
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
   drawPlanePath(ctx);
   ctx.fillStyle = color;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = selected ? "#111827" : "rgba(255, 255, 255, 0.9)";
+  ctx.lineWidth = selected ? 2.4 : 1.8;
   ctx.lineJoin = "round";
   ctx.fill();
   ctx.stroke();

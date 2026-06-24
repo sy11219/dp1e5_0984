@@ -12,11 +12,14 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +56,7 @@ import java.util.regex.Pattern;
 public class ShipmentParser {
 
     private static final String ENVIOS_FOLDER = "data/envios";
-    private static final DateTimeFormatter BASIC_DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
+    private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     // Patrón del nombre de archivo: _envios_SKBO_.txt  (o _envio_SKBO_.txt - ambos aceptados)
     private static final Pattern FILE_PATTERN = Pattern.compile(
@@ -88,7 +91,89 @@ public class ShipmentParser {
      * @throws IOException Si hay error de lectura
      */
     public List<Shipment> parseAll(String simulationStartDate, int maxSimulationDays) throws IOException {
-        return parseAll(ENVIOS_FOLDER, simulationStartDate, maxSimulationDays);
+        return parseAllFromDatabase(simulationStartDate, maxSimulationDays);
+    }
+
+    public List<Shipment> parseAllFromDatabase(String simulationStartDate, int maxSimulationDays) throws IOException {
+        return parseAllFromDatabase(simulationStartDate, maxSimulationDays, ZoneOffset.UTC);
+    }
+
+    public List<Shipment> parseAllFromDatabase(
+            String simulationStartDate,
+            int maxSimulationDays,
+            ZoneId simulationZone
+    ) throws IOException {
+        if (simulationStartDate == null || !simulationStartDate.matches("\\d{8}")) {
+            throw new IOException("La fecha inicial debe tener formato aaaammdd.");
+        }
+        if (maxSimulationDays < 1) {
+            throw new IOException("maxSimulationDays debe ser mayor o igual a 1.");
+        }
+
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
+        ZoneId zone = simulationZone == null ? ZoneOffset.UTC : simulationZone;
+        Instant startInstant = startDate.atStartOfDay(zone).toInstant();
+        Instant endInstant = startDate.plusDays(maxSimulationDays).atStartOfDay(zone).toInstant();
+        int maxSimulationMinutes = maxSimulationDays * 1440;
+        List<Shipment> shipments = new ArrayList<>();
+
+        try (Connection connection = openConnection()) {
+            boolean hasClientId = columnExists(connection, "shipments", "client_id");
+            String clientColumn = hasClientId ? "s.client_id AS client_id," : "NULL AS client_id,";
+            String sql = """
+                    SELECT s.shipment_code,
+                           %s
+                           oa.code AS origin_code,
+                           da.code AS destination_code,
+                           s.baggage_count,
+                           s.registered_at
+                    FROM shipments s
+                    JOIN airports oa ON oa.id = s.origin_airport_id
+                    JOIN airports da ON da.id = s.destination_airport_id
+                    WHERE s.registered_at >= ?
+                      AND s.registered_at < ?
+                      AND (s.status IS NULL OR UPPER(s.status) <> 'CANCELED')
+                    ORDER BY s.registered_at, s.shipment_code
+                    """.formatted(clientColumn);
+
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC));
+                statement.setObject(2, OffsetDateTime.ofInstant(endInstant, ZoneOffset.UTC));
+
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        Timestamp registeredTimestamp = result.getTimestamp("registered_at");
+                        if (registeredTimestamp == null) continue;
+
+                        Instant registeredInstant = registeredTimestamp.toInstant();
+                        int requestMinute = (int) Duration.between(startInstant, registeredInstant).toMinutes();
+                        if (requestMinute < 0 || requestMinute >= maxSimulationMinutes) continue;
+
+                        String originCode = result.getString("origin_code");
+                        OffsetDateTime originLocalTime = registeredInstant.atOffset(ZoneOffset.UTC)
+                                .withOffsetSameInstant(originOffset(originCode));
+                        String clientId = result.getString("client_id");
+
+                        shipments.add(new Shipment(
+                                result.getString("shipment_code"),
+                                originCode,
+                                result.getString("destination_code"),
+                                requestMinute,
+                                result.getInt("baggage_count"),
+                                clientId == null ? "" : clientId,
+                                originLocalTime.format(RAW_DATE),
+                                twoDigits(originLocalTime.getHour()),
+                                twoDigits(originLocalTime.getMinute())
+                        ));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new IOException("No se pudieron cargar envios desde la base de datos.", e);
+        }
+
+        System.out.printf("[ShipmentParser] Cargados %d envios desde BD.%n", shipments.size());
+        return shipments;
     }
 
     /**
@@ -157,7 +242,7 @@ public class ShipmentParser {
             return shipments;
         }
 
-        LocalDate startDate = LocalDate.parse(simulationStartDate, BASIC_DATE_FORMATTER);
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
         OffsetDateTime rangeStart = startDate.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime rangeEnd = startDate.plusDays(maxSimulationDays).atStartOfDay().atOffset(ZoneOffset.UTC);
 
@@ -185,7 +270,7 @@ public class ShipmentParser {
                 while (resultSet.next()) {
                     OffsetDateTime registeredAt = resultSet.getObject("registered_at", OffsetDateTime.class)
                             .withOffsetSameInstant(ZoneOffset.UTC);
-                    int requestMinute = (int) ChronoUnit.MINUTES.between(rangeStart, registeredAt);
+                    int requestMinute = (int) Duration.between(rangeStart, registeredAt).toMinutes();
                     if (requestMinute < 0 || requestMinute >= maxSimulationDays * 1440) {
                         continue;
                     }
@@ -197,7 +282,7 @@ public class ShipmentParser {
                             requestMinute,
                             resultSet.getInt("baggage_count"),
                             "DB",
-                            registeredAt.format(BASIC_DATE_FORMATTER),
+                            registeredAt.format(RAW_DATE),
                             String.format("%02d", registeredAt.getHour()),
                             String.format("%02d", registeredAt.getMinute())
                     );
@@ -247,7 +332,7 @@ public class ShipmentParser {
                     continue;
                 }
 
-                String shipmentId   = m.group(1);
+                String shipmentId   = originCode + "-" + m.group(1);
                 String date         = m.group(2);  // aaaammdd
                 String hourStr      = m.group(3);  // HH
                 String minuteStr    = m.group(4);  // MM
@@ -291,6 +376,44 @@ public class ShipmentParser {
      * @param simulationStartDate Fecha inicio de simulación (aaaammdd)
      * @return Minutos desde inicio de simulación (puede ser negativo si fecha anterior)
      */
+    // Conexion a PostgreSQL para la lectura principal de shipments.
+    private Connection openConnection() throws SQLException {
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("No se encontro el driver JDBC de PostgreSQL. Verifica la dependencia org.postgresql:postgresql en pom.xml.", e);
+        }
+
+        String url = requireEnv("DB_URL");
+        String user = requireEnv("DB_USER");
+        String password = requireEnv("DB_PASSWORD");
+        return DriverManager.getConnection(url, user, password);
+    }
+
+    private String requireEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException("Falta variable de entorno: " + name);
+        }
+        return value;
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws SQLException {
+        try (ResultSet columns = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
+            return columns.next();
+        }
+    }
+
+    private ZoneOffset originOffset(String originCode) {
+        Airport origin = airportMap.get(originCode);
+        return ZoneOffset.ofHours(origin != null ? origin.getGmtOffset() : 0);
+    }
+
+    private String twoDigits(int value) {
+        return String.format("%02d", value);
+    }
+
+    // Conversor usado por el lector legado de archivos TXT.
     private int dateTimeToSimMinutes(String date, String hourStr, String minuteStr,
                                       String simulationStartDate,
                                      String originCode,

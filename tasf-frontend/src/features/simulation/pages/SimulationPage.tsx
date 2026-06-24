@@ -6,6 +6,7 @@ import {
   getCurrentBatchSimulationRequest,
   startBatchSimulationRequest,
   advanceBatchSimulationRequest,
+  stopBatchSimulationRequest,
   cancelBatchFlightRequest,
 } from "../../../api/simulationApi"
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
@@ -22,10 +23,13 @@ import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, Flight, SimulationData } from "../types"
 import { DEFAULT_START_DATE, SIMULATION_DAYS } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
-import { formatRealTime } from "../utils/timeUtils"
 import { SimulationResultModal } from "../components/SimulationResultModal"
+import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
 
 const BATCH_SIMULATION_PAUSED_KEY = "tasf.simulation5d.paused"
+const BATCH_SIMULATION_STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
+const SIMULATION_MAP_FOCUS_KEY = "tasf.simulation5d.mapFocus"
+const SIMULATION_REPORT_DISMISSED_PREFIX = "tasf.simulation5d.reportDismissed."
 
 function setBatchSimulationPaused(paused: boolean) {
   try {
@@ -36,6 +40,34 @@ function setBatchSimulationPaused(paused: boolean) {
     }
   } catch {
     // Local storage can be unavailable in some browser privacy modes.
+  }
+}
+
+function markBatchSimulationStopped(data: SimulationData | null) {
+  if (!data?.simulationId) return
+
+  try {
+    window.localStorage.setItem(BATCH_SIMULATION_STOPPED_KEY, data.simulationId)
+  } catch {
+    // Ignore storage failures; the backend stop still clears the shared session.
+  }
+}
+
+function clearBatchSimulationStopped() {
+  try {
+    window.localStorage.removeItem(BATCH_SIMULATION_STOPPED_KEY)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function wasBatchSimulationStopped(data: SimulationData | null) {
+  if (!data?.simulationId) return false
+
+  try {
+    return window.localStorage.getItem(BATCH_SIMULATION_STOPPED_KEY) === data.simulationId
+  } catch {
+    return false
   }
 }
 
@@ -51,6 +83,32 @@ function elapsedRealTimeMs(data: SimulationData | null) {
       : Date.now()
 
   return Math.max(0, (Number.isFinite(finishedAt) ? finishedAt : Date.now()) - startedAt)
+}
+
+function reportDismissedKey(data: SimulationData | null) {
+  return data?.simulationId ? `${SIMULATION_REPORT_DISMISSED_PREFIX}${data.simulationId}` : null
+}
+
+function wasFinalReportDismissed(data: SimulationData | null) {
+  const key = reportDismissedKey(data)
+  if (!key) return false
+
+  try {
+    return window.localStorage.getItem(key) === "true"
+  } catch {
+    return false
+  }
+}
+
+function markFinalReportDismissed(data: SimulationData | null) {
+  const key = reportDismissedKey(data)
+  if (!key) return
+
+  try {
+    window.localStorage.setItem(key, "true")
+  } catch {
+    // Ignore storage failures; the in-memory flag still prevents duplicate modals.
+  }
 }
 
 /**
@@ -84,14 +142,18 @@ export function SimulationPage() {
   const [error, setError]             = useState("")
   const [notice, setNotice]           = useState("")
   const [flightToCancel, setFlightToCancel] = useState("")
-  const [selectedAirport, setSelectedAirport] = useState<string | null>(null)
-  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null)
+  const initialMapFocusRef = useRef(readMapFocus(SIMULATION_MAP_FOCUS_KEY))
+  const [selectedAirport, setSelectedAirport] = useState<string | null>(
+    () => initialMapFocusRef.current?.type === "airport" ? initialMapFocusRef.current.id : null
+  )
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
+    () => initialMapFocusRef.current?.type === "flight" ? initialMapFocusRef.current.id : null
+  )
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null)
   const [reportDismissed, setReportDismissed] = useState(false)
   const [stopSummaryOpen, setStopSummaryOpen] = useState(false)
   const [stoppedSummaryData, setStoppedSummaryData] = useState<SimulationData | null>(null)
   const [stoppedSummaryRealTimeMs, setStoppedSummaryRealTimeMs] = useState(0)
-  const [now, setNow]                 = useState(new Date())
   const [realTimeMs, setRealTimeMs]   = useState(0)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
@@ -117,7 +179,10 @@ export function SimulationPage() {
   } = useSimulationPlayer(maxMinute)
 
   const showReport = Boolean(
-    data?.status === "COMPLETED" && simMinute >= maxMinute && !reportDismissed
+    data?.status === "COMPLETED" &&
+    simMinute >= maxMinute &&
+    !reportDismissed &&
+    !wasFinalReportDismissed(data)
   )
   const modalOpen = showReport || stopSummaryOpen
 
@@ -132,7 +197,12 @@ export function SimulationPage() {
 
     if (payload.status !== "COMPLETED" && payload.visualStartedAt && visualEnd > visualStart) {
       animatingRef.current = true
-      animateBatch(visualStart, Math.min(visualEnd, cap), payload.visualStartedAt)
+      animateBatch(
+        visualStart,
+        Math.min(visualEnd, cap),
+        payload.visualStartedAt,
+        payload.planningIntervalMs ?? payload.batchIntervalMs
+      )
       return
     }
 
@@ -140,12 +210,30 @@ export function SimulationPage() {
     setSimMinute(payload.tick ?? payload.startOffsetMinutes ?? 0)
   }, [animateBatch, maxMinute, setSimMinute])
 
-  // ── Reloj de pared ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    const t = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(t)
+  const restoreMapFocus = useCallback((payload: SimulationData) => {
+    const stored = readMapFocus(SIMULATION_MAP_FOCUS_KEY)
+
+    if (stored?.type === "airport" && payload.airports.some((airport) => airport.code === stored.id)) {
+      setSelectedAirport(stored.id)
+      setSelectedFlightId(null)
+      setMapFocusTarget({ type: "airport", id: stored.id, token: ++focusTokenRef.current })
+      return
+    }
+
+    if (stored?.type === "flight" && payload.flights.some((flight) => flight.id === stored.id)) {
+      setSelectedAirport(null)
+      setSelectedFlightId(stored.id)
+      setMapFocusTarget({ type: "flight", id: stored.id, token: ++focusTokenRef.current })
+      return
+    }
+
+    writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
+    setSelectedAirport(null)
+    setSelectedFlightId(null)
+    setMapFocusTarget(null)
   }, [])
 
+  // ── Reloj de pared ─────────────────────────────────────────────────────────
   useEffect(() => {
     const timers = [0, 120, 320].map((delay) =>
       window.setTimeout(() => window.dispatchEvent(new Event("resize")), delay)
@@ -163,7 +251,14 @@ export function SimulationPage() {
         if (cancelled) return
         setAirportCatalog(airports)
         setFlightCatalog(flights)
-        setSelectedAirport((current) => current || airports[0]?.code || null)
+        setSelectedAirport((current) => {
+          const stored = readMapFocus(SIMULATION_MAP_FOCUS_KEY)
+          if (stored?.type === "airport" && airports.some((airport) => airport.code === stored.id)) {
+            return stored.id
+          }
+          if (current && airports.some((airport) => airport.code === current)) return current
+          return null
+        })
       })
       .catch(() => {
         if (!cancelled) setError("No se pudieron leer los aeropuertos o vuelos desde la BD.")
@@ -199,16 +294,23 @@ export function SimulationPage() {
     setFetching(true)
     setError("")
     try {
-      const payload = await advanceBatchSimulationRequest(sessionId, BATCH_MINUTES, fromTick)
+      const stepMinutes = data?.planningWindowMinutes ?? data?.batchMinutes ?? BATCH_MINUTES
+      const payload = await advanceBatchSimulationRequest(sessionId, stepMinutes, fromTick)
       setData(payload)
       setNotice(payload.message || "")
 
       const toTick = payload.tick ?? fromTick
+      const payloadMaxMinute = payload.maxTick ?? maxMinute
 
       if (toTick > fromTick) {
         // Hay datos nuevos: animar desde el tick anterior hasta el nuevo
         animatingRef.current = true
-        animateBatch(fromTick, Math.min(toTick, maxMinute), payload.visualStartedAt)
+        animateBatch(
+          fromTick,
+          Math.min(toTick, payloadMaxMinute),
+          payload.visualStartedAt,
+          payload.planningIntervalMs ?? payload.batchIntervalMs
+        )
       } else {
         // No avanzó (ya completado)
         animatingRef.current = false
@@ -221,7 +323,7 @@ export function SimulationPage() {
     } finally {
       setFetching(false)
     }
-  }, [fetching, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
+  }, [fetching, data?.planningWindowMinutes, data?.batchMinutes, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
 
   // ── Callback que dispara el hook cuando termina la animación de un lote ────
   useEffect(() => {
@@ -250,10 +352,17 @@ export function SimulationPage() {
     void getCurrentBatchSimulationRequest()
       .then((payload) => {
         if (cancelled || !payload) return
+        if (wasBatchSimulationStopped(payload)) {
+          setBatchSimulationPaused(true)
+          return
+        }
+        if (payload.status === "COMPLETED" && wasFinalReportDismissed(payload)) {
+          setReportDismissed(true)
+          return
+        }
         setData(payload)
-        setSelectedAirport(payload.airports[0]?.code || airportCatalog[0]?.code || null)
-        setSelectedFlightId(null)
-        setMapFocusTarget(null)
+        setReportDismissed(wasFinalReportDismissed(payload))
+        restoreMapFocus(payload)
         syncSharedVisualWindow(payload)
         setPlaying(payload.status !== "COMPLETED")
       })
@@ -263,7 +372,7 @@ export function SimulationPage() {
     return () => {
       cancelled = true
     }
-  }, [airportCatalog, setPlaying, syncSharedVisualWindow])
+  }, [restoreMapFocus, setPlaying, syncSharedVisualWindow])
 
   useEffect(() => {
     if (!data?.simulationId || data.status === "COMPLETED" || !playing) return
@@ -272,12 +381,22 @@ export function SimulationPage() {
       void getCurrentBatchSimulationRequest()
         .then((payload) => {
           if (!payload) return
+          if (wasBatchSimulationStopped(payload)) {
+            setBatchSimulationPaused(true)
+            return
+          }
           const previousTick = data.tick ?? data.startOffsetMinutes ?? 0
           const nextTick = payload.tick ?? previousTick
+          const payloadMaxMinute = payload.maxTick ?? maxMinute
           setData(payload)
           if (nextTick > previousTick) {
             animatingRef.current = true
-            animateBatch(previousTick, Math.min(nextTick, maxMinute), payload.visualStartedAt)
+            animateBatch(
+              previousTick,
+              Math.min(nextTick, payloadMaxMinute),
+              payload.visualStartedAt,
+              payload.planningIntervalMs ?? payload.batchIntervalMs
+            )
           } else {
             syncSharedVisualWindow(payload)
           }
@@ -293,6 +412,8 @@ export function SimulationPage() {
     setError("")
     setNotice("")
     setReportDismissed(false)
+    clearBatchSimulationStopped()
+    writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
     setBatchSimulationPaused(false)
     prevTickRef.current    = 0
     animatingRef.current   = false
@@ -304,7 +425,7 @@ export function SimulationPage() {
       const initial = await startBatchSimulationRequest(startDate, days, startTime)
       setData(initial)
       setSimMinute(initial.tick ?? initial.startOffsetMinutes ?? 0)
-      setSelectedAirport(initial.airports[0]?.code || airportCatalog[0]?.code || null)
+      setSelectedAirport(null)
       setSelectedFlightId(null)
       setMapFocusTarget(null)
       setPlaying(true)
@@ -336,9 +457,10 @@ export function SimulationPage() {
       const updated = await cancelBatchFlightRequest(data.simulationId, id)
       setFlightToCancel("")
       setData(updated)
-      setSelectedAirport(updated.airports[0]?.code || airportCatalog[0]?.code || null)
+      setSelectedAirport(null)
       setSelectedFlightId(null)
       setMapFocusTarget(null)
+      writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
       setNotice(`Vuelo ${id} cancelado. Replanificacion aplicada sobre el estado actual.`)
       setPlaying(true)
     } catch (err) {
@@ -374,6 +496,7 @@ export function SimulationPage() {
     [displayData, simMinute]
   );
   const selected = displayData.airports.find((a) => a.code === selectedAirport)
+  const controlsBusy = loading || fetching || cancelling
 
   const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
     const updateAirport = (airport: Airport) =>
@@ -388,30 +511,38 @@ export function SimulationPage() {
     )
   }
 
+  const clearMapSelection = useCallback(() => {
+    setSelectedAirport(null)
+    setSelectedFlightId(null)
+    setMapFocusTarget(null)
+    writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
+  }, [])
+
   const focusAirport = (code: string) => {
     // Si es el mismo aeropuerto, deseleccionar
     if (selectedAirport === code) {
-      setSelectedAirport(null)
-      setMapFocusTarget(null)
+      clearMapSelection()
     } else {
       setSelectedAirport(code)
       setSelectedFlightId(null)
       setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current })
+      writeMapFocus(SIMULATION_MAP_FOCUS_KEY, { type: "airport", id: code })
     }
   }
 
   const focusFlight = (id: string) => {
     // Si es el mismo vuelo, deseleccionar
     if (selectedFlightId === id) {
-      setSelectedFlightId(null)
-      setMapFocusTarget(null)
+      clearMapSelection()
     } else {
+      setSelectedAirport(null)
       setSelectedFlightId(id)
       setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current })
+      writeMapFocus(SIMULATION_MAP_FOCUS_KEY, { type: "flight", id })
     }
   }
 
-  const clearSimulationView = () => {
+  const clearSimulationView = (options?: { preserveReportDismissed?: boolean }) => {
     setPlaying(false)
     setSimMinute(0)
     setData(null)
@@ -421,7 +552,8 @@ export function SimulationPage() {
     setSelectedAirport(null)
     setSelectedFlightId(null)
     setMapFocusTarget(null)
-    setReportDismissed(false)
+    writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
+    if (!options?.preserveReportDismissed) setReportDismissed(false)
     setBatchSimulationPaused(true)
     prevTickRef.current    = 0
     setRealTimeMs(0)
@@ -446,6 +578,7 @@ export function SimulationPage() {
     if (!data) return
 
     const elapsed = realTimeMs || elapsedRealTimeMs(data)
+    markBatchSimulationStopped(data)
     setBatchSimulationPaused(true)
     setRealTimeMs(elapsed)
     setPlaying(false)
@@ -453,6 +586,11 @@ export function SimulationPage() {
     setStoppedSummaryData(data)
     setStoppedSummaryRealTimeMs(elapsed)
     setStopSummaryOpen(true)
+    if (data.simulationId) {
+      void stopBatchSimulationRequest(data.simulationId).catch(() => {
+        // The local stopped marker still prevents this browser from restoring it.
+      })
+    }
   }
 
   const handleStopSummaryOpenChange = (open: boolean) => {
@@ -463,10 +601,18 @@ export function SimulationPage() {
     }
   }
 
+  const handleFinalReportOpenChange = (open: boolean) => {
+    if (open) return
+
+    markFinalReportDismissed(data)
+    setReportDismissed(true)
+    clearSimulationView({ preserveReportDismissed: true })
+  }
+
   return (
     <div className="app-shell">
       <Navbar />
-      <Topbar data={data} now={now} simMinute={simMinute} />
+      <Topbar data={data} simMinute={simMinute} durationMs={realTimeMs} />
 
       <main
         className={[
@@ -495,12 +641,10 @@ export function SimulationPage() {
             fetching={fetching}
             playing={playing}
             cancelling={cancelling}
-            simMinute={simMinute}
             startDate={startDate}
             startTime={startTime}
             onCancelFlight={cancelFlight}
             onFlightToCancelChange={setFlightToCancel}
-            onPause={handlePause}
             onPlay={() => {
               setBatchSimulationPaused(false)
               // Reanudar: pedir el siguiente lote si no hay animación en curso
@@ -511,8 +655,6 @@ export function SimulationPage() {
                 setPlaying(true)
               }
             }}
-            onReset={handleRestart}
-            onStop={handleStop}
             onRunSimulation={runSimulation}
             onStartDateChange={setStartDate}
             onStartTimeChange={setStartTime}
@@ -525,6 +667,13 @@ export function SimulationPage() {
             ) : (
               <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
             )}
+          </section>
+          <section className="panel section simulation-bottom-actions">
+            <div className="segmented">
+              <button onClick={handlePause} disabled={!data?.simulationId || controlsBusy || !playing}>Pausar</button>
+              <button onClick={handleRestart} disabled={!data?.simulationId || controlsBusy}>Reiniciar</button>
+              <button className="danger" onClick={handleStop} disabled={!data?.simulationId || controlsBusy}>Cancelar</button>
+            </div>
           </section>
         </aside>
         ) : (
@@ -547,9 +696,11 @@ export function SimulationPage() {
             activeFlights={modalOpen ? [] : activeFlights}
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
+            selectedFlightId={selectedFlightId}
             focusTarget={mapFocusTarget}
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
+            onClearSelection={clearMapSelection}
           />
           <Timeline
             simMinute={simMinute}
@@ -563,7 +714,7 @@ export function SimulationPage() {
         {rightPanelOpen ? (
         <aside className="right-panel">
           <div className="panel section panel-runtime">
-            <span>Tiempo de ejecución: <strong>{formatRealTime(realTimeMs)}</strong></span>
+            <span>Panel de operaciones</span>
             <button
               type="button"
               className="panel-collapse-button panel-collapse-button-right"
@@ -574,12 +725,21 @@ export function SimulationPage() {
               <PanelRightClose size={18} />
             </button>
           </div>
-          <section
-            className="panel section"
-            onClick={selected ? () => focusAirport(selected.code) : undefined}
-            style={selected ? { cursor: "pointer" } : undefined}
-          >
-            <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
+          <section className="panel section">
+            <div className="section-header">
+              <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
+              {selected && (
+                <button
+                  type="button"
+                  className="icon-button section-close"
+                  onClick={clearMapSelection}
+                  aria-label="Quitar aeropuerto seleccionado"
+                  title="Quitar seleccion"
+                >
+                  x
+                </button>
+              )}
+            </div>
             {loadingAirports && <div className="empty-state">Cargando aeropuertos...</div>}
             {selected && (
               <AirportDetail
@@ -636,7 +796,7 @@ export function SimulationPage() {
 
       <SimulationResultModal
         open={showReport}
-        onOpenChange={(open) => setReportDismissed(!open)}
+        onOpenChange={handleFinalReportOpenChange}
         data={data}
         realTimeMs={realTimeMs}
       />
@@ -664,15 +824,11 @@ type SimulationControlsProps = {
   fetching: boolean
   playing: boolean
   cancelling: boolean
-  simMinute: number
   startDate: string
   startTime: string
   onCancelFlight: () => void
   onFlightToCancelChange: (id: string) => void
-  onPause: () => void
   onPlay: () => void
-  onReset: () => void
-  onStop: () => void
   onRunSimulation: () => void
   onStartDateChange: (date: string) => void
   onStartTimeChange: (time: string) => void
@@ -680,15 +836,15 @@ type SimulationControlsProps = {
 
 function SimulationControls({
   error, notice, flightToCancel, hasSimulation,
-  loading, fetching, playing, cancelling, simMinute, startDate, startTime,
+  loading, fetching, playing, cancelling, startDate, startTime,
   onCancelFlight, onFlightToCancelChange,
-  onPause, onPlay, onReset, onStop, onRunSimulation, onStartDateChange, onStartTimeChange,
+  onPlay, onRunSimulation, onStartDateChange, onStartTimeChange,
 }: SimulationControlsProps) {
   const busy = loading || fetching || cancelling
 
   return (
     <section className="panel section">
-      <h2>Simulación 5 días</h2>
+      <h2>Panel de control</h2>
       <div className="control-grid">
         <div className="field">
           <label>Fecha inicial</label>
@@ -717,25 +873,6 @@ function SimulationControls({
         >
           {loading ? "Iniciando..." : "Ejecutar Simulación"}
         </button>
-
-        <div className="segmented">
-          <button onClick={onPause} disabled={!hasSimulation || busy || !playing}>Pausar</button>
-          <button onClick={onReset} disabled={!hasSimulation || busy}>Reiniciar</button>
-          <button className="danger" onClick={onStop} disabled={!hasSimulation || busy}>Detener</button>
-        </div>
-
-        {/* Indicador de estado */}
-        <div className="metric">
-          <span>Minuto simulado</span>
-          <strong>{Math.floor(simMinute)}</strong>
-          <span>
-            {loading     ? "iniciando sesión..." :
-             fetching    ? "actualizando simulación..." :
-             cancelling  ? "replanificando..." :
-             playing     ? "reproduciendo simulación..." :
-                           "pausado"}
-          </span>
-        </div>
 
         {/* Cancelar vuelo futuro */}
         <div className="field">

@@ -1,13 +1,13 @@
 import type { SimulationData } from "../types";
-import { formatClock, formatDateOnly, formatSimMinute, formatTimeOnly } from "../utils/formatters";
+import { formatDateOnly, formatFlightMoment, formatTimeOnly } from "../utils/formatters";
+import { formatRealTime } from "../utils/timeUtils";
 
 interface TopbarProps {
   data: SimulationData | null;
-  now: Date;
   simMinute: number;
+  durationMs?: number;
   title?: string;
   subtitle?: string;
-  clockLabel?: string;
 }
 
 interface StatusItemProps {
@@ -26,24 +26,31 @@ function StatusItem({ label, value, sub }: StatusItemProps) {
   );
 }
 
+function formatDateTime(value: string | Date | undefined): string {
+  if (!value) return "--";
+  return `${formatDateOnly(value)} ${formatTimeOnly(value)}`;
+}
+
+function formatElapsedSimulation(minutes: number): string {
+  const totalSeconds = Math.max(0, Math.floor(minutes * 60));
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
 export function Topbar({
   data,
-  now,
   simMinute,
+  durationMs,
   title = "TASF.B2B - Simulador de equipaje",
   subtitle = "Simulación 5 días",
-  clockLabel = "Reloj simulado",
 }: TopbarProps) {
-  let simulatedDateStr = "--";
-  let simulatedDayLabel = "--";
-  if (data?.simulationStartDateTime) {
-    const minutesFromStart = simMinute - (data.startOffsetMinutes ?? 0);
-    const simulatedDate = new Date(
-      new Date(data.simulationStartDateTime).getTime() + minutesFromStart * 60000
-    );
-    simulatedDateStr = formatDateOnly(simulatedDate);
-    simulatedDayLabel = `Día ${Math.floor(simMinute / 1440) + 1}`;
-  }
+  const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
+  const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
+  const simulatedDayLabel = data
+    ? `Día ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
+    : "--";
 
   return (
     <header className="topbar">
@@ -52,41 +59,25 @@ export function Topbar({
         <span>{subtitle}</span>
       </div>
       <div className="status-strip">
-        <StatusItem label="Ahora" value={formatClock(now)} sub={formatDateOnly(now)} />
         <StatusItem
-          label={clockLabel}
-          value={formatSimMinute(simMinute)}
-          sub={data ? `minuto ${simMinute}` : "avance actual"}
+          label="Fecha y Hora de Inicio"
+          value={formatDateTime(data?.simulationStartDateTime)}
+          sub={data ? "inicio programado" : "--"}
         />
         <StatusItem
-          label="Fecha simulada"
-          value={simulatedDateStr}
+          label="Fecha y Hora en Simulación"
+          value={data ? formatFlightMoment(data, simMinute) : "--"}
           sub={simulatedDayLabel}
         />
         <StatusItem
-          label="Inicio"
-          value={data ? formatTimeOnly(data.realStartedAt) : "--"}
-          sub={data ? formatDateOnly(data.realStartedAt) : "--"}
-        />
-        <StatusItem
-          label="Ultima actualización"
-          value={data ? formatTimeOnly(data.realFinishedAt) : "--"}
-          sub={data ? formatDateOnly(data.realFinishedAt) : "--"}
-        />
-        <StatusItem
-          label="Simulado desde"
-          value={data ? formatDateOnly(data.simulationStartDateTime) : "--"}
-          sub={data ? formatTimeOnly(data.simulationStartDateTime) : "--"}
-        />
-        <StatusItem
-          label="Simulado hasta"
-          value={data ? formatDateOnly(data.simulationEndDateTime) : "--"}
-          sub={data ? formatTimeOnly(data.simulationEndDateTime) : "--"}
-        />
-        <StatusItem
-          label="Duración"
-          value={data ? `${(data.runtimeMs / 1000).toFixed(2)} s` : "--"}
+          label="Duración de la simulación"
+          value={data ? formatRealTime(simulationDurationMs) : "--"}
           sub="ejecución real"
+        />
+        <StatusItem
+          label="Tiempo transcurrido en simulación"
+          value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
+          sub="avance acumulado"
         />
       </div>
     </header>
