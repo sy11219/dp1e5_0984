@@ -91,7 +91,7 @@ public class ShipmentParser {
      * @throws IOException Si hay error de lectura
      */
     public List<Shipment> parseAll(String simulationStartDate, int maxSimulationDays) throws IOException {
-        return parseAllFromDatabase(simulationStartDate, maxSimulationDays);
+        return parseAll("data/envios", simulationStartDate, maxSimulationDays);
     }
 
     public List<Shipment> parseAllFromDatabase(String simulationStartDate, int maxSimulationDays) throws IOException {
@@ -191,18 +191,12 @@ public class ShipmentParser {
         File folder = new File(folderPath);
         if (!folder.exists() || !folder.isDirectory()) {
             System.err.printf("[ShipmentParser] ERROR: La carpeta '%s' no existe.%n", folderPath);
-            List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
-            allShipments.addAll(databaseShipments);
-            System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
             return allShipments;
         }
 
         File[] files = folder.listFiles();
         if (files == null || files.length == 0) {
             System.err.printf("[ShipmentParser] AVISO: No se encontraron archivos en '%s'.%n", folderPath);
-            List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
-            allShipments.addAll(databaseShipments);
-            System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
             return allShipments;
         }
 
@@ -224,83 +218,7 @@ public class ShipmentParser {
 
         System.out.printf("[ShipmentParser] Total TXT: %d envios cargados de %d archivos.%n",
                 allShipments.size(), fileCount);
-
-        List<Shipment> databaseShipments = loadRegisteredShipmentsFromDatabase(simulationStartDate, maxSimulationDays);
-        allShipments.addAll(databaseShipments);
-        System.out.printf("[ShipmentParser] Total combinado: %d envios cargados.%n", allShipments.size());
         return allShipments;
-    }
-
-    private List<Shipment> loadRegisteredShipmentsFromDatabase(String simulationStartDate, int maxSimulationDays) {
-        List<Shipment> shipments = new ArrayList<>();
-
-        String dbUrl = env("DB_URL");
-        String dbUser = env("DB_USER");
-        String dbPassword = env("DB_PASSWORD");
-        if (dbUrl == null || dbUser == null || dbPassword == null) {
-            System.err.println("[ShipmentParser] BD omitida: faltan DB_URL, DB_USER o DB_PASSWORD.");
-            return shipments;
-        }
-
-        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
-        OffsetDateTime rangeStart = startDate.atStartOfDay().atOffset(ZoneOffset.UTC);
-        OffsetDateTime rangeEnd = startDate.plusDays(maxSimulationDays).atStartOfDay().atOffset(ZoneOffset.UTC);
-
-        String sql = """
-                SELECT s.shipment_code,
-                       oa.code AS origin_code,
-                       da.code AS destination_code,
-                       s.baggage_count,
-                       s.registered_at
-                FROM shipments s
-                JOIN airports oa ON oa.id = s.origin_airport_id
-                JOIN airports da ON da.id = s.destination_airport_id
-                WHERE UPPER(s.status) = 'REGISTERED'
-                  AND s.registered_at >= ?
-                  AND s.registered_at < ?
-                ORDER BY s.registered_at, s.shipment_code
-                """;
-
-        try (Connection connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setObject(1, rangeStart);
-            statement.setObject(2, rangeEnd);
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-                while (resultSet.next()) {
-                    OffsetDateTime registeredAt = resultSet.getObject("registered_at", OffsetDateTime.class)
-                            .withOffsetSameInstant(ZoneOffset.UTC);
-                    int requestMinute = (int) Duration.between(rangeStart, registeredAt).toMinutes();
-                    if (requestMinute < 0 || requestMinute >= maxSimulationDays * 1440) {
-                        continue;
-                    }
-
-                    Shipment shipment = new Shipment(
-                            resultSet.getString("shipment_code"),
-                            resultSet.getString("origin_code"),
-                            resultSet.getString("destination_code"),
-                            requestMinute,
-                            resultSet.getInt("baggage_count"),
-                            "DB",
-                            registeredAt.format(RAW_DATE),
-                            String.format("%02d", registeredAt.getHour()),
-                            String.format("%02d", registeredAt.getMinute())
-                    );
-                    shipments.add(shipment);
-                }
-            }
-        } catch (SQLException | RuntimeException e) {
-            System.err.printf("[ShipmentParser] BD omitida por error cargando envios: %s%n", e.getMessage());
-            return new ArrayList<>();
-        }
-
-        System.out.printf("[ShipmentParser] BD: %d envios REGISTERED cargados.%n", shipments.size());
-        return shipments;
-    }
-
-    private String env(String name) {
-        String value = System.getenv(name);
-        return value == null || value.isBlank() ? null : value;
     }
 
     /**

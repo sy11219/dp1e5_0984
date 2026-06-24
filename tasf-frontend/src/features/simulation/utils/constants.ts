@@ -4,17 +4,9 @@ export const STATUS_COLOR = {
   red: "#d84545",
 } as const;
 
-function currentLocalDateTime() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-const defaultLocalDateTime = currentLocalDateTime();
-
 export const SIMULATION_DAYS = 5;
-export const DEFAULT_START_DATE = defaultLocalDateTime.slice(0, 10);
-export const DEFAULT_START_TIME = defaultLocalDateTime.slice(11, 16);
+export const DEFAULT_START_DATE = "2026-01-02";
+export const DEFAULT_START_TIME = "00:00";
 export const DEFAULT_SPEED = 360;
 export const SPEED_MIN = 60;
 export const SPEED_MAX = 1800;

@@ -300,7 +300,9 @@ public class RealtimeSimulationService {
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
         int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
         int simulationEndMinute = startOffsetMinutes + days * 1440;
-        List<Shipment> shipments = shipmentParser.parseAllFromDatabase(startDate, shipmentDaysToLoad, sessionZone);
+        List<Shipment> shipments = "SIMULACION_LOTES".equals(scenario)
+                ? shipmentParser.parseAll("data/envios", startDate, shipmentDaysToLoad)
+                : shipmentParser.parseAllFromDatabase(startDate, shipmentDaysToLoad, sessionZone);
         shipments.removeIf(s -> s.getRequestMinute() < startOffsetMinutes
                 || s.getRequestMinute() >= simulationEndMinute);
         shipments.sort(Comparator.comparingInt(Shipment::getRequestMinute));

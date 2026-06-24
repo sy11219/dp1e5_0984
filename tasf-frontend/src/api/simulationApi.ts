@@ -1,5 +1,5 @@
 import type { Airport, Flight, SimulationData } from "../features/simulation/types";
-import { DEFAULT_START_DATE, SIMULATION_DAYS } from "../features/simulation/utils/constants";
+import { SIMULATION_DAYS } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
 
 const clientTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "";
@@ -88,12 +88,12 @@ let realtimeOperationPromise: Promise<SimulationData> | null = null;
 
 export async function runRealtimeOperationRequest(): Promise<SimulationData> {
   if (!realtimeOperationPromise) {
-    realtimeOperationPromise = runSimulationRequest(DEFAULT_START_DATE, SIMULATION_DAYS).catch(
-      (error) => {
+    realtimeOperationPromise = getCurrentRealtimeSessionRequest()
+      .then((current) => current ?? startRealtimeSessionRequest())
+      .catch((error) => {
         realtimeOperationPromise = null;
         throw error;
-      }
-    );
+      });
   }
   return realtimeOperationPromise;
 }

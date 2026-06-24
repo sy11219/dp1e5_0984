@@ -1,0 +1,56 @@
+Simulador ALNS listo en http://localhost:8080/
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 20020 vuelos SCHEDULED desde BD para 7 dia(s).
+[ShipmentParser] Cargados 0 envios desde BD.
+[Tiempo real] Scheduler iniciado en fecha/hora actual (America/Bogota) por 5 dias.
+[ShipmentParser] Cargados 0 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 0 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 0 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 0 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 20020 vuelos SCHEDULED desde BD para 7 dia(s).
+[ShipmentParser] EBCI ? 1715 envios cargados desde '_envios_EBCI_.txt'
+[ShipmentParser] EDDI ? 1505 envios cargados desde '_envios_EDDI_.txt'
+[ShipmentParser] EHAM ? 1433 envios cargados desde '_envios_EHAM_.txt'
+[ShipmentParser] EKCH ? 1012 envios cargados desde '_envios_EKCH_.txt'
+[ShipmentParser] LATI ? 687 envios cargados desde '_envios_LATI_.txt'
+[ShipmentParser] LBSF ? 1418 envios cargados desde '_envios_LBSF_.txt'
+[ShipmentParser] LDZA ? 560 envios cargados desde '_envios_LDZA_.txt'
+[ShipmentParser] LKPR ? 1250 envios cargados desde '_envios_LKPR_.txt'
+[ShipmentParser] LOWW ? 1504 envios cargados desde '_envios_LOWW_.txt'
+[ShipmentParser] OAKB ? 1155 envios cargados desde '_envios_OAKB_.txt'
+[ShipmentParser] OERK ? 1274 envios cargados desde '_envios_OERK_.txt'
+[ShipmentParser] OJAI ? 1263 envios cargados desde '_envios_OJAI_.txt'
+[ShipmentParser] OMDB ? 1036 envios cargados desde '_envios_OMDB_.txt'
+[ShipmentParser] OOMS ? 1503 envios cargados desde '_envios_OOMS_.txt'
+[ShipmentParser] OPKC ? 925 envios cargados desde '_envios_OPKC_.txt'
+[ShipmentParser] OSDI ? 944 envios cargados desde '_envios_OSDI_.txt'
+[ShipmentParser] OYSN ? 1144 envios cargados desde '_envios_OYSN_.txt'
+[ShipmentParser] SABE ? 1164 envios cargados desde '_envios_SABE_.txt'
+[ShipmentParser] SBBR ? 1591 envios cargados desde '_envios_SBBR_.txt'
+[ShipmentParser] SCEL ? 1106 envios cargados desde '_envios_SCEL_.txt'
+[ShipmentParser] SEQM ? 1043 envios cargados desde '_envios_SEQM_.txt'
+[ShipmentParser] SGAS ? 1596 envios cargados desde '_envios_SGAS_.txt'
+[ShipmentParser] SKBO ? 603 envios cargados desde '_envios_SKBO_.txt'
+[ShipmentParser] SLLP ? 1268 envios cargados desde '_envios_SLLP_.txt'
+[ShipmentParser] SPIM ? 1971 envios cargados desde '_envios_SPIM_.txt'
+[ShipmentParser] SUAA ? 1185 envios cargados desde '_envios_SUAA_.txt'
+[ShipmentParser] SVMI ? 672 envios cargados desde '_envios_SVMI_.txt'
+[ShipmentParser] UBBB ? 1222 envios cargados desde '_envios_UBBB_.txt'
+[ShipmentParser] UMMS ? 2148 envios cargados desde '_envios_UMMS_.txt'
+[ShipmentParser] VIDP ? 946 envios cargados desde '_envios_VIDP_.txt'
+[ShipmentParser] Total TXT: 36843 envios cargados de 30 archivos.
+[Lote] Ventana 244–424 | 755 envíos | 19573 vuelos disponibles
+[ALNS] Iniciando | Envíos: 755 | Vuelos: 19573 | Fitness inicial: 497066
+[ALNS] Finalizado | Iters: 400 | Fitness: 497066 ? 497066 | Mejoras: 0 | Aceptadas SA: 400
+[ALNS] Pesos Destructores: D0=2.93 D1=2.93 D2=2.93
+[ALNS] Pesos Reparadores:  R0=2.93 R1=2.93 R2=2.93
+[Lote] Rutas: 755 / 755
+[Lote] Completado en 792 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=792 ms | estable=true
+[ShipmentParser] Cargados 0 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true

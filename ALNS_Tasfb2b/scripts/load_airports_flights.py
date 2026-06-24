@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--flights", default=str(base_dir / "data" / "planes_vuelo.txt"))
     parser.add_argument("--start-date", default="2026-01-01", help="Fecha base para materializar vuelos recurrentes.")
     parser.add_argument("--days", type=int, default=1, help="Cantidad de dias a generar para planes_vuelo.txt.")
-    parser.add_argument("--create-schema", action="store_true", help="Crea airports y flight_plans si no existen.")
+    parser.add_argument("--create-schema", action="store_true", help="Crea airports, flight_plans y shipments vacia si no existen.")
     return parser.parse_args()
 
 
@@ -167,6 +167,21 @@ def create_schema(conn: Any) -> None:
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS shipments (
+              id UUID PRIMARY KEY,
+              shipment_code VARCHAR(80) UNIQUE NOT NULL,
+              origin_airport_id UUID NOT NULL REFERENCES airports(id),
+              destination_airport_id UUID NOT NULL REFERENCES airports(id),
+              baggage_count INT NOT NULL CHECK (baggage_count > 0),
+              registered_at TIMESTAMPTZ NOT NULL,
+              max_delivery_at TIMESTAMPTZ NOT NULL,
+              status VARCHAR(30) NOT NULL DEFAULT 'REGISTERED',
+              created_at TIMESTAMPTZ DEFAULT now()
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_flights_origin_date
             ON flight_plans(origin_airport_id, departure_time_utc)
             """
@@ -177,6 +192,11 @@ def create_schema(conn: Any) -> None:
             ON flight_plans(destination_airport_id, arrival_time_utc)
             """
         )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shipments_code ON shipments(shipment_code)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shipments_origin ON shipments(origin_airport_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shipments_destination ON shipments(destination_airport_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_shipments_registered_at ON shipments(registered_at)")
 
 
 def timezone_label(gmt_offset: int) -> str:

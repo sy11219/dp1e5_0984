@@ -165,6 +165,20 @@ public class DbSeedLoader {
                     """);
 
             statement.execute("""
+                    CREATE TABLE IF NOT EXISTS shipments (
+                      id UUID PRIMARY KEY,
+                      shipment_code VARCHAR(80) UNIQUE NOT NULL,
+                      origin_airport_id UUID NOT NULL REFERENCES airports(id),
+                      destination_airport_id UUID NOT NULL REFERENCES airports(id),
+                      baggage_count INT NOT NULL CHECK (baggage_count > 0),
+                      registered_at TIMESTAMPTZ NOT NULL,
+                      max_delivery_at TIMESTAMPTZ NOT NULL,
+                      status VARCHAR(30) NOT NULL DEFAULT 'REGISTERED',
+                      created_at TIMESTAMPTZ DEFAULT now()
+                    )
+                    """);
+
+            statement.execute("""
                     CREATE INDEX IF NOT EXISTS idx_flights_origin_date
                     ON flight_plans(origin_airport_id, departure_time_utc)
                     """);
@@ -173,6 +187,12 @@ public class DbSeedLoader {
                     CREATE INDEX IF NOT EXISTS idx_flights_destination_date
                     ON flight_plans(destination_airport_id, arrival_time_utc)
                     """);
+
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_shipments_code ON shipments(shipment_code)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_shipments_origin ON shipments(origin_airport_id)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_shipments_destination ON shipments(destination_airport_id)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_shipments_registered_at ON shipments(registered_at)");
         }
     }
 

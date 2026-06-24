@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Carga todos los archivos data/envios/_envios_XXXX_.txt en la tabla shipments.
+Herramienta legacy para cargar data/envios/_envios_XXXX_.txt en la tabla shipments.
+El flujo actual NO usa este script: los TXT son insumo de simulacion 5 dias y
+la BD recibe solo envios registrados desde la pestana Envios.
 
 Uso recomendado:
   pip install "psycopg[binary]"
@@ -70,6 +72,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--shipments-dir", default=str(base_dir / "data" / "envios"))
     parser.add_argument("--create-schema", action="store_true", help="Crea/ajusta la tabla shipments si no existe.")
+    parser.add_argument(
+        "--confirm-legacy-txt-db-load",
+        action="store_true",
+        help="Confirma explicitamente la carga legacy de TXT a BD. No se usa en el flujo normal.",
+    )
     return parser.parse_args()
 
 
@@ -255,6 +262,12 @@ def main() -> None:
     import psycopg
 
     args = parse_args()
+    if not args.confirm_legacy_txt_db_load:
+        raise RuntimeError(
+            "Carga cancelada: los TXT de data/envios no deben cargarse a BD en el flujo actual. "
+            "Usa la pestana Envios para registrar pedidos manuales. "
+            "Si necesitas ejecutar la herramienta legacy, agrega --confirm-legacy-txt-db-load."
+        )
     if not args.db_url:
         raise RuntimeError("Falta --db-url o la variable de entorno DB_URL.")
 
