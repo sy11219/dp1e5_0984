@@ -1,6 +1,7 @@
 import type { ActiveFlight, AirportLoads, SimulationData } from "../types";
 
-export function capacityStatus(utilization: number): "green" | "yellow" | "red" {
+export function capacityStatus(utilization: number): "green" | "yellow" | "red" | "white" {
+  if (utilization == 0) return "white";
   if (utilization < 0.7) return "green";
   if (utilization < 0.9) return "yellow";
   return "red";
