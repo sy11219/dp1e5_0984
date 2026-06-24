@@ -81,14 +81,16 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
         ) : (
           visible.map(s => {
             const status = !s.planned ? "red" : s.onTime ? "green" : "yellow";
-            const isCompleted = simMinute >= s.estimatedArrival;
+            const isCompleted = s.planned && simMinute >= s.estimatedArrival;
+            const arrivalLabel = s.planned ? formatSimMinute(s.estimatedArrival) : "pendiente";
+            const progressLabel = !s.planned ? "Sin ruta" : isCompleted ? "Entregado" : "En curso";
             return (
               <div className="row" key={`${s.id}-${s.requestMinute}`}>
                 <span className={`dot ${status}`}></span>
                 <div className="row-main">
                   <strong>{s.clientId}</strong>
                   <span>{`${s.origin} → ${s.destination} · ${s.suitcases} maletas`}</span>
-                  <span>{`Pedido: ${formatSimMinute(s.requestMinute)} · Llegada: ${formatSimMinute(s.estimatedArrival)}`}</span>
+                  <span>{`Pedido: ${formatSimMinute(s.requestMinute)} · Llegada: ${arrivalLabel}`}</span>
                   <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
                     <button
                       onClick={() => setSelectedShipment(s)}
@@ -97,7 +99,7 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
                       Ver vuelos ({s.flightIds.length})
                     </button>
                     <span className="capacity-pill" style={{ background: isCompleted ? "#2f855a" : "#ffbf00", color: "#fff" }}>
-                      {isCompleted ? "Entregado" : "En curso"}
+                      {progressLabel}
                     </span>
                   </div>
                 </div>

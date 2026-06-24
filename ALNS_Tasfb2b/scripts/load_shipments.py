@@ -19,6 +19,7 @@ Requiere que la tabla airports ya este cargada, porque usa:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import uuid
 from dataclasses import dataclass
@@ -62,7 +63,11 @@ class ShipmentRow:
 def parse_args() -> argparse.Namespace:
     base_dir = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description="Carga archivos de envios en PostgreSQL.")
-    parser.add_argument("--db-url", required=True, help="URL PostgreSQL. Ej: postgresql://user:pass@host:5432/db?sslmode=require")
+    parser.add_argument(
+        "--db-url",
+        default=os.getenv("DB_URL"),
+        help="URL PostgreSQL. Tambien puede definirse con DB_URL.",
+    )
     parser.add_argument("--shipments-dir", default=str(base_dir / "data" / "envios"))
     parser.add_argument("--create-schema", action="store_true", help="Crea/ajusta la tabla shipments si no existe.")
     return parser.parse_args()
@@ -250,6 +255,9 @@ def main() -> None:
     import psycopg
 
     args = parse_args()
+    if not args.db_url:
+        raise RuntimeError("Falta --db-url o la variable de entorno DB_URL.")
+
     shipments_dir = Path(args.shipments_dir)
 
     with psycopg.connect(args.db_url) as conn:

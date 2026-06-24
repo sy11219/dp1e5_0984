@@ -410,13 +410,8 @@ select {
   gap: 10px;
 }
 
-.operations-bottom-status,
 .simulation-bottom-actions {
   margin-top: auto;
-}
-
-.operations-bottom-status .metrics {
-  grid-template-columns: 1fr;
 }
 
 .section {
@@ -656,6 +651,34 @@ select {
 
 .metric strong {
   font-size: 20px;
+}
+
+.current-time-metrics {
+  grid-template-columns: 1fr;
+  margin-bottom: 12px;
+}
+
+.global-indicators {
+  grid-template-columns: 1fr;
+}
+
+.traffic-metric {
+  border-left: 5px solid var(--traffic-color);
+}
+
+.traffic-metric-green {
+  --traffic-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.traffic-metric-yellow {
+  --traffic-color: #ca8a04;
+  background: #fefce8;
+}
+
+.traffic-metric-red {
+  --traffic-color: #dc2626;
+  background: #fef2f2;
 }
 
 .map-panel {

@@ -14,6 +14,7 @@ import { AirportDetail } from "../components/AirportDetail"
 import { AirportsTable } from "../components/AirportsTable"
 import { CapacityLegend } from "../components/CapacityLegend"
 import { FlightsTable } from "../components/FlightsTable"
+import { GlobalIndicators } from "../components/GlobalIndicators"
 import { ShipmentsTable } from "../components/ShipmentsTable"
 import { Metrics } from "../components/Metrics"
 import MapStage, { type MapFocusTarget } from "../components/simulation/map/MapStage"
@@ -21,7 +22,7 @@ import { Timeline } from "../components/Timeline"
 import { Topbar } from "../components/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, Flight, SimulationData } from "../types"
-import { DEFAULT_START_DATE, SIMULATION_DAYS } from "../utils/constants"
+import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../utils/constants"
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 import { SimulationResultModal } from "../components/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
@@ -129,7 +130,7 @@ function markFinalReportDismissed(data: SimulationData | null) {
  */
 export function SimulationPage() {
   const [startDate, setStartDate]     = useState(DEFAULT_START_DATE)
-  const [startTime, setStartTime]     = useState("00:00")
+  const [startTime, setStartTime]     = useState(DEFAULT_START_TIME)
   const [days]                        = useState(SIMULATION_DAYS)
   const [data, setData]               = useState<SimulationData | null>(null)
   const [airportCatalog, setAirportCatalog] = useState<Airport[]>([])
@@ -490,7 +491,7 @@ export function SimulationPage() {
         .filter(
           (s) =>
             s.requestMinute <= simMinute &&
-            simMinute <= s.estimatedArrival + 60
+            (!s.planned || simMinute <= s.estimatedArrival + 60)
         )
         .sort((a, b) => a.estimatedArrival - b.estimatedArrival),
     [displayData, simMinute]
@@ -658,6 +659,12 @@ export function SimulationPage() {
             onRunSimulation={runSimulation}
             onStartDateChange={setStartDate}
             onStartTimeChange={setStartTime}
+          />
+          <GlobalIndicators
+            data={data}
+            currentMinute={simMinute}
+            planningWindowMinutes={data?.planningWindowMinutes ?? data?.batchMinutes}
+            fleetFlights={flightCatalog}
           />
           <CapacityLegend />
           <section className="panel section">
@@ -901,7 +908,7 @@ function SimulationControls({
 }
 
 function catalogSimulationData(airports: Airport[], flights: Flight[]): SimulationData {
-  const start = `${DEFAULT_START_DATE}T00:00:00`
+  const start = `${DEFAULT_START_DATE}T${DEFAULT_START_TIME}:00`
   return {
     scenario: "CATALOG",
     status: "IDLE",

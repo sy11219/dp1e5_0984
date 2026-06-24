@@ -3,6 +3,7 @@ import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "
 import {
   cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
+  getFlightsRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
@@ -10,9 +11,10 @@ import { AirportDetail } from "../../simulation/components/AirportDetail";
 import { AirportsTable } from "../../simulation/components/AirportsTable";
 import { CapacityLegend } from "../../simulation/components/CapacityLegend";
 import { FlightsTable } from "../../simulation/components/FlightsTable";
+import { GlobalIndicators } from "../../simulation/components/GlobalIndicators";
 import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
 import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
-import type { AirportLoads, SimulationData } from "../../simulation/types";
+import type { AirportLoads, Flight, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import {
@@ -152,6 +154,7 @@ function LiveMetrics({
 
 export const OperationsPage = () => {
   const [data, setData] = useState<SimulationData | null>(null);
+  const [flightCatalog, setFlightCatalog] = useState<Flight[]>([]);
   const [, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
@@ -218,6 +221,22 @@ export const OperationsPage = () => {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    void getFlightsRequest()
+      .then((flights) => {
+        if (!ignore) setFlightCatalog(flights);
+      })
+      .catch(() => {
+        if (!ignore) setFlightCatalog([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -381,6 +400,16 @@ export const OperationsPage = () => {
           </button>
           <section className="panel section">
             <h2>Panel de control</h2>
+            <div className="metrics current-time-metrics">
+              <div className="metric">
+                <span>Fecha actual</span>
+                <strong>{formatDateOnly(now)}</strong>
+              </div>
+              <div className="metric">
+                <span>Hora actual</span>
+                <strong>{formatClock(now)}</strong>
+              </div>
+            </div>
             <div className="control-grid">
               <div className="field">
                 <label>Cancelar vuelo</label>
@@ -404,6 +433,13 @@ export const OperationsPage = () => {
               {notice && <div className="success">{notice}</div>}
             </div>
           </section>
+
+          <GlobalIndicators
+            data={data}
+            currentMinute={operationalMinute}
+            planningWindowMinutes={data?.planningWindowMinutes ?? data?.planningIntervalMinutes}
+            fleetFlights={flightCatalog}
+          />
 
           <CapacityLegend />
 
@@ -512,18 +548,6 @@ export const OperationsPage = () => {
             ) : (
               <div className="empty-state">Sin datos.</div>
             )}
-          </section>
-          <section className="panel section operations-bottom-status">
-            <div className="metrics">
-              <div className="metric">
-                <span>Fecha actual</span>
-                <strong>{formatDateOnly(now)}</strong>
-              </div>
-              <div className="metric">
-                <span>Hora actual</span>
-                <strong>{formatClock(now)}</strong>
-              </div>
-            </div>
           </section>
         </aside>
         ) : (
