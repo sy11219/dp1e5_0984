@@ -449,6 +449,11 @@ public class RealtimeSimulationService {
             return lastBatchRuntimeMs == 0 || lastBatchRuntimeMs < planningIntervalMs();
         }
 
+        private boolean plannerFastMode() {
+            return lastBatchRuntimeMs > 0
+                    && lastBatchRuntimeMs >= Math.round(planningIntervalMs() * 0.80);
+        }
+
         private int plannedCompletionTick() {
             int completionTick = maxTick;
             List<Shipment> source = isBatchScenario() ? todosLosShipmentsProcesados : processed;
@@ -512,12 +517,13 @@ public class RealtimeSimulationService {
                 int iters   = Math.max(80, Math.min(400, n * 4));
                 int seg     = Math.max(10, iters / 15);
                 int nDestr  = Math.max(3, Math.min(n / 5 + 5, 60));
+                boolean fastMode = plannerFastMode();
 
                 ALNS alns = new ALNS(iters, seg, nDestr, 300.0, 0.995, 2,
-                        9.0, 3.0, 0.0, 0.8);
+                        9.0, 3.0, 0.0, 0.8, fastMode);
 
                 Map<String, Route> resultado = alns.ejecutarIncremental(
-                        loteShipments, vuelosDisponibles, airportMap);
+                        loteShipments, vuelosDisponibles, airportMap, todosLosShipmentsProcesados);
 
                 registrarEventosLote(loteShipments, resultado);
 
@@ -774,8 +780,10 @@ public class RealtimeSimulationService {
         private void planQueue() {
             int iters   = Math.max(20, Math.min(80, queue.size() * 3));
             int segment = Math.max(5, iters / 5);
-            ALNS alns   = new ALNS(iters, segment, -1, 80.0, 0.96, 2, 9.0, 3.0, 0.0, 0.8);
-            Map<String, Route> result = alns.ejecutar(queue, availableFlightsFrom(tick), airportMap);
+            ALNS alns   = new ALNS(iters, segment, -1, 80.0, 0.96, 2,
+                    9.0, 3.0, 0.0, 0.8, plannerFastMode());
+            Map<String, Route> result = alns.ejecutarIncremental(
+                    queue, availableFlightsFrom(tick), airportMap, processed);
             events.add(new RealtimeEvent(tick, "SYSTEM", result.size(), "replan"));
             processed.addAll(queue);
             for (Shipment s : queue) queuedShipmentIds.remove(s.getShipmentId());
@@ -1068,6 +1076,7 @@ public class RealtimeSimulationService {
             json.prop("planningTimeScale", planningTimeScale()).comma();
             json.prop("planningWindowMinutes", planningWindowMinutes()).comma();
             json.prop("planningStable", planningStable()).comma();
+            json.prop("planningFastMode", plannerFastMode()).comma();
             json.prop("connectionWaitMinutes", OperationParameters.CONNECTION_WAIT_MINUTES).comma();
             json.prop("finalPickupWaitMinutes", OperationParameters.FINAL_PICKUP_WAIT_MINUTES).comma();
             json.prop("batchCount", batchCount).comma();

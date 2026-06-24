@@ -29,6 +29,7 @@ public class ALNSRouteFinder {
 
     private final Map<String, Airport> airportMap;
     private final int maxEscalas;
+    private final AirportCapacityTimeline airportCapacityTimeline;
     private final Map<List<Flight>, Map<String, List<Flight>>> flightIndexCache = new IdentityHashMap<>();
     private final Map<RouteCacheKey, List<Route>> candidateRouteCache = new HashMap<>();
 
@@ -37,8 +38,15 @@ public class ALNSRouteFinder {
     }
 
     public ALNSRouteFinder(Map<String, Airport> airportMap, int maxEscalas) {
+        this(airportMap, maxEscalas, null);
+    }
+
+    public ALNSRouteFinder(Map<String, Airport> airportMap,
+                           int maxEscalas,
+                           AirportCapacityTimeline airportCapacityTimeline) {
         this.airportMap = airportMap;
         this.maxEscalas = maxEscalas;
+        this.airportCapacityTimeline = airportCapacityTimeline;
     }
 
     public Route findBestRoute(Shipment shipment, List<Flight> flights) {
@@ -109,7 +117,7 @@ public class ALNSRouteFinder {
                 route = findBestRouteCached(partShipment, flights);
             }
 
-            if (route != null && route.isValid()) {
+            if (route != null && route.isValid() && esFeasible(route, bags)) {
                 reserve(route, bags);
                 result.add(new PartialRoute(route, bags));
                 pending -= bags;
@@ -126,10 +134,22 @@ public class ALNSRouteFinder {
 
     public List<Route> findCandidateRoutesCached(Shipment shipment, List<Flight> flights, int maxCandidates) {
         RouteCacheKey key = RouteCacheKey.of(shipment, flights, maxCandidates, maxEscalas);
-        return candidateRouteCache.computeIfAbsent(
+        List<Route> cached = candidateRouteCache.computeIfAbsent(
                 key,
                 ignored -> findCandidateRoutes(shipment, flights, maxCandidates)
         );
+        List<Route> adapted = new ArrayList<>(cached.size());
+        for (Route route : cached) {
+            adapted.add(new Route(
+                    shipment.getShipmentId(),
+                    shipment.getOriginCode(),
+                    shipment.getDestCode(),
+                    route.getFlights(),
+                    shipment.getSuitcaseCount(),
+                    shipment.getRequestMinute()
+            ));
+        }
+        return adapted;
     }
 
     public boolean esFeasible(Route route, int bags) {
@@ -138,12 +158,8 @@ public class ALNSRouteFinder {
         for (int i = 0; i < flights.size(); i++) {
             Flight flight = flights.get(i);
             if (!flight.hasSpaceFor(bags)) return false;
-            if (i < flights.size() - 1) {
-                Airport airport = airportMap.get(flight.getDestCode());
-                if (airport != null && !airport.hasCapacityFor(bags)) return false;
-            }
         }
-        return true;
+        return airportCapacityTimeline == null || airportCapacityTimeline.canReserve(route, bags);
     }
 
     public int getDeadlineMinutes(Shipment shipment) {
@@ -186,7 +202,9 @@ public class ALNSRouteFinder {
                         shipment.getSuitcaseCount(),
                         shipment.getRequestMinute()
                 );
-                if (route.isValid()) routes.add(route);
+                if (route.isValid() && (!checkCapacity || esFeasible(route, shipment.getSuitcaseCount()))) {
+                    routes.add(route);
+                }
                 continue;
             }
 
@@ -206,11 +224,6 @@ public class ALNSRouteFinder {
                     maxArrival)) {
 
                 if (checkCapacity && !flight.hasSpaceFor(shipment.getSuitcaseCount())) continue;
-
-                if (checkCapacity && !flight.getDestCode().equals(shipment.getDestCode())) {
-                    Airport airport = airportMap.get(flight.getDestCode());
-                    if (airport != null && !airport.hasCapacityFor(shipment.getSuitcaseCount())) continue;
-                }
 
                 int wait = flight.absoluteDepartureMinute() - current.availableMinute;
                 int duration = flight.absoluteArrivalMinute() - flight.absoluteDepartureMinute();
@@ -272,6 +285,9 @@ public class ALNSRouteFinder {
         for (Flight flight : route.getFlights()) {
             flight.assignLoad(bags);
         }
+        if (airportCapacityTimeline != null) {
+            airportCapacityTimeline.reserve(route, bags);
+        }
         List<Flight> routeFlights = route.getFlights();
         for (int i = 0; i < routeFlights.size() - 1; i++) {
             Airport airport = airportMap.get(routeFlights.get(i).getDestCode());
@@ -296,7 +312,6 @@ public class ALNSRouteFinder {
 
     private record RouteCacheKey(
             int flightsIdentity,
-            String shipmentId,
             String origin,
             String destination,
             int requestMinute,
@@ -307,7 +322,6 @@ public class ALNSRouteFinder {
         static RouteCacheKey of(Shipment shipment, List<Flight> flights, int maxCandidates, int maxStops) {
             return new RouteCacheKey(
                     System.identityHashCode(flights),
-                    shipment.getShipmentId(),
                     shipment.getOriginCode(),
                     shipment.getDestCode(),
                     shipment.getRequestMinute(),

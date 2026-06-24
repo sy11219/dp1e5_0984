@@ -30,6 +30,8 @@ public class Route {
     private final List<Flight> flights;        // Secuencia de vuelos (en orden)
     private final int suitcaseCount;           // Maletas que viajan por esta ruta
     private final int startMinute;             // Minuto desde el que el envío está disponible
+    private Integer cachedArrivalMinute;
+    private Boolean cachedValid;
 
     // Alias historico para reportes y compatibilidad interna.
     public static final int TRANSIT_TIME_MINUTES = OperationParameters.CONNECTION_WAIT_MINUTES;
@@ -68,7 +70,11 @@ public class Route {
      * @return Minuto absoluto de llegada, o Integer.MAX_VALUE si la ruta es inválida
      */
     public int calculateArrivalMinute() {
-        if (flights.isEmpty()) return Integer.MAX_VALUE;
+        if (cachedArrivalMinute != null) return cachedArrivalMinute;
+        if (flights.isEmpty()) {
+            cachedArrivalMinute = Integer.MAX_VALUE;
+            return cachedArrivalMinute;
+        }
 
         int currentReadyMinute = startMinute; // Cuando el envío está listo para su primer vuelo
 
@@ -77,7 +83,8 @@ public class Route {
 
             // El envío debe salir DESPUÉS de estar listo; si el vuelo sale antes, ruta inválida
             if (f.absoluteDepartureMinute() < currentReadyMinute) {
-                return Integer.MAX_VALUE; // Vuelo sale antes que el envío esté listo
+                cachedArrivalMinute = Integer.MAX_VALUE;
+                return cachedArrivalMinute; // Vuelo sale antes que el envío esté listo
             }
 
             // Llegamos al siguiente aeropuerto
@@ -89,7 +96,8 @@ public class Route {
             }
         }
 
-        return currentReadyMinute; // Minuto de llegada al destino final
+        cachedArrivalMinute = currentReadyMinute;
+        return cachedArrivalMinute; // Minuto de llegada al destino final
     }
 
     /**
@@ -102,23 +110,35 @@ public class Route {
      * @return true si la ruta es válida
      */
     public boolean isValid() {
-        if (flights.isEmpty()) return false;
+        if (cachedValid != null) return cachedValid;
+        if (flights.isEmpty()) {
+            cachedValid = false;
+            return cachedValid;
+        }
 
         // Primer vuelo debe partir del origen del envío
-        if (!flights.get(0).getOriginCode().equals(originCode)) return false;
+        if (!flights.get(0).getOriginCode().equals(originCode)) {
+            cachedValid = false;
+            return cachedValid;
+        }
 
         // Último vuelo debe llegar al destino final
-        if (!flights.get(flights.size() - 1).getDestCode().equals(finalDestCode)) return false;
+        if (!flights.get(flights.size() - 1).getDestCode().equals(finalDestCode)) {
+            cachedValid = false;
+            return cachedValid;
+        }
 
         // Las escalas deben ser consecutivas: destino de un vuelo = origen del siguiente
         for (int i = 0; i < flights.size() - 1; i++) {
             if (!flights.get(i).getDestCode().equals(flights.get(i + 1).getOriginCode())) {
-                return false;
+                cachedValid = false;
+                return cachedValid;
             }
         }
 
         // Verificar que los tiempos sean coherentes (el envío puede alcanzar cada vuelo)
-        return calculateArrivalMinute() != Integer.MAX_VALUE;
+        cachedValid = calculateArrivalMinute() != Integer.MAX_VALUE;
+        return cachedValid;
     }
 
     /**
