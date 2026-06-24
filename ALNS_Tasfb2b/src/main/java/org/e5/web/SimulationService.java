@@ -302,7 +302,7 @@ public class SimulationService {
     }
 
     private String status(double utilization) {
-        if (utilization == 0) return "white";
+        if (utilization == 0) return "gray";
         if (utilization < 0.70) return "green";
         if (utilization < 0.90) return "yellow";
         return "red";

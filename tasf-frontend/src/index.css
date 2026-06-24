@@ -13,7 +13,7 @@
   --green: #21a67a;
   --yellow: #d9a219;
   --red: #d84545;
-  --white: #ffffff;
+  --gray: #a8a7a7;
   --ink-soft: #647084;
   --line: #dfe5ec;
   --panel: #ffffff;
@@ -522,7 +522,7 @@ select {
 
 .green { background: var(--green); }
 .yellow { background: var(--yellow); }
-.white { background: var(--white); }
+.gray { background: var(--gray); }
 .red { background: var(--red); }
 
 .airport-status-control {
@@ -707,7 +707,7 @@ select {
 .airport-marker.green span { background: var(--green); }
 .airport-marker.yellow span { background: var(--yellow); }
 .airport-marker.red span { background: var(--red); }
-.airport-marker.white span { background: var(--white); }
+.airport-marker.gray span { background: var(--gray); }
 
 .airport-marker strong {
   font-size: 11px;

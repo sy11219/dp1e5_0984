@@ -5,7 +5,8 @@ export function CapacityLegend() {
       <div className="legend">
         <div className="legend-row"><span className="dot green"></span>Menor a 70%</div>
         <div className="legend-row"><span className="dot yellow"></span>Desde 70% hasta menor a 90%</div>
-        <div className="legend-row"><span className="dot red"></span>90% o mas</div>
+        <div className="legend-row"><span className="dot red"></span>90% o más</div>
+        <div className="legend-row"><span className="dot gray"></span>Vacío</div>
       </div>
     </section>
   );
