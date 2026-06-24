@@ -19,7 +19,7 @@ export function computeActiveFlights(
   const active: ActiveFlight[] = [];
 
   for (const flight of data.flights) {
-    if (flight.assignedLoad <= 0) continue;
+    //if (flight.assignedLoad <= 0) continue;
     if (flight.scheduleStatus?.toUpperCase().startsWith("CANCEL")) continue;
     if (minute < flight.absoluteDepartureMinute) continue;
     if (minute > flight.absoluteArrivalMinute) continue;

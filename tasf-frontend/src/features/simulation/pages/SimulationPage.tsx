@@ -353,6 +353,10 @@ export function SimulationPage() {
     () => computeActiveFlights(displayData, simMinute),
     [displayData, simMinute]
   )
+  const activeFlightIds = useMemo(
+    () => new Set(activeFlights.map(f => f.id)),
+    [activeFlights]
+  )
   const visibleShipments = useMemo(
     () =>
       (displayData.shipments ?? []).filter(
@@ -546,9 +550,9 @@ export function SimulationPage() {
             )}
           </section>
           <section className="panel section">
-            <h3>Vuelos activos</h3>
+            <h3>Vuelos</h3>
             {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
-            <FlightsTable flights={activeFlights} />
+            <FlightsTable flights={displayData.flights} activeFlightIds={activeFlightIds}/>
           </section>
           <section className="panel section">
             <h3>Envíos</h3>

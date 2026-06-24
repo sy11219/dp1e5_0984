@@ -264,6 +264,10 @@ export const OperationsPage = () => {
     () => computeActiveFlights(data, operationalMinute),
     [data, operationalMinute]
   );
+  const activeFlightIds = useMemo(
+    () => new Set(activeFlights.map(f => f.id)),
+    [activeFlights]
+  )
   const visibleShipments = useMemo(
     () =>
       (data?.shipments ?? []).filter(
@@ -427,8 +431,8 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
-            <h3>Vuelos activos</h3>
-            <FlightsTable flights={activeFlights} />
+            <h3>Vuelos</h3>
+            <FlightsTable flights={data?.flights || []} activeFlightIds={activeFlightIds}/>
           </section>
 
           <section className="panel section">

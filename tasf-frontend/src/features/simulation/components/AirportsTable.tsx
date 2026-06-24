@@ -44,7 +44,8 @@ export function AirportsTable({ airports, loads, flights, shipments }: AirportsT
       result = result.filter(
         (a) =>
           a.code.toLowerCase().includes(query) ||
-          a.continent.toLowerCase().includes(query)
+          a.continent.toLowerCase().includes(query) ||
+          a.city.toLowerCase().includes(query)
       );
     }
 
