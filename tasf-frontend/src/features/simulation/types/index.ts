@@ -1,4 +1,4 @@
-export type CapacityStatus = "green" | "yellow" | "red";
+export type CapacityStatus = "green" | "yellow" | "red" | "gray";
 
 export interface Airport {
   code: string;

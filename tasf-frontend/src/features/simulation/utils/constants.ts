@@ -2,6 +2,7 @@ export const STATUS_COLOR = {
   green: "#21a67a",
   yellow: "#d9a219",
   red: "#d84545",
+  gray: "#a8a7a7",
 } as const;
 
 export const SIMULATION_DAYS = 5;

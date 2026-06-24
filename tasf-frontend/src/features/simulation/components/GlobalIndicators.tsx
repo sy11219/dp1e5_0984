@@ -2,7 +2,7 @@ import type { Flight, SimulationData } from "../types";
 import { capacityStatus, computeAirportLoads } from "../utils/calculations";
 import { percent } from "../utils/formatters";
 
-type TrafficStatus = "green" | "yellow" | "red";
+type TrafficStatus = "green" | "yellow" | "red" | "gray";
 
 interface GlobalIndicatorsProps {
   data: SimulationData | null;

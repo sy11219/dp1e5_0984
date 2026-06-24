@@ -316,6 +316,10 @@ export const OperationsPage = () => {
     () => computeActiveFlights(data, operationalMinute),
     [data, operationalMinute]
   );
+  const activeFlightIds = useMemo(
+    () => new Set(activeFlights.map(f => f.id)),
+    [activeFlights]
+  )
   const visibleShipments = useMemo(
     () =>
       (data?.shipments ?? []).filter(
@@ -521,9 +525,10 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
-            <h3>Vuelos activos</h3>
+            <h3>Vuelos</h3>
             <FlightsTable
-              flights={activeFlights}
+              flights={data?.flights || []}
+              activeFlightIds={activeFlightIds}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
             />
