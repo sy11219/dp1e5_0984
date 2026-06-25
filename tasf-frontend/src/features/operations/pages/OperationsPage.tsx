@@ -3,7 +3,6 @@ import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "
 import {
   cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
-  getFlightsRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
@@ -14,7 +13,7 @@ import { FlightsTable } from "../../simulation/components/FlightsTable";
 import { GlobalIndicators } from "../../simulation/components/GlobalIndicators";
 import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
 import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
-import type { AirportLoads, Flight, SimulationData } from "../../simulation/types";
+import type { AirportLoads, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import {
@@ -154,7 +153,6 @@ function LiveMetrics({
 
 export const OperationsPage = () => {
   const [data, setData] = useState<SimulationData | null>(null);
-  const [flightCatalog, setFlightCatalog] = useState<Flight[]>([]);
   const [, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
@@ -221,22 +219,6 @@ export const OperationsPage = () => {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    let ignore = false;
-
-    void getFlightsRequest()
-      .then((flights) => {
-        if (!ignore) setFlightCatalog(flights);
-      })
-      .catch(() => {
-        if (!ignore) setFlightCatalog([]);
-      });
-
-    return () => {
-      ignore = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -442,7 +424,6 @@ export const OperationsPage = () => {
             data={data}
             currentMinute={operationalMinute}
             planningWindowMinutes={data?.planningWindowMinutes ?? data?.planningIntervalMinutes}
-            fleetFlights={flightCatalog}
           />
 
           <CapacityLegend />

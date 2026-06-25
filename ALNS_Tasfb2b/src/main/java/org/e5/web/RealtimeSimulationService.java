@@ -188,11 +188,23 @@ public class RealtimeSimulationService {
 
     public synchronized String startBatchSimulation(String startDate, int days, String startTime,
                                                    String timeZone) throws Exception {
+        return startBatchSimulation(startDate, days, startTime, timeZone, "", "");
+    }
+
+    public synchronized String startBatchSimulation(String startDate, int days, String startTime,
+                                                   String timeZone, String clientId,
+                                                   String controlToken) throws Exception {
         validate(startDate, days, true);
+        RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        if (current != null && !current.completed) {
+            requireBatchControl(current, clientId, controlToken);
+        }
         int startOffsetMinutes = parseStartTime(startTime);
-        String json = createSession(startDate, days, "SIMULACION_LOTES", startOffsetMinutes, timeZone);
+        String ownerClientId = normalizeClientId(clientId);
+        String json = createSession(startDate, days, "SIMULACION_LOTES", startOffsetMinutes, timeZone, ownerClientId);
         sharedSimulationSessionId = lastCreatedSessionId;
-        return json;
+        RealtimeSession created = sessions.get(sharedSimulationSessionId);
+        return created == null ? json : created.snapshotJson(true);
     }
 
     public String currentSimulation() {
@@ -201,10 +213,15 @@ public class RealtimeSimulationService {
     }
 
     public synchronized String stopBatchSimulation(String id) {
+        return stopBatchSimulation(id, "", "");
+    }
+
+    public synchronized String stopBatchSimulation(String id, String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
         }
+        requireBatchControl(session, clientId, controlToken);
 
         sessions.remove(id);
         if (id.equals(sharedSimulationSessionId)) {
@@ -233,8 +250,13 @@ public class RealtimeSimulationService {
     }
 
     public String advance(String id, int steps, int expectedTick) {
+        return advance(id, steps, expectedTick, "", "");
+    }
+
+    public String advance(String id, int steps, int expectedTick, String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if ("SIMULACION_LOTES".equals(session.scenario)) {
+            requireBatchControl(session, clientId, controlToken);
             if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJson();
             session.advanceBatch(BATCH_MINUTES);
         } else {
@@ -276,11 +298,17 @@ public class RealtimeSimulationService {
     }
 
     private String createSession(String startDate, int days, String scenario) throws Exception {
-        return createSession(startDate, days, scenario, 0, ZoneId.systemDefault().getId());
+        return createSession(startDate, days, scenario, 0, ZoneId.systemDefault().getId(), "");
     }
 
     private String createSession(String startDate, int days, String scenario,
                                  int startOffsetMinutes, String timeZone) throws Exception {
+        return createSession(startDate, days, scenario, startOffsetMinutes, timeZone, "");
+    }
+
+    private String createSession(String startDate, int days, String scenario,
+                                 int startOffsetMinutes, String timeZone,
+                                 String ownerClientId) throws Exception {
         ZoneId sessionZone = resolveZone(timeZone);
         AirportParser airportParser = new AirportParser();
         List<Airport> airports = airportParser.parse();
@@ -309,7 +337,7 @@ public class RealtimeSimulationService {
 
         RealtimeSession session = new RealtimeSession(
                 startDate, days, scenario, startOffsetMinutes, sessionZone,
-                airports, airportMap, flights, shipments);
+                airports, airportMap, flights, shipments, ownerClientId);
         sessions.put(session.id, session);
         lastCreatedSessionId = session.id;
         return session.snapshotJson();
@@ -328,6 +356,16 @@ public class RealtimeSimulationService {
         RealtimeSession session = sessions.get(id);
         if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
         return session;
+    }
+
+    private void requireBatchControl(RealtimeSession session, String clientId, String controlToken) {
+        if (session == null || !session.isBatchScenario()) return;
+        if (session.controlsAllowed(clientId, controlToken)) return;
+        throw new SecurityException("Solo la maquina que inicio la simulacion puede controlar esta sesion.");
+    }
+
+    private static String normalizeClientId(String clientId) {
+        return clientId == null ? "" : clientId.trim();
     }
 
     private void validate(String startDate, int days, boolean batch) {
@@ -356,6 +394,8 @@ public class RealtimeSimulationService {
         final ZoneId originZone;
         final String simulationStartInstant;
         final String simulationEndInstant;
+        final String ownerClientId;
+        final String controlToken;
         final List<Airport> airports;
         final Map<String, Airport> airportMap;
         final List<Flight> flights;
@@ -373,6 +413,7 @@ public class RealtimeSimulationService {
         final Set<String> knownShipmentIds = new HashSet<>();
         final Set<String> pendingCancellations = new HashSet<>();
         final Set<String> cancellations = new HashSet<>();
+        final List<CancellationRequest> queuedCancellationRequests = new ArrayList<>();
 
         final long realStartedAtMs = System.currentTimeMillis();
         int tick;
@@ -399,12 +440,15 @@ public class RealtimeSimulationService {
         RealtimeSession(String startDate, int days, String scenario, int startOffsetMinutes,
                         ZoneId originZone,
                         List<Airport> airports, Map<String, Airport> airportMap,
-                        List<Flight> flights, List<Shipment> shipments) {
+                        List<Flight> flights, List<Shipment> shipments,
+                        String ownerClientId) {
             this.startDate  = startDate;
             this.days       = days;
             this.scenario   = scenario;
             this.startOffsetMinutes = startOffsetMinutes;
             this.originZone = originZone;
+            this.ownerClientId = isBatchScenarioName(scenario) ? normalizeClientId(ownerClientId) : "";
+            this.controlToken = this.ownerClientId.isBlank() ? "" : UUID.randomUUID().toString();
             this.airports   = airports;
             this.airportMap = airportMap;
             this.flights    = flights;
@@ -427,6 +471,16 @@ public class RealtimeSimulationService {
 
         private boolean isBatchScenario() {
             return "SIMULACION_LOTES".equals(scenario);
+        }
+
+        private static boolean isBatchScenarioName(String scenario) {
+            return "SIMULACION_LOTES".equals(scenario);
+        }
+
+        private boolean controlsAllowed(String clientId, String token) {
+            if (!isBatchScenario() || ownerClientId.isBlank()) return true;
+            return ownerClientId.equals(normalizeClientId(clientId))
+                    && controlToken.equals(token == null ? "" : token.trim());
         }
 
         private long planningIntervalMs() {
@@ -454,25 +508,8 @@ public class RealtimeSimulationService {
                     && lastBatchRuntimeMs >= Math.round(planningIntervalMs() * 0.80);
         }
 
-        private int plannedCompletionTick() {
-            int completionTick = maxTick;
-            List<Shipment> source = isBatchScenario() ? todosLosShipmentsProcesados : processed;
-
-            for (Shipment shipment : source) {
-                Route route = shipment.getAssignedRoute();
-                if (route == null || !route.isValid() || route.getFlights().isEmpty()) continue;
-
-                Flight lastFlight = route.getFlights().get(route.getFlights().size() - 1);
-                completionTick = Math.max(
-                        completionTick,
-                        lastFlight.absoluteArrivalMinute() + OperationParameters.FINAL_PICKUP_WAIT_MINUTES);
-            }
-
-            return completionTick;
-        }
-
         private int effectiveMaxTick() {
-            return isBatchScenario() ? plannedCompletionTick() : maxTick;
+            return maxTick;
         }
 
         // ── SIMULACION_LOTES: avance de un lote completo ─────────────────────
@@ -497,6 +534,7 @@ public class RealtimeSimulationService {
             int batchEnd   = Math.min(tick + steps, maxTick);
             lastBatchStart = batchStart;
             lastBatchEnd   = batchEnd;
+            applyQueuedCancellationRequests();
 
             // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
             List<Shipment> loteShipments = new ArrayList<>();
@@ -537,13 +575,13 @@ public class RealtimeSimulationService {
             batchCount++;
             tick = batchEnd;
             if (tick >= maxTick) {
-                if (!queue.isEmpty()) planQueue();
-                tick = Math.max(tick, plannedCompletionTick());
+                tick = maxTick;
+                queue.clear();
                 completed = true;
                 System.out.println("[Lote] Simulación completada.");
             }
 
-            events.add(new RealtimeEvent(tick, "SYSTEM", loteShipments.size(), "batch_complete"));
+            addVisibleEvent(tick, "SYSTEM", loteShipments.size(), "batch_complete");
 
             lastBatchRuntimeMs = System.currentTimeMillis() - batchStartMs;
             visualWindowStartedAtMs = batchStartMs;
@@ -561,8 +599,8 @@ public class RealtimeSimulationService {
 
             for (Shipment s : loteShipments) {
                 if (!s.isSplitPart() && createdEvents.add(s.getShipmentId())) {
-                    events.add(new RealtimeEvent(s.getRequestMinute(),
-                            s.getOriginCode(), s.getSuitcaseCount(), "shipment_created"));
+                    addVisibleEvent(s.getRequestMinute(),
+                            s.getOriginCode(), s.getSuitcaseCount(), "shipment_created");
                 }
             }
 
@@ -590,29 +628,34 @@ public class RealtimeSimulationService {
             List<Flight> rutaVuelos = ruta.getFlights();
             if (rutaVuelos.isEmpty()) return;
 
-            events.add(new RealtimeEvent(
+            addVisibleEvent(
                     rutaVuelos.get(0).absoluteDepartureMinute(),
-                    s.getOriginCode(), -s.getSuitcaseCount(), "flight_departure"));
+                    s.getOriginCode(), -s.getSuitcaseCount(), "flight_departure");
 
             for (int i = 0; i < rutaVuelos.size(); i++) {
                 Flight f = rutaVuelos.get(i);
                 boolean last = (i == rutaVuelos.size() - 1);
                 if (last) {
                     int arrivalMinute = f.absoluteArrivalMinute();
-                    events.add(new RealtimeEvent(arrivalMinute,
-                            f.getDestCode(), s.getSuitcaseCount(), "final_arrival"));
-                    events.add(new RealtimeEvent(
+                    addVisibleEvent(arrivalMinute,
+                            f.getDestCode(), s.getSuitcaseCount(), "final_arrival");
+                    addVisibleEvent(
                             arrivalMinute + OperationParameters.FINAL_PICKUP_WAIT_MINUTES,
-                            f.getDestCode(), -s.getSuitcaseCount(), "final_pickup"));
+                            f.getDestCode(), -s.getSuitcaseCount(), "final_pickup");
                     continue;
                 }
 
-                events.add(new RealtimeEvent(f.absoluteArrivalMinute(),
-                        f.getDestCode(), s.getSuitcaseCount(), "connection_arrival"));
+                addVisibleEvent(f.absoluteArrivalMinute(),
+                        f.getDestCode(), s.getSuitcaseCount(), "connection_arrival");
                 Flight next = rutaVuelos.get(i + 1);
-                events.add(new RealtimeEvent(next.absoluteDepartureMinute(),
-                        f.getDestCode(), -s.getSuitcaseCount(), "connection_departure"));
+                addVisibleEvent(next.absoluteDepartureMinute(),
+                        f.getDestCode(), -s.getSuitcaseCount(), "connection_departure");
             }
+        }
+
+        private void addVisibleEvent(int minute, String airport, int delta, String type) {
+            if (isBatchScenario() && minute > maxTick) return;
+            events.add(new RealtimeEvent(minute, airport, delta, type));
         }
 
         // ── TIEMPO_REAL: avance tick a tick ───────────────────────────────────
@@ -723,6 +766,7 @@ public class RealtimeSimulationService {
             }
 
             long cycleStartMs = System.currentTimeMillis();
+            applyQueuedCancellationRequests();
             applyPendingRealtimeCancellations();
 
             lastBatchStart = tick;
@@ -794,21 +838,21 @@ public class RealtimeSimulationService {
             if (pendingCancellations.isEmpty()) return;
             List<String> pending = new ArrayList<>(pendingCancellations);
             pendingCancellations.clear();
-            for (String flightId : pending) {
-                cancellations.add(flightId);
-                requeueAffectedByRealtimeCancellation(flightId);
+            for (String cancellationKey : pending) {
+                cancellations.add(cancellationKey);
+                requeueAffectedByRealtimeCancellation(cancellationKey);
                 events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
             }
         }
 
-        private void requeueAffectedByRealtimeCancellation(String flightId) {
+        private void requeueAffectedByRealtimeCancellation(String cancellationKey) {
             Iterator<Shipment> iterator = processed.iterator();
             while (iterator.hasNext()) {
                 Shipment s = iterator.next();
                 Route route = s.getAssignedRoute();
                 if (route == null) continue;
                 boolean usesCancelled = route.getFlights().stream()
-                        .anyMatch(f -> f.getFlightId().equals(flightId));
+                        .anyMatch(f -> cancellationKey(f).equals(cancellationKey));
                 if (!usesCancelled) continue;
 
                 for (Flight f : route.getFlights()) {
@@ -837,33 +881,33 @@ public class RealtimeSimulationService {
         synchronized void cancel(String flightId, FlightPlanService flightPlanService) {
             Flight requested = findFlight(flightId);
             Flight toCancel = resolveCancellationFlight(flightId);
-            if (toCancel == null)
-                throw new IllegalArgumentException("Vuelo no encontrado: " + flightId);
-
-            try {
-                flightPlanService.cancelFlight(toCancel.getFlightId());
-            } catch (Exception e) {
-                throw new IllegalStateException("No se pudo marcar el vuelo como CANCELED en BD: " + toCancel.getFlightId(), e);
+            if (toCancel == null) {
+                queueCancellationRequest(flightId);
+                events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled_pending"));
+                return;
             }
 
-            String cancelledFlightId = toCancel.getFlightId();
-            if (requested != null && !requested.getFlightId().equals(cancelledFlightId)) {
+            String cancelledFlightKey = cancellationKey(toCancel);
+            if (requested != null && !cancellationKey(requested).equals(cancelledFlightKey)) {
                 events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancel_redirected"));
             }
 
             if ("SIMULACION_LOTES".equals(scenario)) {
-                cancellations.add(cancelledFlightId);
+                cancellations.add(cancelledFlightKey);
                 events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
-                cancelBatch(cancelledFlightId);
+                cancelBatch(cancelledFlightKey);
             } else {
-                pendingCancellations.add(cancelledFlightId);
+                pendingCancellations.add(cancelledFlightKey);
                 events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled_pending"));
             }
         }
 
         private Flight resolveCancellationFlight(String input) {
             Flight requested = findFlight(input);
-            if (requested != null && requested.absoluteDepartureMinute() - tick > 60) {
+            if (requested != null
+                    && requested.absoluteDepartureMinute() - tick > 60
+                    && !isCancelled(requested)
+                    && !isPendingCancellation(requested)) {
                 return requested;
             }
 
@@ -881,10 +925,42 @@ public class RealtimeSimulationService {
             return flights.stream()
                     .filter(f -> sameRecurringFlight(recurringReference, f))
                     .filter(f -> f.absoluteDepartureMinute() >= minDeparture)
-                    .filter(f -> !cancellations.contains(f.getFlightId()))
-                    .filter(f -> !pendingCancellations.contains(f.getFlightId()))
+                    .filter(f -> !isCancelled(f))
+                    .filter(f -> !isPendingCancellation(f))
                     .min(Comparator.comparingInt(Flight::absoluteDepartureMinute))
                     .orElse(null);
+        }
+
+        private void queueCancellationRequest(String input) {
+            if (input == null || input.isBlank()) {
+                throw new IllegalArgumentException("Codigo de vuelo invalido.");
+            }
+            String normalized = input.trim();
+            boolean exists = queuedCancellationRequests.stream()
+                    .anyMatch(request -> request.matchesInput(normalized));
+            if (!exists) queuedCancellationRequests.add(new CancellationRequest(normalized));
+        }
+
+        private void applyQueuedCancellationRequests() {
+            if (queuedCancellationRequests.isEmpty()) return;
+
+            Iterator<CancellationRequest> iterator = queuedCancellationRequests.iterator();
+            while (iterator.hasNext()) {
+                CancellationRequest request = iterator.next();
+                Flight toCancel = resolveCancellationFlight(request.input());
+                if (toCancel == null) continue;
+
+                String key = cancellationKey(toCancel);
+                if (isBatchScenario()) {
+                    cancellations.add(key);
+                    cancelBatch(key);
+                    events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
+                } else {
+                    pendingCancellations.add(key);
+                    events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled_pending"));
+                }
+                iterator.remove();
+            }
         }
 
         private boolean sameCancellationCode(Flight flight, String input) {
@@ -906,13 +982,25 @@ public class RealtimeSimulationService {
             return idx < 0 ? "" : flightId.substring(idx + 1);
         }
 
+        private String cancellationKey(Flight flight) {
+            return flight.getFlightId() + "@" + flight.absoluteDepartureMinute();
+        }
+
+        private boolean isCancelled(Flight flight) {
+            return cancellations.contains(cancellationKey(flight));
+        }
+
+        private boolean isPendingCancellation(Flight flight) {
+            return pendingCancellations.contains(cancellationKey(flight));
+        }
+
         synchronized void markCancelled(String flightId) {
             Flight toCancel = findFlight(flightId);
             if (toCancel == null)
                 throw new IllegalArgumentException("Vuelo no encontrado: " + flightId);
             if (toCancel.absoluteDepartureMinute() <= tick)
                 throw new IllegalArgumentException("No se puede cancelar un vuelo que ya inicio.");
-            cancellations.add(flightId);
+            cancellations.add(cancellationKey(toCancel));
             events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled"));
         }
 
@@ -921,14 +1009,14 @@ public class RealtimeSimulationService {
          *   1. Afectados directos → ALNS rápido.
          *   2. Reoptimización global de todos los ya planificados.
          */
-        private void cancelBatch(String flightId) {
+        private void cancelBatch(String cancellationKey) {
             // Afectados directos
             List<Shipment> afectados = new ArrayList<>();
             for (Shipment s : todosLosShipmentsProcesados) {
                 Route route = solucionGlobal.get(s.getShipmentId());
                 if (route == null) continue;
                 boolean usa = route.getFlights().stream()
-                        .anyMatch(f -> f.getFlightId().equals(flightId));
+                        .anyMatch(f -> cancellationKey(f).equals(cancellationKey));
                 if (usa) {
                     afectados.add(s);
                     s.resetPlanningState();
@@ -937,7 +1025,7 @@ public class RealtimeSimulationService {
             }
 
             System.out.printf("[Cancelación] Vuelo %s | %d envíos afectados directamente%n",
-                    flightId, afectados.size());
+                    cancellationKey, afectados.size());
 
             List<Flight> disponibles = availableFlightsFrom(tick);
 
@@ -1010,8 +1098,9 @@ public class RealtimeSimulationService {
             int start = firstFlightAtOrAfter(flights, fromMinute);
             for (int i = start; i < flights.size(); i++) {
                 Flight f = flights.get(i);
-                if (!cancellations.contains(f.getFlightId())
-                        && !pendingCancellations.contains(f.getFlightId()))
+                if (isBatchScenario() && f.absoluteDepartureMinute() > maxTick) break;
+                if (!isCancelled(f)
+                        && !isPendingCancellation(f))
                     available.add(f);
             }
             return available;
@@ -1037,9 +1126,26 @@ public class RealtimeSimulationService {
             return null;
         }
 
+        private boolean flightVisibleInSnapshot(Flight flight) {
+            int windowStart = visualWindowStartTick;
+            int windowEnd = visualWindowEndTick;
+            windowEnd = Math.min(windowEnd, maxTick);
+
+            if (isBatchScenario() && flight.absoluteDepartureMinute() > maxTick) {
+                return false;
+            }
+
+            return flight.absoluteDepartureMinute() <= windowEnd
+                    && flight.absoluteArrivalMinute() >= windowStart;
+        }
+
         // ── Snapshot JSON ─────────────────────────────────────────────────────
 
         synchronized String snapshotJson() {
+            return snapshotJson(false);
+        }
+
+        synchronized String snapshotJson(boolean includeControlToken) {
             Json json = new Json();
 
             // Para lotes: mostrar lo consumido; para tiempo real: mostrar todo lo conocido desde BD.
@@ -1050,10 +1156,13 @@ public class RealtimeSimulationService {
 
             int planned    = (int) shipmentSource.stream().filter(Shipment::isPlanned).count();
             int onTime     = (int) shipmentSource.stream().filter(Shipment::isOnTime).count();
-            int totalBags  = shipments.stream().mapToInt(Shipment::getSuitcaseCount).sum();
+            int totalBags  = shipmentSource.stream().mapToInt(Shipment::getSuitcaseCount).sum();
             int plannedBags = shipmentSource.stream()
                     .filter(Shipment::isPlanned).mapToInt(Shipment::getSuitcaseCount).sum();
-            int usedFlights = (int) flights.stream().filter(f -> f.getAssignedLoad() > 0).count();
+            int usedFlights = (int) flights.stream()
+                    .filter(this::flightVisibleInSnapshot)
+                    .filter(f -> f.getAssignedLoad() > 0)
+                    .count();
 
             String message = cancellations.isEmpty() ? "" :
                     "Vuelos cancelados: " + String.join(", ", cancellations) +
@@ -1063,6 +1172,10 @@ public class RealtimeSimulationService {
             json.prop("simulationId", id).comma();
             json.prop("scenario", scenarioLabel()).comma();
             json.prop("status", completed ? "COMPLETED" : "RUNNING").comma();
+            json.prop("ownerClientId", ownerClientId).comma();
+            if (includeControlToken && !controlToken.isBlank()) {
+                json.prop("controlToken", controlToken).comma();
+            }
             json.prop("days", days).comma();
             json.prop("tick", tick).comma();
             json.prop("maxTick", effectiveMaxTick()).comma();
@@ -1087,7 +1200,7 @@ public class RealtimeSimulationService {
             json.prop("visualEndTick", visualWindowEndTick).comma();
             json.prop("visualStartedAt", java.time.Instant.ofEpochMilli(visualWindowStartedAtMs).toString()).comma();
             json.prop("realtimeExecutionIntervalMs", REALTIME_EXECUTION_INTERVAL_MS).comma();
-            json.prop("pendingCancellationCount", pendingCancellations.size()).comma();
+            json.prop("pendingCancellationCount", pendingCancellations.size() + queuedCancellationRequests.size()).comma();
             json.prop("message", message).comma();
             json.prop("simulationStartDateTime", simulationStartInstant).comma();
             json.prop("simulationEndDateTime", simulationEndInstant).comma();
@@ -1102,6 +1215,10 @@ public class RealtimeSimulationService {
             for (String pending : pendingCancellations) {
                 if (!visibleCancellations.contains(pending)) visibleCancellations.add(pending);
             }
+            for (CancellationRequest request : queuedCancellationRequests) {
+                String pending = "PENDING@" + request.input();
+                if (!visibleCancellations.contains(pending)) visibleCancellations.add(pending);
+            }
             int ci = 0;
             for (String cid : visibleCancellations) {
                 json.value(cid);
@@ -1111,7 +1228,7 @@ public class RealtimeSimulationService {
 
             // metrics
             json.name("metrics").objStart();
-            json.prop("shipments", shipments.size()).comma();
+            json.prop("shipments", shipmentSource.size()).comma();
             json.prop("processedShipments", processedShipmentCount).comma();
             json.prop("queuedShipments", queue.size()).comma();
             json.prop("plannedShipments", planned).comma();
@@ -1119,7 +1236,7 @@ public class RealtimeSimulationService {
             json.prop("totalBags", totalBags).comma();
             json.prop("plannedBags", plannedBags).comma();
             json.prop("usedFlights", usedFlights).comma();
-            json.prop("pendingCancellations", pendingCancellations.size()).comma();
+            json.prop("pendingCancellations", pendingCancellations.size() + queuedCancellationRequests.size()).comma();
             json.prop("fitnessInitial", 0).comma();
             json.prop("fitnessFinal", 0).comma();
             json.prop("iterations", 0).comma();
@@ -1152,15 +1269,8 @@ public class RealtimeSimulationService {
 
             // flights
             json.name("flights").arrayStart();
-            List<Flight> used = "TIEMPO_REAL".equals(scenario)
-                    ? flights.stream()
-                    .filter(f -> f.getAssignedLoad() > 0)
-                    .filter(f -> f.absoluteArrivalMinute() >= tick)
-                    .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
-                    .limit(300)
-                    .toList()
-                    : flights.stream()
-                    .filter(f -> f.getAssignedLoad() > 0)
+            List<Flight> used = flights.stream()
+                    .filter(this::flightVisibleInSnapshot)
                     .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
                     .toList();
             for (int i = 0; i < used.size(); i++) {
@@ -1180,8 +1290,8 @@ public class RealtimeSimulationService {
                 json.prop("utilization", util).comma();
                 json.prop("status", status(util)).comma();
                 json.prop("scheduleStatus",
-                        cancellations.contains(f.getFlightId()) ? "CANCELLED" :
-                                pendingCancellations.contains(f.getFlightId()) ? "PENDING_CANCEL" :
+                        isCancelled(f) ? "CANCELLED" :
+                                isPendingCancellation(f) ? "PENDING_CANCEL" :
                                         f.absoluteDepartureMinute() <= tick ? "IN_PROGRESS" : "QUEUED");
                 json.objEnd();
                 if (i < used.size() - 1) json.comma();
@@ -1269,6 +1379,12 @@ public class RealtimeSimulationService {
     }
 
     private record RealtimeEvent(int minute, String airport, int delta, String type) {}
+
+    private record CancellationRequest(String input) {
+        boolean matchesInput(String candidate) {
+            return input.equalsIgnoreCase(candidate == null ? "" : candidate.trim());
+        }
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Builder JSON mínimo (sin dependencias externas)

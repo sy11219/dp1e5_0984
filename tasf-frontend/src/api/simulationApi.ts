@@ -3,6 +3,51 @@ import { SIMULATION_DAYS } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
 
 const clientTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+const BATCH_CLIENT_ID_KEY = "tasf.simulation5d.clientId";
+const BATCH_CONTROL_TOKEN_PREFIX = "tasf.simulation5d.controlToken.";
+
+export function getBatchClientId(): string {
+  try {
+    const existing = window.localStorage.getItem(BATCH_CLIENT_ID_KEY);
+    if (existing) return existing;
+
+    const generated =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(BATCH_CLIENT_ID_KEY, generated);
+    return generated;
+  } catch {
+    return "volatile-client";
+  }
+}
+
+function batchTokenKey(simulationId: string): string {
+  return `${BATCH_CONTROL_TOKEN_PREFIX}${simulationId}`;
+}
+
+export function getBatchControlToken(simulationId?: string): string {
+  if (!simulationId) return "";
+  try {
+    return window.localStorage.getItem(batchTokenKey(simulationId)) || "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberBatchControlToken(data: SimulationData): void {
+  if (!data.simulationId || !data.controlToken) return;
+  try {
+    window.localStorage.setItem(batchTokenKey(data.simulationId), data.controlToken);
+  } catch {
+    // Sin localStorage, la maquina queda como observadora tras recargar.
+  }
+}
+
+export function ownsBatchSimulation(data: SimulationData | null | undefined): boolean {
+  if (!data?.simulationId || !data.ownerClientId) return false;
+  return data.ownerClientId === getBatchClientId() && Boolean(getBatchControlToken(data.simulationId));
+}
 
 // ── Simulación estática (un solo disparo, sin lotes) ─────────────────────────
 
@@ -27,14 +72,18 @@ export async function runSimulationRequest(
 export async function startBatchSimulationRequest(
   startDate: string,
   days: number,
-  startTime = "00:00"
+  startTime = "00:00",
+  currentSimulationId?: string
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>("/simulations/batch/start", {
     startDate: startDate.replaceAll("-", ""),
     days,
     startTime,
     timeZone: clientTimeZone(),
+    clientId: getBatchClientId(),
+    controlToken: getBatchControlToken(currentSimulationId),
   });
+  rememberBatchControlToken(response.data);
   return response.data;
 }
 
@@ -57,8 +106,14 @@ export async function advanceBatchSimulationRequest(
 ): Promise<SimulationData> {
   const response = await api.post<SimulationData>(
     `/simulations/batch/${simulationId}/advance`,
-    { steps, expectedTick }
+    {
+      steps,
+      expectedTick,
+      clientId: getBatchClientId(),
+      controlToken: getBatchControlToken(simulationId),
+    }
   );
+  rememberBatchControlToken(response.data);
   return response.data;
 }
 
@@ -68,7 +123,10 @@ export async function advanceBatchSimulationRequest(
 export async function stopBatchSimulationRequest(
   simulationId: string
 ): Promise<void> {
-  await api.post(`/simulations/batch/${simulationId}/stop`, {});
+  await api.post(`/simulations/batch/${simulationId}/stop`, {
+    clientId: getBatchClientId(),
+    controlToken: getBatchControlToken(simulationId),
+  });
 }
 
 export async function cancelBatchFlightRequest(

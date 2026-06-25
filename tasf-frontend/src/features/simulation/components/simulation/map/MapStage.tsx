@@ -35,6 +35,8 @@ export type MapFocusTarget = {
 };
 
 const FOCUS_ZOOM = 5;
+const FLIGHT_ROUTE_LINE_WIDTH = 1.2;
+const SELECTED_FLIGHT_ROUTE_LINE_WIDTH = 3.2;
 
 export default function MapStage({
   data,
@@ -192,7 +194,7 @@ export default function MapStage({
       canvasRef.current.height,
       selectedFlightId ?? "",
       activeFlights
-        .map((flight) => `${flight.id}:${Math.round(flight.progress * 1000)}:${flight.status}`)
+        .map((flight) => `${flight.id}:${Math.round(flight.progress * 1000)}:${flight.status}:${flight.assignedLoad}`)
         .join("|"),
     ].join(":");
 
@@ -213,9 +215,10 @@ export default function MapStage({
       const { destPixel, planePixel, angle } =
         getRouteGeometry(mapRef.current, origin, destination, flight.progress);
       const isSelected = flight.id === selectedFlightId;
+      const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[flight.status];
 
-      ctx.strokeStyle = STATUS_COLOR[flight.status];
-      ctx.lineWidth = isSelected ? 4 : 1.8;
+      ctx.strokeStyle = flightColor;
+      ctx.lineWidth = isSelected ? SELECTED_FLIGHT_ROUTE_LINE_WIDTH : FLIGHT_ROUTE_LINE_WIDTH;
       ctx.globalAlpha = isSelected ? 0.95 : 0.62;
       ctx.shadowColor = isSelected ? "rgba(15, 23, 42, 0.36)" : "transparent";
       ctx.shadowBlur = isSelected ? 10 : 0;
@@ -227,7 +230,7 @@ export default function MapStage({
       ctx.shadowBlur = 0;
       ctx.shadowColor = "transparent";
 
-      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, STATUS_COLOR[flight.status], isSelected);
+      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, flightColor, isSelected);
     }
   }, [activeFlights, airportByCode, selectedFlightId]);
 
@@ -441,7 +444,7 @@ function createAirportIcon(airport: Airport, load: number, isSelected: boolean) 
 
   return L.divIcon({
     className: "airport-map-icon",
-    html: `<div class="airport-marker ${status}${isSelected ? " selected" : ""}" title="${airport.code} - ${airport.city}"><span></span><strong>${airport.code}</strong></div>`,
+    html: `<div class="airport-marker ${status}${isSelected ? " selected" : ""}" title="${airport.code} - ${airport.city}"><span class="airport-warehouse-icon"></span><strong>${airport.code}</strong></div>`,
     iconSize: [70, 30],
     iconAnchor: [12, 15],
   });

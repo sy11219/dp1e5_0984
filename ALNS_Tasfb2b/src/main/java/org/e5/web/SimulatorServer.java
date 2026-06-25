@@ -34,6 +34,8 @@ public class SimulatorServer {
     private static final Pattern START_TIME = Pattern.compile("\"startTime\"\\s*:\\s*\"(\\d{2}:\\d{2})\"");
     private static final Pattern TIME_ZONE = Pattern.compile("\"timeZone\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern FLIGHT_ID = Pattern.compile("\"flightId\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern CLIENT_ID = Pattern.compile("\"clientId\"\\s*:\\s*\"([^\"]*)\"");
+    private static final Pattern CONTROL_TOKEN = Pattern.compile("\"controlToken\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CODE = Pattern.compile("\"code\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CITY = Pattern.compile("\"city\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern COUNTRY = Pattern.compile("\"country\"\\s*:\\s*\"([^\"]*)\"");
@@ -455,8 +457,11 @@ public class SimulatorServer {
                 int days = readInt(DAYS, body, 5);
                 String startTime = readString(START_TIME, body, "00:00");
                 String timeZone = readString(TIME_ZONE, body, "");
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
                 send(exchange, 200, "application/json",
-                        realtimeSimulationService.startBatchSimulation(startDate, days, startTime, timeZone));
+                        realtimeSimulationService.startBatchSimulation(startDate, days, startTime, timeZone,
+                                clientId, controlToken));
                 return;
             }
 
@@ -475,15 +480,20 @@ public class SimulatorServer {
             if (advanceMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 int steps = readInt(STEPS, body, RealtimeSimulationService.BATCH_MINUTES);
                 int expectedTick = readInt(EXPECTED_TICK, body, -1);
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
                 send(exchange, 200, "application/json",
-                        realtimeSimulationService.advance(advanceMatcher.group(1), steps, expectedTick));
+                        realtimeSimulationService.advance(advanceMatcher.group(1), steps, expectedTick,
+                                clientId, controlToken));
                 return;
             }
 
             Matcher stopMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/stop$").matcher(path);
             if (stopMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
                 send(exchange, 200, "application/json",
-                        realtimeSimulationService.stopBatchSimulation(stopMatcher.group(1)));
+                        realtimeSimulationService.stopBatchSimulation(stopMatcher.group(1), clientId, controlToken));
                 return;
             }
 
@@ -496,6 +506,8 @@ public class SimulatorServer {
             }
 
             send(exchange, 404, "application/json", "{\"error\":\"Endpoint de simulacion por lotes no encontrado\"}");
+        } catch (SecurityException e) {
+            send(exchange, 403, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (IllegalArgumentException e) {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {

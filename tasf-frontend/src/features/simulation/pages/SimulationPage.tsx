@@ -8,6 +8,7 @@ import {
   advanceBatchSimulationRequest,
   stopBatchSimulationRequest,
   cancelBatchFlightRequest,
+  ownsBatchSimulation,
 } from "../../../api/simulationApi"
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
 import { AirportDetail } from "../components/AirportDetail"
@@ -292,6 +293,7 @@ export function SimulationPage() {
   // ── Pedir siguiente lote ───────────────────────────────────────────────────
   const fetchNextBatch = useCallback(async (sessionId: string, fromTick: number) => {
     if (fetching) return
+    if (data?.simulationId === sessionId && !ownsBatchSimulation(data)) return
     setFetching(true)
     setError("")
     try {
@@ -324,14 +326,14 @@ export function SimulationPage() {
     } finally {
       setFetching(false)
     }
-  }, [fetching, data?.planningWindowMinutes, data?.batchMinutes, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
+  }, [fetching, data, BATCH_MINUTES, animateBatch, maxMinute, setPlaying])
 
   // ── Callback que dispara el hook cuando termina la animación de un lote ────
   useEffect(() => {
     onBatchCompleteRef.current = () => {
       animatingRef.current = false
 
-      if (!data?.simulationId || data.status === "COMPLETED" || !playing) return
+      if (!data?.simulationId || data.status === "COMPLETED" || !playing || !ownsBatchSimulation(data)) return
 
       // Guardar el tick actual como "from" del próximo lote
       const currentTick = data.tick ?? 0
@@ -423,7 +425,7 @@ export function SimulationPage() {
 
     try {
       // 1. Crear la sesión (tick = 0, status = RUNNING, sin datos aún)
-      const initial = await startBatchSimulationRequest(startDate, days, startTime)
+      const initial = await startBatchSimulationRequest(startDate, days, startTime, data?.simulationId)
       setData(initial)
       setSimMinute(initial.tick ?? initial.startOffsetMinutes ?? 0)
       setSelectedAirport(null)
@@ -502,6 +504,8 @@ export function SimulationPage() {
   );
   const selected = displayData.airports.find((a) => a.code === selectedAirport)
   const controlsBusy = loading || fetching || cancelling
+  const ownsCurrentSimulation = ownsBatchSimulation(data)
+  const canControlSimulation = !data?.simulationId || ownsCurrentSimulation
 
   const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
     const updateAirport = (airport: Airport) =>
@@ -646,11 +650,13 @@ export function SimulationPage() {
             fetching={fetching}
             playing={playing}
             cancelling={cancelling}
+            canControlSimulation={canControlSimulation}
             startDate={startDate}
             startTime={startTime}
             onCancelFlight={cancelFlight}
             onFlightToCancelChange={setFlightToCancel}
             onPlay={() => {
+              if (!canControlSimulation) return
               setBatchSimulationPaused(false)
               // Reanudar: pedir el siguiente lote si no hay animación en curso
               if (!animatingRef.current && data?.simulationId && data.status !== "COMPLETED") {
@@ -668,7 +674,6 @@ export function SimulationPage() {
             data={data}
             currentMinute={simMinute}
             planningWindowMinutes={data?.planningWindowMinutes ?? data?.batchMinutes}
-            fleetFlights={flightCatalog}
           />
           <CapacityLegend />
           <section className="panel section">
@@ -679,13 +684,15 @@ export function SimulationPage() {
               <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
             )}
           </section>
-          <section className="panel section simulation-bottom-actions">
-            <div className="segmented">
-              <button onClick={handlePause} disabled={!data?.simulationId || controlsBusy || !playing}>Pausar</button>
-              <button onClick={handleRestart} disabled={!data?.simulationId || controlsBusy}>Reiniciar</button>
-              <button className="danger" onClick={handleStop} disabled={!data?.simulationId || controlsBusy}>Cancelar</button>
-            </div>
-          </section>
+          {canControlSimulation && (
+            <section className="panel section simulation-bottom-actions">
+              <div className="segmented">
+                <button onClick={handlePause} disabled={!data?.simulationId || controlsBusy || !playing}>Pausar</button>
+                <button onClick={handleRestart} disabled={!data?.simulationId || controlsBusy}>Reiniciar</button>
+                <button className="danger" onClick={handleStop} disabled={!data?.simulationId || controlsBusy}>Cancelar</button>
+              </div>
+            </section>
+          )}
         </aside>
         ) : (
         <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
@@ -836,6 +843,7 @@ type SimulationControlsProps = {
   fetching: boolean
   playing: boolean
   cancelling: boolean
+  canControlSimulation: boolean
   startDate: string
   startTime: string
   onCancelFlight: () => void
@@ -848,7 +856,7 @@ type SimulationControlsProps = {
 
 function SimulationControls({
   error, notice, flightToCancel, hasSimulation,
-  loading, fetching, playing, cancelling, startDate, startTime,
+  loading, fetching, playing, cancelling, canControlSimulation, startDate, startTime,
   onCancelFlight, onFlightToCancelChange,
   onPlay, onRunSimulation, onStartDateChange, onStartTimeChange,
 }: SimulationControlsProps) {
@@ -864,7 +872,7 @@ function SimulationControls({
             type="date"
             value={startDate}
             onChange={(e) => onStartDateChange(e.target.value)}
-            disabled={busy || hasSimulation}
+            disabled={busy || hasSimulation || !canControlSimulation}
           />
         </div>
 
@@ -874,10 +882,11 @@ function SimulationControls({
             type="time"
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
-            disabled={busy || hasSimulation}
+            disabled={busy || hasSimulation || !canControlSimulation}
           />
         </div>
 
+        {canControlSimulation && (
         <button
           className="primary"
           onClick={hasSimulation && !playing ? onPlay : onRunSimulation}
@@ -885,6 +894,7 @@ function SimulationControls({
         >
           {loading ? "Iniciando..." : "Ejecutar Simulación"}
         </button>
+        )}
 
         {/* Cancelar vuelo futuro */}
         <div className="field">

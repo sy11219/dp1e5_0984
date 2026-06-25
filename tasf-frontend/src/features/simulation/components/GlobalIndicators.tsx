@@ -1,6 +1,5 @@
-import type { Flight, SimulationData } from "../types";
-import { capacityStatus, computeAirportLoads } from "../utils/calculations";
-import { percent } from "../utils/formatters";
+import type { SimulationData } from "../types";
+import { capacityStatus, computeActiveFlights, computeAirportLoads } from "../utils/calculations";
 
 type TrafficStatus = "green" | "yellow" | "red" | "gray";
 
@@ -8,7 +7,6 @@ interface GlobalIndicatorsProps {
   data: SimulationData | null;
   currentMinute: number;
   planningWindowMinutes?: number;
-  fleetFlights?: Flight[];
 }
 
 interface TrafficMetricProps {
@@ -30,14 +28,25 @@ function trafficStatus(value: number): TrafficStatus {
   return capacityStatus(value / 100);
 }
 
+function trafficPercent(numerator: number, denominator: number): number {
+  return denominator ? (numerator / denominator) * 100 : 0;
+}
+
+function formatTrafficPercent(value: number): string {
+  return value.toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function TrafficMetric({ label, numerator, denominator }: TrafficMetricProps) {
-  const value = percent(numerator, denominator);
+  const value = trafficPercent(numerator, denominator);
   const status = trafficStatus(value);
 
   return (
     <div className={`metric traffic-metric traffic-metric-${status}`}>
       <span>{label}</span>
-      <strong>{`${value}%`}</strong>
+      <strong>{`${formatTrafficPercent(value)}%`}</strong>
       <span>{`${numerator.toLocaleString("es-PE")} / ${denominator.toLocaleString("es-PE")} maletas`}</span>
     </div>
   );
@@ -47,7 +56,6 @@ export function GlobalIndicators({
   data,
   currentMinute,
   planningWindowMinutes,
-  fleetFlights,
 }: GlobalIndicatorsProps) {
   if (!data) {
     return (
@@ -60,18 +68,23 @@ export function GlobalIndicators({
 
   const minute = sampledMinute(currentMinute, planningWindowMinutes);
   const airportLoads = computeAirportLoads(data, minute);
-  const airportBags = Object.values(airportLoads).reduce((sum, load) => sum + Math.max(0, load), 0);
+  const airportBags = data.airports.reduce((sum, airport) => {
+    const capacity = Math.max(0, airport.maxCapacity || 0);
+    const load = Math.max(0, airportLoads[airport.code] || 0);
+    return sum + Math.min(load, capacity);
+  }, 0);
   const airportCapacity = data.airports.reduce(
     (sum, airport) => sum + Math.max(0, airport.maxCapacity || 0),
     0
   );
 
-  const fleetCapacitySource = fleetFlights?.length ? fleetFlights : data.flights;
-  const assignedBags = data.flights.reduce(
-    (sum, flight) => sum + Math.max(0, flight.assignedLoad || 0),
-    0
-  );
-  const fleetCapacity = fleetCapacitySource.reduce(
+  const activeFlights = computeActiveFlights(data, minute);
+  const assignedBags = activeFlights.reduce((sum, flight) => {
+    const capacity = Math.max(0, flight.maxCapacity || 0);
+    const load = Math.max(0, flight.assignedLoad || 0);
+    return sum + Math.min(load, capacity);
+  }, 0);
+  const fleetCapacity = activeFlights.reduce(
     (sum, flight) => sum + Math.max(0, flight.maxCapacity || 0),
     0
   );

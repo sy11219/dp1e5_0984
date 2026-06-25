@@ -751,6 +751,7 @@ select {
 }
 
 .airport-marker {
+  --airport-color: var(--gray);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -766,18 +767,40 @@ select {
   pointer-events: auto;
 }
 
-.airport-marker span {
+.airport-marker.green { --airport-color: var(--green); }
+.airport-marker.yellow { --airport-color: var(--yellow); }
+.airport-marker.red { --airport-color: var(--red); }
+.airport-marker.gray { --airport-color: var(--gray); }
+
+.airport-warehouse-icon {
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  position: relative;
+  display: inline-block;
+  flex: 0 0 14px;
+}
+
+.airport-warehouse-icon::before {
+  content: "";
+  position: absolute;
+  inset: 1px 0 0;
+  background: var(--airport-color);
+  clip-path: polygon(50% 0, 100% 38%, 100% 100%, 0 100%, 0 38%);
   border: 2px solid #fff;
+  border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(15,23,42,0.18);
 }
 
-.airport-marker.green span { background: var(--green); }
-.airport-marker.yellow span { background: var(--yellow); }
-.airport-marker.red span { background: var(--red); }
-.airport-marker.gray span { background: var(--gray); }
+.airport-warehouse-icon::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  bottom: 1px;
+  width: 4px;
+  height: 5px;
+  border-radius: 1px 1px 0 0;
+  background: rgba(255,255,255,0.85);
+}
 
 .airport-marker strong {
   font-size: 11px;

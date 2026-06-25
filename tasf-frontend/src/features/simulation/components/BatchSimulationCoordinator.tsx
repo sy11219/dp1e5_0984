@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom"
 import {
   advanceBatchSimulationRequest,
   getCurrentBatchSimulationRequest,
+  ownsBatchSimulation,
 } from "../../../api/simulationApi"
 import type { SimulationData } from "../types"
 
@@ -62,6 +63,7 @@ export function BatchSimulationCoordinator() {
       try {
         const current = await getCurrentBatchSimulationRequest()
         if (current && isStoppedLocally(current)) return
+        if (current && !ownsBatchSimulation(current)) return
         if (cancelled || !current || !shouldAdvanceBatch(current) || !current.simulationId) return
 
         advancingRef.current = true

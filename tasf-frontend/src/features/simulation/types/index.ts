@@ -88,6 +88,8 @@ export interface Shipment {
 
 export interface SimulationData {
   simulationId?: string;
+  ownerClientId?: string;
+  controlToken?: string;
   scenario: string;
   status?: string;
   message?: string;
