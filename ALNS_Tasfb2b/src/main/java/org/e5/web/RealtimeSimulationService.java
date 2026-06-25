@@ -255,14 +255,16 @@ public class RealtimeSimulationService {
 
     public String advance(String id, int steps, int expectedTick, String clientId, String controlToken) {
         RealtimeSession session = require(id);
-        if ("SIMULACION_LOTES".equals(session.scenario)) {
-            requireBatchControl(session, clientId, controlToken);
-            if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJson();
-            session.advanceBatch(BATCH_MINUTES);
-        } else {
-            session.advanceRealtimeIfDue();
+        synchronized (session) {
+            if ("SIMULACION_LOTES".equals(session.scenario)) {
+                requireBatchControl(session, clientId, controlToken);
+                if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJson();
+                session.advanceBatch(BATCH_MINUTES);
+            } else {
+                session.advanceRealtimeIfDue();
+            }
+            return session.snapshotJson();
         }
-        return session.snapshotJson();
     }
 
     /**

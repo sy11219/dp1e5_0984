@@ -433,8 +433,8 @@ export function SimulationPage() {
       setMapFocusTarget(null)
       setPlaying(true)
 
-      // 2. Pedir inmediatamente el primer lote
-      await fetchNextBatch(initial.simulationId!, initial.tick ?? initial.startOffsetMinutes ?? 0)
+      // 2. Pedir el primer lote sin mantener bloqueado el estado "Iniciando".
+      void fetchNextBatch(initial.simulationId!, initial.tick ?? initial.startOffsetMinutes ?? 0)
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo iniciar la simulación.")
       setPlaying(false)
