@@ -25,7 +25,12 @@ import java.util.PriorityQueue;
  */
 public class ALNSRouteFinder {
 
-    private static final int DEFAULT_CANDIDATE_ROUTES = 5;
+    private static final int DEFAULT_CANDIDATE_ROUTES = readPositiveInt(
+            "TASF_ROUTE_CANDIDATE_ROUTES", 5);
+    private static final int MAX_FLIGHTS_PER_LEG = readPositiveInt(
+            "TASF_ROUTE_MAX_FLIGHTS_PER_LEG", 180);
+    private static final int MAX_FRACTIONAL_FIRST_FLIGHTS = readPositiveInt(
+            "TASF_ROUTE_MAX_FRACTIONAL_FIRST_FLIGHTS", 80);
 
     private final Map<String, Airport> airportMap;
     private final int maxEscalas;
@@ -80,8 +85,10 @@ public class ALNSRouteFinder {
         );
 
         int partIndex = 1;
+        int evaluatedFirstFlights = 0;
         for (Flight firstFlight : candidates) {
             if (pending <= 0) break;
+            if (++evaluatedFirstFlights > MAX_FRACTIONAL_FIRST_FLIGHTS) break;
             if (firstFlight.availableSpace() <= 0) continue;
 
             int bags = Math.min(pending, firstFlight.availableSpace());
@@ -262,9 +269,21 @@ public class ALNSRouteFinder {
             if (flight.absoluteDepartureMinute() > maxArrival) break;
             if (flight.absoluteArrivalMinute() <= maxArrival) {
                 candidates.add(flight);
+                if (candidates.size() >= MAX_FLIGHTS_PER_LEG) break;
             }
         }
         return candidates;
+    }
+
+    private static int readPositiveInt(String name, int defaultValue) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.isBlank()) return defaultValue;
+        try {
+            int value = Integer.parseInt(raw.trim());
+            return value > 0 ? value : defaultValue;
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
+        }
     }
 
     private int firstDepartureAtOrAfter(List<Flight> flights, int minute) {

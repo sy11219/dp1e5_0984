@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AirportFlight } from "../utils/airportRelations";
 import { Button } from "@/components/ui/button";
 import { formatSimMinute } from "../utils/formatters";
@@ -10,25 +10,29 @@ type Props = {
 const PAGE_SIZE = 15;
 
 export function AirportFlightsList({ flights }: Props) {
-  if (flights.length === 0) {
-    return <div className="empty-state">Sin vuelos en este aeropuerto.</div>;
-  }
-
   const incoming = useMemo(() => flights.filter((f) => f.direction === "incoming"), [flights]);
   const outgoing = useMemo(() => flights.filter((f) => f.direction === "outgoing"), [flights]);
 
   const [incomingPage, setIncomingPage] = useState(1);
   const [outgoingPage, setOutgoingPage] = useState(1);
 
-  // Reset pages when counts change
-  useMemo(() => setIncomingPage(1), [incoming.length]);
-  useMemo(() => setOutgoingPage(1), [outgoing.length]);
+  useEffect(() => {
+    setIncomingPage(1);
+  }, [incoming.length]);
+
+  useEffect(() => {
+    setOutgoingPage(1);
+  }, [outgoing.length]);
 
   const incomingTotal = incoming.length;
   const outgoingTotal = outgoing.length;
 
   const incomingVisible = incoming.slice((incomingPage - 1) * PAGE_SIZE, incomingPage * PAGE_SIZE);
   const outgoingVisible = outgoing.slice((outgoingPage - 1) * PAGE_SIZE, outgoingPage * PAGE_SIZE);
+
+  if (flights.length === 0) {
+    return <div className="empty-state">Sin vuelos en este aeropuerto.</div>;
+  }
 
   return (
     <div className="grid md:grid-cols-2 gap-4">

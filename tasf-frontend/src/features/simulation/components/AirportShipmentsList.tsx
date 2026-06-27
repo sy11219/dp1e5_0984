@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import type { AirportShipment } from "../utils/airportRelations";
 import { Button } from "@/components/ui/button";
 
@@ -13,12 +13,15 @@ function roleLabel(role: AirportShipment["role"]) {
 }
 
 export function AirportShipmentsList({ shipments }: Props) {
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [shipments.length]);
+
   if (shipments.length === 0) {
     return <div className="empty-state">Sin envíos en este aeropuerto.</div>;
   }
-
-  const [page, setPage] = useState(1);
-  useMemo(() => setPage(1), [shipments.length]);
 
   const total = shipments.length;
   const visible = shipments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);

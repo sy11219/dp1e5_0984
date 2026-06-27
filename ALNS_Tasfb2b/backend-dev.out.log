@@ -1,0 +1,1897 @@
+Simulador ALNS listo en http://localhost:8080/
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 2860 vuelos SCHEDULED desde BD para 1 dia(s).
+[ShipmentParser] Cargados 2 envios desde BD.
+[Tiempo real] Scheduler iniciado en fecha/hora actual (America/Bogota) por 5 dias.
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=1 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 2860 vuelos SCHEDULED desde BD para 1 dia(s).
+[ShipmentParser] EBCI ? 2820 envios cargados desde '_envios_EBCI_.txt'
+[ShipmentParser] EDDI ? 3474 envios cargados desde '_envios_EDDI_.txt'
+[ShipmentParser] EHAM ? 1740 envios cargados desde '_envios_EHAM_.txt'
+[ShipmentParser] EKCH ? 1276 envios cargados desde '_envios_EKCH_.txt'
+[ShipmentParser] LATI ? 2407 envios cargados desde '_envios_LATI_.txt'
+[ShipmentParser] LBSF ? 2352 envios cargados desde '_envios_LBSF_.txt'
+[ShipmentParser] LDZA ? 3062 envios cargados desde '_envios_LDZA_.txt'
+[ShipmentParser] LKPR ? 3120 envios cargados desde '_envios_LKPR_.txt'
+[ShipmentParser] LOWW ? 3540 envios cargados desde '_envios_LOWW_.txt'
+[ShipmentParser] OAKB ? 2981 envios cargados desde '_envios_OAKB_.txt'
+[ShipmentParser] OERK ? 1704 envios cargados desde '_envios_OERK_.txt'
+[ShipmentParser] OJAI ? 2001 envios cargados desde '_envios_OJAI_.txt'
+[ShipmentParser] OMDB ? 1979 envios cargados desde '_envios_OMDB_.txt'
+[ShipmentParser] OOMS ? 3340 envios cargados desde '_envios_OOMS_.txt'
+[ShipmentParser] OPKC ? 2304 envios cargados desde '_envios_OPKC_.txt'
+[ShipmentParser] OSDI ? 4316 envios cargados desde '_envios_OSDI_.txt'
+[ShipmentParser] OYSN ? 2855 envios cargados desde '_envios_OYSN_.txt'
+[ShipmentParser] SABE ? 4510 envios cargados desde '_envios_SABE_.txt'
+[ShipmentParser] SBBR ? 3776 envios cargados desde '_envios_SBBR_.txt'
+[ShipmentParser] SCEL ? 2055 envios cargados desde '_envios_SCEL_.txt'
+[ShipmentParser] SEQM ? 2189 envios cargados desde '_envios_SEQM_.txt'
+[ShipmentParser] SGAS ? 3139 envios cargados desde '_envios_SGAS_.txt'
+[ShipmentParser] SKBO ? 3927 envios cargados desde '_envios_SKBO_.txt'
+[ShipmentParser] SLLP ? 4009 envios cargados desde '_envios_SLLP_.txt'
+[ShipmentParser] SPIM ? 3444 envios cargados desde '_envios_SPIM_.txt'
+[ShipmentParser] SUAA ? 2385 envios cargados desde '_envios_SUAA_.txt'
+[ShipmentParser] SVMI ? 2742 envios cargados desde '_envios_SVMI_.txt'
+[ShipmentParser] UBBB ? 3895 envios cargados desde '_envios_UBBB_.txt'
+[ShipmentParser] UMMS ? 2902 envios cargados desde '_envios_UMMS_.txt'
+[ShipmentParser] VIDP ? 1597 envios cargados desde '_envios_VIDP_.txt'
+[ShipmentParser] Total TXT: 85841 envios cargados de 30 archivos.
+[Lote] Ventana 0–180 | 1643 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1643 | Vuelos: 6058 | Fitness inicial: 1020030
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1020030 ? 1020030 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1643 / 1643
+[Lote] Completado en 731 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=731 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 180–360 | 2058 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2058 | Vuelos: 6064 | Fitness inicial: 1357940
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1357940 ? 1357940 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2058 / 2058
+[Lote] Completado en 527 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=527 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 360–540 | 2269 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2269 | Vuelos: 6074 | Fitness inicial: 1560207
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1560207 ? 1560207 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2269 / 2269
+[Lote] Completado en 617 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=617 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 540–720 | 2265 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2265 | Vuelos: 6109 | Fitness inicial: 1535159
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1535159 ? 1535159 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2265 / 2265
+[Lote] Completado en 588 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=588 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 720–900 | 1813 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1813 | Vuelos: 6073 | Fitness inicial: 1397257
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1397257 ? 1397257 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1812 / 1813
+[Lote] Completado en 825 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=825 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 900–1080 | 1612 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1612 | Vuelos: 6088 | Fitness inicial: 1165657
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1165657 ? 1165657 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.72 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1612 / 1612
+[Lote] Completado en 426 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=426 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1080–1260 | 1307 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1307 | Vuelos: 6070 | Fitness inicial: 938671
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 938671 ? 938671 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1307 / 1307
+[Lote] Completado en 341 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=341 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1260–1440 | 2203 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2203 | Vuelos: 6097 | Fitness inicial: 1541393
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1541393 ? 1541393 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2203 / 2203
+[Lote] Completado en 593 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=593 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1440–1620 | 2226 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2226 | Vuelos: 6058 | Fitness inicial: 4544510
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4544510 ? 4544510 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2195 / 2226
+[Lote] Completado en 5633 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=5633 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1620–1800 | 2614 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2614 | Vuelos: 6064 | Fitness inicial: 5499560
+[ALNS] Iter 1 | Mejor: 5499445 | D0 R0
+[ALNS] Early stopping en iter 41 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 42 | Fitness: 5499560 ? 5499445 | Mejoras: 1 | Aceptadas SA: 42
+[ALNS] Pesos Destructores: D0=2.13 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=2.36 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2577 / 2614
+[Lote] Completado en 6975 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=6975 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1800–1980 | 2869 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2869 | Vuelos: 6074 | Fitness inicial: 4118651
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4118651 ? 4118651 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2848 / 2869
+[Lote] Completado en 3760 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3760 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1980–2160 | 2584 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2584 | Vuelos: 6109 | Fitness inicial: 1828844
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1828844 ? 1828844 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2584 / 2584
+[Lote] Completado en 682 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=682 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2160–2340 | 2183 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2183 | Vuelos: 6073 | Fitness inicial: 3804797
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3804797 ? 3804797 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2161 / 2183
+[Lote] Completado en 3277 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3277 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2340–2520 | 1422 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1422 | Vuelos: 6088 | Fitness inicial: 1085750
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1085750 ? 1085750 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1422 / 1422
+[Lote] Completado en 401 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=401 ms | estable=true
+[Lote] Ventana 2520–2700 | 1087 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1087 | Vuelos: 6070 | Fitness inicial: 862867
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 862867 ? 862867 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1087 / 1087
+[Lote] Completado en 320 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=320 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2700–2880 | 2150 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2150 | Vuelos: 6097 | Fitness inicial: 1446627
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1446627 ? 1446627 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2150 / 2150
+[Lote] Completado en 602 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=602 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2880–3060 | 2093 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2093 | Vuelos: 6058 | Fitness inicial: 1340320
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1340320 ? 1340320 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2093 / 2093
+[Lote] Completado en 637 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=637 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3060–3240 | 2776 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2776 | Vuelos: 6064 | Fitness inicial: 1916355
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1916355 ? 1916355 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2776 / 2776
+[Lote] Completado en 895 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=895 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3240–3420 | 3075 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3075 | Vuelos: 6074 | Fitness inicial: 5037621
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 5037621 ? 5037621 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 3046 / 3075
+[Lote] Completado en 4919 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=4919 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3420–3600 | 2838 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2838 | Vuelos: 6109 | Fitness inicial: 2143233
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2143233 ? 2143233 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2836 / 2838
+[Lote] Completado en 1022 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1022 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3600–3780 | 2382 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2382 | Vuelos: 6073 | Fitness inicial: 3589083
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3589083 ? 3589083 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2363 / 2382
+[Lote] Completado en 3141 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3141 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3780–3960 | 2006 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2006 | Vuelos: 6088 | Fitness inicial: 1498239
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1498239 ? 1498239 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2006 / 2006
+[Lote] Completado en 607 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=607 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3960–4140 | 1751 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1751 | Vuelos: 6070 | Fitness inicial: 1338515
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1338515 ? 1338515 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1751 / 1751
+[Lote] Completado en 487 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=487 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4140–4320 | 2172 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2172 | Vuelos: 6097 | Fitness inicial: 1507755
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1507755 ? 1507755 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2172 / 2172
+[Lote] Completado en 657 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=657 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4320–4500 | 2279 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2279 | Vuelos: 6058 | Fitness inicial: 2009048
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2009048 ? 2009048 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2274 / 2279
+[Lote] Completado en 1692 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1692 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4500–4680 | 3970 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3970 | Vuelos: 6064 | Fitness inicial: 114419322
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 114419322 ? 114419322 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2844 / 3970
+[Lote] Completado en 130540 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=130540 ms | estable=false
+[Lote] Ventana 4680–4860 | 2817 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2817 | Vuelos: 6074 | Fitness inicial: 6028979
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 6028979 ? 6028979 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 2776 / 2817
+[Lote] Completado en 7735 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=7735 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4860–5040 | 2527 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2527 | Vuelos: 6109 | Fitness inicial: 1743703
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1743703 ? 1743703 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2527 / 2527
+[Lote] Completado en 806 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=806 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5040–5220 | 1714 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1714 | Vuelos: 6073 | Fitness inicial: 3953346
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3953346 ? 3953346 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 1687 / 1714
+[Lote] Completado en 3800 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3800 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5220–5400 | 1246 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1246 | Vuelos: 6088 | Fitness inicial: 982134
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 982134 ? 982134 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1246 / 1246
+[Lote] Completado en 378 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=378 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5400–5580 | 942 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 942 | Vuelos: 6070 | Fitness inicial: 788840
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 788840 ? 788840 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 942 / 942
+[Lote] Completado en 325 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=325 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5580–5760 | 1988 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1988 | Vuelos: 6097 | Fitness inicial: 1402562
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1402562 ? 1402562 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1988 / 1988
+[Lote] Completado en 791 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=791 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5760–5940 | 2014 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2014 | Vuelos: 6058 | Fitness inicial: 1347330
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1347330 ? 1347330 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2014 / 2014
+[Lote] Completado en 638 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=638 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5940–6120 | 3749 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3749 | Vuelos: 6064 | Fitness inicial: 107084286
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 107084286 ? 107084286 | Mejoras: 0 | Aceptadas SA: 39
+[ALNS] Pesos Destructores: D0=1.88 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.68
+[Lote] Rutas: 2696 / 3749
+[Lote] Completado en 93250 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=93250 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6120–6300 | 2593 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2593 | Vuelos: 6074 | Fitness inicial: 4431425
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4431425 ? 4431425 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 2567 / 2593
+[Lote] Completado en 3770 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3770 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6300–6480 | 2255 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2255 | Vuelos: 6109 | Fitness inicial: 2801712
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2801712 ? 2801712 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2243 / 2255
+[Lote] Completado en 1424 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1424 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6480–6660 | 1828 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1828 | Vuelos: 6073 | Fitness inicial: 2279309
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2279309 ? 2279309 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.72 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1819 / 1828
+[Lote] Completado en 2080 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=2080 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6660–6840 | 1500 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1500 | Vuelos: 6088 | Fitness inicial: 1176825
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1176825 ? 1176825 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1500 / 1500
+[Lote] Completado en 472 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=472 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6840–7020 | 921 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 921 | Vuelos: 6070 | Fitness inicial: 744605
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 744605 ? 744605 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 921 / 921
+[Lote] Completado en 317 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=317 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 7020–7200 | 2100 envíos | 6094 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2100 | Vuelos: 6094 | Fitness inicial: 1415420
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1415420 ? 1415420 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2100 / 2100
+[Lote] Simulación completada.
+[Lote] Completado en 787 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=787 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 2860 vuelos SCHEDULED desde BD para 1 dia(s).
+[ShipmentParser] EBCI ? 2820 envios cargados desde '_envios_EBCI_.txt'
+[ShipmentParser] EDDI ? 3474 envios cargados desde '_envios_EDDI_.txt'
+[ShipmentParser] EHAM ? 1740 envios cargados desde '_envios_EHAM_.txt'
+[ShipmentParser] EKCH ? 1276 envios cargados desde '_envios_EKCH_.txt'
+[ShipmentParser] LATI ? 2407 envios cargados desde '_envios_LATI_.txt'
+[ShipmentParser] LBSF ? 2352 envios cargados desde '_envios_LBSF_.txt'
+[ShipmentParser] LDZA ? 3062 envios cargados desde '_envios_LDZA_.txt'
+[ShipmentParser] LKPR ? 3120 envios cargados desde '_envios_LKPR_.txt'
+[ShipmentParser] LOWW ? 3540 envios cargados desde '_envios_LOWW_.txt'
+[ShipmentParser] OAKB ? 2981 envios cargados desde '_envios_OAKB_.txt'
+[ShipmentParser] OERK ? 1704 envios cargados desde '_envios_OERK_.txt'
+[ShipmentParser] OJAI ? 2001 envios cargados desde '_envios_OJAI_.txt'
+[ShipmentParser] OMDB ? 1979 envios cargados desde '_envios_OMDB_.txt'
+[ShipmentParser] OOMS ? 3340 envios cargados desde '_envios_OOMS_.txt'
+[ShipmentParser] OPKC ? 2304 envios cargados desde '_envios_OPKC_.txt'
+[ShipmentParser] OSDI ? 4316 envios cargados desde '_envios_OSDI_.txt'
+[ShipmentParser] OYSN ? 2855 envios cargados desde '_envios_OYSN_.txt'
+[ShipmentParser] SABE ? 4510 envios cargados desde '_envios_SABE_.txt'
+[ShipmentParser] SBBR ? 3776 envios cargados desde '_envios_SBBR_.txt'
+[ShipmentParser] SCEL ? 2055 envios cargados desde '_envios_SCEL_.txt'
+[ShipmentParser] SEQM ? 2189 envios cargados desde '_envios_SEQM_.txt'
+[ShipmentParser] SGAS ? 3139 envios cargados desde '_envios_SGAS_.txt'
+[ShipmentParser] SKBO ? 3927 envios cargados desde '_envios_SKBO_.txt'
+[ShipmentParser] SLLP ? 4009 envios cargados desde '_envios_SLLP_.txt'
+[ShipmentParser] SPIM ? 3444 envios cargados desde '_envios_SPIM_.txt'
+[ShipmentParser] SUAA ? 2385 envios cargados desde '_envios_SUAA_.txt'
+[ShipmentParser] SVMI ? 2742 envios cargados desde '_envios_SVMI_.txt'
+[ShipmentParser] UBBB ? 3895 envios cargados desde '_envios_UBBB_.txt'
+[ShipmentParser] UMMS ? 2902 envios cargados desde '_envios_UMMS_.txt'
+[ShipmentParser] VIDP ? 1597 envios cargados desde '_envios_VIDP_.txt'
+[ShipmentParser] Total TXT: 85841 envios cargados de 30 archivos.
+[Lote] Ventana 0–180 | 1643 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1643 | Vuelos: 6058 | Fitness inicial: 1020030
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1020030 ? 1020030 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1643 / 1643
+[Lote] Completado en 438 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=438 ms | estable=true
+[Lote] Ventana 180–360 | 2058 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2058 | Vuelos: 6064 | Fitness inicial: 1357940
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1357940 ? 1357940 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2058 / 2058
+[Lote] Completado en 498 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=498 ms | estable=true
+[Lote] Ventana 360–540 | 2269 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2269 | Vuelos: 6074 | Fitness inicial: 1560207
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1560207 ? 1560207 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2269 / 2269
+[Lote] Completado en 540 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=540 ms | estable=true
+[Lote] Ventana 540–720 | 2265 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2265 | Vuelos: 6109 | Fitness inicial: 1535159
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1535159 ? 1535159 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2265 / 2265
+[Lote] Completado en 524 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=524 ms | estable=true
+[Lote] Ventana 720–900 | 1813 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1813 | Vuelos: 6073 | Fitness inicial: 1397257
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1397257 ? 1397257 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1812 / 1813
+[Lote] Completado en 553 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=553 ms | estable=true
+[Lote] Ventana 900–1080 | 1612 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1612 | Vuelos: 6088 | Fitness inicial: 1165657
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1165657 ? 1165657 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 1612 / 1612
+[Lote] Completado en 391 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=391 ms | estable=true
+[Lote] Ventana 1080–1260 | 1307 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1307 | Vuelos: 6070 | Fitness inicial: 938671
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 938671 ? 938671 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1307 / 1307
+[Lote] Completado en 316 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=316 ms | estable=true
+[Lote] Ventana 1260–1440 | 2203 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2203 | Vuelos: 6097 | Fitness inicial: 1541393
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1541393 ? 1541393 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 2203 / 2203
+[Lote] Completado en 542 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=542 ms | estable=true
+[Lote] Ventana 1440–1620 | 2226 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2226 | Vuelos: 6058 | Fitness inicial: 4544510
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4544510 ? 4544510 | Mejoras: 0 | Aceptadas SA: 39
+[ALNS] Pesos Destructores: D0=1.91 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.85 R3=1.98
+[Lote] Rutas: 2195 / 2226
+[Lote] Completado en 5221 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=5221 ms | estable=true
+[Lote] Ventana 1620–1800 | 2614 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2614 | Vuelos: 6064 | Fitness inicial: 5499560
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 5499560 ? 5499560 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2577 / 2614
+[Lote] Completado en 5856 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=5856 ms | estable=true
+[Lote] Ventana 1800–1980 | 2869 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2869 | Vuelos: 6074 | Fitness inicial: 4118651
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4118651 ? 4118651 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 2848 / 2869
+[Lote] Completado en 3289 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3289 ms | estable=true
+[Lote] Ventana 1980–2160 | 2584 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2584 | Vuelos: 6109 | Fitness inicial: 1828844
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1828844 ? 1828844 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2584 / 2584
+[Lote] Completado en 799 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=799 ms | estable=true
+[Lote] Ventana 2160–2340 | 2183 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2183 | Vuelos: 6073 | Fitness inicial: 3804797
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3804797 ? 3804797 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2161 / 2183
+[Lote] Completado en 3641 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3641 ms | estable=true
+[Lote] Ventana 2340–2520 | 1422 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1422 | Vuelos: 6088 | Fitness inicial: 1085750
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1085750 ? 1085750 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1422 / 1422
+[Lote] Completado en 416 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=416 ms | estable=true
+[Lote] Ventana 2520–2700 | 1087 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1087 | Vuelos: 6070 | Fitness inicial: 862867
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 862867 ? 862867 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1087 / 1087
+[Lote] Completado en 378 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=378 ms | estable=true
+[Lote] Ventana 2700–2880 | 2150 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2150 | Vuelos: 6097 | Fitness inicial: 1446627
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1446627 ? 1446627 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.40 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2150 / 2150
+[Lote] Completado en 628 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=628 ms | estable=true
+[Lote] Ventana 2880–3060 | 2093 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2093 | Vuelos: 6058 | Fitness inicial: 1340320
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1340320 ? 1340320 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2093 / 2093
+[Lote] Completado en 654 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=654 ms | estable=true
+[Lote] Ventana 3060–3240 | 2776 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2776 | Vuelos: 6064 | Fitness inicial: 1916355
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1916355 ? 1916355 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2776 / 2776
+[Lote] Completado en 872 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=872 ms | estable=true
+[Lote] Ventana 3240–3420 | 3075 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3075 | Vuelos: 6074 | Fitness inicial: 5037621
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 5037621 ? 5037621 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 3046 / 3075
+[Lote] Completado en 5505 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=5505 ms | estable=true
+[Lote] Ventana 3420–3600 | 2838 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2838 | Vuelos: 6109 | Fitness inicial: 2143233
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2143233 ? 2143233 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2836 / 2838
+[Lote] Completado en 1093 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1093 ms | estable=true
+[Lote] Ventana 3600–3780 | 2382 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2382 | Vuelos: 6073 | Fitness inicial: 3589083
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3589083 ? 3589083 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2363 / 2382
+[Lote] Completado en 3199 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3199 ms | estable=true
+[Lote] Ventana 3780–3960 | 2006 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2006 | Vuelos: 6088 | Fitness inicial: 1498239
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1498239 ? 1498239 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2006 / 2006
+[Lote] Completado en 555 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=555 ms | estable=true
+[Lote] Ventana 3960–4140 | 1751 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1751 | Vuelos: 6070 | Fitness inicial: 1338515
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1338515 ? 1338515 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1751 / 1751
+[Lote] Completado en 511 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=511 ms | estable=true
+[Lote] Ventana 4140–4320 | 2172 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2172 | Vuelos: 6097 | Fitness inicial: 1507755
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1507755 ? 1507755 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2172 / 2172
+[Lote] Completado en 663 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=663 ms | estable=true
+[Lote] Ventana 4320–4500 | 2279 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2279 | Vuelos: 6058 | Fitness inicial: 2009048
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2009048 ? 2009048 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2274 / 2279
+[Lote] Completado en 1845 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1845 ms | estable=true
+[Lote] Ventana 4500–4680 | 3970 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3970 | Vuelos: 6064 | Fitness inicial: 114419322
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 114419322 ? 114419322 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2844 / 3970
+[Lote] Completado en 129714 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=129714 ms | estable=false
+[Lote] Ventana 4680–4860 | 2817 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2817 | Vuelos: 6074 | Fitness inicial: 6028979
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 6028979 ? 6028979 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 2776 / 2817
+[Lote] Completado en 7502 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=7502 ms | estable=true
+[Lote] Ventana 4860–5040 | 2527 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2527 | Vuelos: 6109 | Fitness inicial: 1743703
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1743703 ? 1743703 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2527 / 2527
+[Lote] Completado en 699 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=699 ms | estable=true
+[Lote] Ventana 5040–5220 | 1714 envíos | 6073 vuelos disponibles
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ALNS] Iniciando | Envíos: 1714 | Vuelos: 6073 | Fitness inicial: 3953346
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3953346 ? 3953346 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1687 / 1714
+[Lote] Completado en 3962 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3962 ms | estable=true
+[Lote] Ventana 5220–5400 | 1246 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1246 | Vuelos: 6088 | Fitness inicial: 982134
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 982134 ? 982134 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1246 / 1246
+[Lote] Completado en 445 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=445 ms | estable=true
+[Lote] Ventana 5400–5580 | 942 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 942 | Vuelos: 6070 | Fitness inicial: 788840
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 788840 ? 788840 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 942 / 942
+[Lote] Completado en 292 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=292 ms | estable=true
+[Lote] Ventana 5580–5760 | 1988 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1988 | Vuelos: 6097 | Fitness inicial: 1402562
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1402562 ? 1402562 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1988 / 1988
+[Lote] Completado en 536 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=536 ms | estable=true
+[Lote] Ventana 5760–5940 | 2014 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2014 | Vuelos: 6058 | Fitness inicial: 1347330
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1347330 ? 1347330 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2014 / 2014
+[Lote] Completado en 589 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=589 ms | estable=true
+[Lote] Ventana 5940–6120 | 3749 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3749 | Vuelos: 6064 | Fitness inicial: 107084286
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 107084286 ? 107084286 | Mejoras: 0 | Aceptadas SA: 39
+[ALNS] Pesos Destructores: D0=1.88 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.83 R3=1.98
+[Lote] Rutas: 2696 / 3749
+[Lote] Completado en 98354 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=98354 ms | estable=true
+[Lote] Ventana 6120–6300 | 2593 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2593 | Vuelos: 6074 | Fitness inicial: 4431425
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 4431425 ? 4431425 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 2567 / 2593
+[Lote] Completado en 3836 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3836 ms | estable=true
+[Lote] Ventana 6300–6480 | 2255 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2255 | Vuelos: 6109 | Fitness inicial: 2801712
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2801712 ? 2801712 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2243 / 2255
+[Lote] Completado en 1843 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1843 ms | estable=true
+[Lote] Ventana 6480–6660 | 1828 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1828 | Vuelos: 6073 | Fitness inicial: 2279309
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2279309 ? 2279309 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1819 / 1828
+[Lote] Completado en 1606 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1606 ms | estable=true
+[Lote] Ventana 6660–6840 | 1500 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1500 | Vuelos: 6088 | Fitness inicial: 1176825
+[ALNS] Iter 6 | Mejor: 1176535 | D0 R3
+[ALNS] Early stopping en iter 46 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 47 | Fitness: 1176825 ? 1176535 | Mejoras: 1 | Aceptadas SA: 47
+[ALNS] Pesos Destructores: D0=2.17 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=2.36
+[Lote] Rutas: 1500 / 1500
+[Lote] Completado en 467 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=467 ms | estable=true
+[Lote] Ventana 6840–7020 | 921 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 921 | Vuelos: 6070 | Fitness inicial: 744605
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 744605 ? 744605 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 921 / 921
+[Lote] Completado en 349 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=349 ms | estable=true
+[Lote] Ventana 7020–7200 | 2100 envíos | 6094 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2100 | Vuelos: 6094 | Fitness inicial: 1415420
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1415420 ? 1415420 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2100 / 2100
+[Lote] Simulación completada.
+[Lote] Completado en 635 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=635 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 2860 vuelos SCHEDULED desde BD para 1 dia(s).
+[ShipmentParser] EBCI ? 2060 envios cargados desde '_envios_EBCI_.txt'
+[ShipmentParser] EDDI ? 2602 envios cargados desde '_envios_EDDI_.txt'
+[ShipmentParser] EHAM ? 2639 envios cargados desde '_envios_EHAM_.txt'
+[ShipmentParser] EKCH ? 2485 envios cargados desde '_envios_EKCH_.txt'
+[ShipmentParser] LATI ? 3304 envios cargados desde '_envios_LATI_.txt'
+[ShipmentParser] LBSF ? 3634 envios cargados desde '_envios_LBSF_.txt'
+[ShipmentParser] LDZA ? 2276 envios cargados desde '_envios_LDZA_.txt'
+[ShipmentParser] LKPR ? 3305 envios cargados desde '_envios_LKPR_.txt'
+[ShipmentParser] LOWW ? 2055 envios cargados desde '_envios_LOWW_.txt'
+[ShipmentParser] OAKB ? 3032 envios cargados desde '_envios_OAKB_.txt'
+[ShipmentParser] OERK ? 1614 envios cargados desde '_envios_OERK_.txt'
+[ShipmentParser] OJAI ? 2892 envios cargados desde '_envios_OJAI_.txt'
+[ShipmentParser] OMDB ? 2380 envios cargados desde '_envios_OMDB_.txt'
+[ShipmentParser] OOMS ? 3487 envios cargados desde '_envios_OOMS_.txt'
+[ShipmentParser] OPKC ? 1685 envios cargados desde '_envios_OPKC_.txt'
+[ShipmentParser] OSDI ? 3955 envios cargados desde '_envios_OSDI_.txt'
+[ShipmentParser] OYSN ? 2437 envios cargados desde '_envios_OYSN_.txt'
+[ShipmentParser] SABE ? 3105 envios cargados desde '_envios_SABE_.txt'
+[ShipmentParser] SBBR ? 4874 envios cargados desde '_envios_SBBR_.txt'
+[ShipmentParser] SCEL ? 2195 envios cargados desde '_envios_SCEL_.txt'
+[ShipmentParser] SEQM ? 1570 envios cargados desde '_envios_SEQM_.txt'
+[ShipmentParser] SGAS ? 4189 envios cargados desde '_envios_SGAS_.txt'
+[ShipmentParser] SKBO ? 3846 envios cargados desde '_envios_SKBO_.txt'
+[ShipmentParser] SLLP ? 3757 envios cargados desde '_envios_SLLP_.txt'
+[ShipmentParser] SPIM ? 2631 envios cargados desde '_envios_SPIM_.txt'
+[ShipmentParser] SUAA ? 2381 envios cargados desde '_envios_SUAA_.txt'
+[ShipmentParser] SVMI ? 3361 envios cargados desde '_envios_SVMI_.txt'
+[ShipmentParser] UBBB ? 3844 envios cargados desde '_envios_UBBB_.txt'
+[ShipmentParser] UMMS ? 5446 envios cargados desde '_envios_UMMS_.txt'
+[ShipmentParser] VIDP ? 2233 envios cargados desde '_envios_VIDP_.txt'
+[ShipmentParser] Total TXT: 89274 envios cargados de 30 archivos.
+[Lote] Ventana 0–180 | 2181 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2181 | Vuelos: 6058 | Fitness inicial: 1417191
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1417191 ? 1417191 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2181 / 2181
+[Lote] Completado en 665 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=665 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 180–360 | 4449 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 4449 | Vuelos: 6064 | Fitness inicial: 117654610
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 117654610 ? 117654610 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.72 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 3294 / 4449
+[Lote] Completado en 113922 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=113922 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 360–540 | 3147 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3147 | Vuelos: 6074 | Fitness inicial: 2534255
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 2534255 ? 2534255 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 3144 / 3147
+[Lote] Completado en 1065 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1065 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 540–720 | 2868 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2868 | Vuelos: 6109 | Fitness inicial: 4675001
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4675001 ? 4675001 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 2841 / 2868
+[Lote] Completado en 3358 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3358 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 720–900 | 2042 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2042 | Vuelos: 6073 | Fitness inicial: 1656134
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1656134 ? 1656134 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2041 / 2042
+[Lote] Completado en 552 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=552 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 900–1080 | 1537 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1537 | Vuelos: 6088 | Fitness inicial: 1201265
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1201265 ? 1201265 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 1537 / 1537
+[Lote] Completado en 384 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=384 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1080–1260 | 812 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 812 | Vuelos: 6070 | Fitness inicial: 625304
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 625304 ? 625304 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 812 / 812
+[Lote] Completado en 208 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=208 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1260–1440 | 3509 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3509 | Vuelos: 6097 | Fitness inicial: 126180779
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 126180779 ? 126180779 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2261 / 3509
+[Lote] Completado en 133495 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=133495 ms | estable=false
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1440–1620 | 2176 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2176 | Vuelos: 6058 | Fitness inicial: 2102678
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 2102678 ? 2102678 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 2169 / 2176
+[Lote] Completado en 1395 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1395 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1620–1800 | 2900 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2900 | Vuelos: 6064 | Fitness inicial: 3518768
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3518768 ? 3518768 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2885 / 2900
+[Lote] Completado en 2812 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=2812 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1800–1980 | 3272 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3272 | Vuelos: 6074 | Fitness inicial: 2548200
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2548200 ? 2548200 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 3270 / 3272
+[Lote] Completado en 1002 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1002 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1980–2160 | 3024 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3024 | Vuelos: 6109 | Fitness inicial: 2156138
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2156138 ? 2156138 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 3024 / 3024
+[Lote] Completado en 693 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=693 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2160–2340 | 2176 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2176 | Vuelos: 6073 | Fitness inicial: 4827786
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4827786 ? 4827786 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2144 / 2176
+[Lote] Completado en 3976 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3976 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2340–2520 | 1666 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1666 | Vuelos: 6088 | Fitness inicial: 1301113
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1301113 ? 1301113 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 1666 / 1666
+[Lote] Completado en 421 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=421 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2520–2700 | 1095 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1095 | Vuelos: 6070 | Fitness inicial: 865231
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 865231 ? 865231 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 1095 / 1095
+[Lote] Completado en 293 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=293 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2700–2880 | 2524 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2524 | Vuelos: 6097 | Fitness inicial: 1676016
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1676016 ? 1676016 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2524 / 2524
+[Lote] Completado en 628 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=628 ms | estable=true
+[Lote] Ventana 2880–3060 | 2659 envíos | 6058 vuelos disponibles
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ALNS] Iniciando | Envíos: 2659 | Vuelos: 6058 | Fitness inicial: 7122196
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 7122196 ? 7122196 | Mejoras: 0 | Aceptadas SA: 39
+[ALNS] Pesos Destructores: D0=1.83 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.68 R3=1.72
+[Lote] Rutas: 2605 / 2659
+[Lote] Completado en 9543 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=9543 ms | estable=true
+[Lote] Ventana 3060–3240 | 3091 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3091 | Vuelos: 6064 | Fitness inicial: 7962572
+[ALNS] Iter 0 | Mejor: 7962457 | D0 R0
+[ALNS] Early stopping en iter 40 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 41 | Fitness: 7962572 ? 7962457 | Mejoras: 1 | Aceptadas SA: 39
+[ALNS] Pesos Destructores: D0=1.90 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=2.23 R1=1.98 R2=1.83 R3=1.86
+[Lote] Rutas: 3032 / 3091
+[Lote] Completado en 7688 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=7688 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3240–3420 | 3354 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3354 | Vuelos: 6074 | Fitness inicial: 4893911
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4893911 ? 4893911 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 3328 / 3354
+[Lote] Completado en 4005 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=4005 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3420–3600 | 2718 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2718 | Vuelos: 6109 | Fitness inicial: 1880440
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1880440 ? 1880440 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2718 / 2718
+[Lote] Completado en 701 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=701 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3600–3780 | 1874 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1874 | Vuelos: 6073 | Fitness inicial: 3550835
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 3550835 ? 3550835 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.72 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1852 / 1874
+[Lote] Completado en 3138 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=3138 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3780–3960 | 1289 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1289 | Vuelos: 6088 | Fitness inicial: 1007429
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1007429 ? 1007429 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.40 R3=1.98
+[Lote] Rutas: 1289 / 1289
+[Lote] Completado en 341 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=341 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3960–4140 | 1102 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1102 | Vuelos: 6070 | Fitness inicial: 892252
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 892252 ? 892252 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1102 / 1102
+[Lote] Completado en 283 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=283 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4140–4320 | 2280 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2280 | Vuelos: 6097 | Fitness inicial: 1572831
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1572831 ? 1572831 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2280 / 2280
+[Lote] Completado en 618 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=618 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4320–4500 | 2154 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2154 | Vuelos: 6058 | Fitness inicial: 1886402
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1886402 ? 1886402 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2149 / 2154
+[Lote] Completado en 1469 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1469 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4500–4680 | 2378 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2378 | Vuelos: 6064 | Fitness inicial: 6672092
+[ALNS] Iter 30 | Mejor: 6671894 | D0 R3
+[ALNS] Iter 39 | Mejor: 6671570 | D2 R2
+[ALNS] Iter 46 | Mejor: 6671366 | D0 R0
+[ALNS] Iter 61 | Mejor: 6671075 | D0 R0
+[ALNS] Early stopping en iter 101 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 102 | Fitness: 6672092 ? 6671075 | Mejoras: 4 | Aceptadas SA: 102
+[ALNS] Pesos Destructores: D0=3.08 D1=2.66 D2=2.83
+[ALNS] Pesos Reparadores:  R0=3.21 R1=2.66 R2=2.89 R3=2.72
+[Lote] Rutas: 2327 / 2378
+[Lote] Completado en 6353 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=6353 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4680–4860 | 2666 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2666 | Vuelos: 6074 | Fitness inicial: 2433505
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 2433505 ? 2433505 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 2660 / 2666
+[Lote] Completado en 1438 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=1438 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4860–5040 | 2465 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2465 | Vuelos: 6109 | Fitness inicial: 1671334
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1671334 ? 1671334 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.72 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2465 / 2465
+[Lote] Completado en 687 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=687 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5040–5220 | 2102 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2102 | Vuelos: 6073 | Fitness inicial: 4662142
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 4662142 ? 4662142 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2070 / 2102
+[Lote] Completado en 4372 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=4372 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5220–5400 | 1669 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1669 | Vuelos: 6088 | Fitness inicial: 1208045
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1208045 ? 1208045 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 1669 / 1669
+[Lote] Completado en 472 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=472 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5400–5580 | 1329 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1329 | Vuelos: 6070 | Fitness inicial: 1018636
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1018636 ? 1018636 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1329 / 1329
+[Lote] Completado en 416 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=416 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5580–5760 | 3367 envíos | 6097 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3367 | Vuelos: 6097 | Fitness inicial: 138511328
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 138511328 ? 138511328 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1994 / 3367
+[Lote] Completado en 154813 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=154813 ms | estable=false
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5760–5940 | 1618 envíos | 6058 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1618 | Vuelos: 6058 | Fitness inicial: 1029214
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 1029214 ? 1029214 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 1618 / 1618
+[Lote] Completado en 468 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=468 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5940–6120 | 3415 envíos | 6064 vuelos disponibles
+[ALNS] Iniciando | Envíos: 3415 | Vuelos: 6064 | Fitness inicial: 116280239
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 116280239 ? 116280239 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 2266 / 3415
+[Lote] Completado en 125713 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=125713 ms | estable=false
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6120–6300 | 2121 envíos | 6074 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2121 | Vuelos: 6074 | Fitness inicial: 3016621
+[ALNS] Modo rapido activo | Iters: 40/120 | nDestruir: 30
+[ALNS] Early stopping en iter 7 | 8 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 8 | Fitness: 3016621 ? 3016621 | Mejoras: 0 | Aceptadas SA: 8
+[ALNS] Pesos Destructores: D0=1.00 D1=1.00 D2=1.00
+[ALNS] Pesos Reparadores:  R0=1.00 R1=1.00 R2=1.00 R3=1.00
+[Lote] Rutas: 2105 / 2121
+[Lote] Completado en 2519 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=2519 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6300–6480 | 2123 envíos | 6109 vuelos disponibles
+[ALNS] Iniciando | Envíos: 2123 | Vuelos: 6109 | Fitness inicial: 1540118
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1540118 ? 1540118 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 2122 / 2123
+[Lote] Completado en 750 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=750 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6480–6660 | 1844 envíos | 6073 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1844 | Vuelos: 6073 | Fitness inicial: 1302053
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 1302053 ? 1302053 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 1844 / 1844
+[Lote] Completado en 645 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=645 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6660–6840 | 1231 envíos | 6088 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1231 | Vuelos: 6088 | Fitness inicial: 880401
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 880401 ? 880401 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1231 / 1231
+[Lote] Completado en 468 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=468 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6840–7020 | 796 envíos | 6070 vuelos disponibles
+[ALNS] Iniciando | Envíos: 796 | Vuelos: 6070 | Fitness inicial: 579271
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 579271 ? 579271 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 796 / 796
+[Lote] Completado en 253 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=253 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 7020–7200 | 251 envíos | 6094 vuelos disponibles
+[ALNS] Iniciando | Envíos: 251 | Vuelos: 6094 | Fitness inicial: 203361
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 203361 ? 203361 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.40 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 251 / 251
+[Lote] Simulación completada.
+[Lote] Completado en 137 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=137 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[AirportParser] Cargados 30 aeropuertos desde BD.
+[FlightPlanParser] Cargados 2860 vuelos SCHEDULED desde BD para 1 dia(s).
+[ShipmentParser] EBCI ? 1715 envios cargados desde '_envios_EBCI_.txt'
+[ShipmentParser] EDDI ? 1505 envios cargados desde '_envios_EDDI_.txt'
+[ShipmentParser] EHAM ? 1433 envios cargados desde '_envios_EHAM_.txt'
+[ShipmentParser] EKCH ? 1012 envios cargados desde '_envios_EKCH_.txt'
+[ShipmentParser] LATI ? 687 envios cargados desde '_envios_LATI_.txt'
+[ShipmentParser] LBSF ? 1418 envios cargados desde '_envios_LBSF_.txt'
+[ShipmentParser] LDZA ? 560 envios cargados desde '_envios_LDZA_.txt'
+[ShipmentParser] LKPR ? 1250 envios cargados desde '_envios_LKPR_.txt'
+[ShipmentParser] LOWW ? 1504 envios cargados desde '_envios_LOWW_.txt'
+[ShipmentParser] OAKB ? 1155 envios cargados desde '_envios_OAKB_.txt'
+[ShipmentParser] OERK ? 1274 envios cargados desde '_envios_OERK_.txt'
+[ShipmentParser] OJAI ? 1263 envios cargados desde '_envios_OJAI_.txt'
+[ShipmentParser] OMDB ? 1036 envios cargados desde '_envios_OMDB_.txt'
+[ShipmentParser] OOMS ? 1503 envios cargados desde '_envios_OOMS_.txt'
+[ShipmentParser] OPKC ? 925 envios cargados desde '_envios_OPKC_.txt'
+[ShipmentParser] OSDI ? 944 envios cargados desde '_envios_OSDI_.txt'
+[ShipmentParser] OYSN ? 1144 envios cargados desde '_envios_OYSN_.txt'
+[ShipmentParser] SABE ? 1164 envios cargados desde '_envios_SABE_.txt'
+[ShipmentParser] SBBR ? 1591 envios cargados desde '_envios_SBBR_.txt'
+[ShipmentParser] SCEL ? 1106 envios cargados desde '_envios_SCEL_.txt'
+[ShipmentParser] SEQM ? 1043 envios cargados desde '_envios_SEQM_.txt'
+[ShipmentParser] SGAS ? 1596 envios cargados desde '_envios_SGAS_.txt'
+[ShipmentParser] SKBO ? 603 envios cargados desde '_envios_SKBO_.txt'
+[ShipmentParser] SLLP ? 1268 envios cargados desde '_envios_SLLP_.txt'
+[ShipmentParser] SPIM ? 1971 envios cargados desde '_envios_SPIM_.txt'
+[ShipmentParser] SUAA ? 1185 envios cargados desde '_envios_SUAA_.txt'
+[ShipmentParser] SVMI ? 672 envios cargados desde '_envios_SVMI_.txt'
+[ShipmentParser] UBBB ? 1222 envios cargados desde '_envios_UBBB_.txt'
+[ShipmentParser] UMMS ? 2148 envios cargados desde '_envios_UMMS_.txt'
+[ShipmentParser] VIDP ? 946 envios cargados desde '_envios_VIDP_.txt'
+[ShipmentParser] Total TXT: 36843 envios cargados de 30 archivos.
+[Lote] Ventana 244–424 | 755 envíos | 6084 vuelos disponibles
+[ALNS] Iniciando | Envíos: 755 | Vuelos: 6084 | Fitness inicial: 497066
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 497066 ? 497066 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 755 / 755
+[Lote] Completado en 236 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=236 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 424–604 | 782 envíos | 6075 vuelos disponibles
+[ALNS] Iniciando | Envíos: 782 | Vuelos: 6075 | Fitness inicial: 511123
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 511123 ? 511123 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 782 / 782
+[Lote] Completado en 251 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=251 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 604–784 | 778 envíos | 6099 vuelos disponibles
+[ALNS] Iniciando | Envíos: 778 | Vuelos: 6099 | Fitness inicial: 502185
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 502185 ? 502185 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 778 / 778
+[Lote] Completado en 268 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=268 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 784–964 | 698 envíos | 6072 vuelos disponibles
+[ALNS] Iniciando | Envíos: 698 | Vuelos: 6072 | Fitness inicial: 457829
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 457829 ? 457829 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 698 / 698
+[Lote] Completado en 217 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=217 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 964–1144 | 397 envíos | 6083 vuelos disponibles
+[ALNS] Iniciando | Envíos: 397 | Vuelos: 6083 | Fitness inicial: 269731
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 269731 ? 269731 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 397 / 397
+[Lote] Completado en 134 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=134 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1144–1324 | 343 envíos | 6096 vuelos disponibles
+[ALNS] Iniciando | Envíos: 343 | Vuelos: 6096 | Fitness inicial: 261188
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 261188 ? 261188 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 343 / 343
+[Lote] Completado en 116 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=116 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1324–1504 | 595 envíos | 6082 vuelos disponibles
+[ALNS] Iniciando | Envíos: 595 | Vuelos: 6082 | Fitness inicial: 417586
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 417586 ? 417586 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 595 / 595
+[Lote] Completado en 191 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=191 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1504–1684 | 593 envíos | 6050 vuelos disponibles
+[ALNS] Iniciando | Envíos: 593 | Vuelos: 6050 | Fitness inicial: 386628
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 386628 ? 386628 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 593 / 593
+[Lote] Completado en 177 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=177 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1684–1864 | 822 envíos | 6084 vuelos disponibles
+[ALNS] Iniciando | Envíos: 822 | Vuelos: 6084 | Fitness inicial: 575611
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 575611 ? 575611 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 822 / 822
+[Lote] Completado en 190 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=190 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 1864–2044 | 857 envíos | 6075 vuelos disponibles
+[ALNS] Iniciando | Envíos: 857 | Vuelos: 6075 | Fitness inicial: 607516
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 607516 ? 607516 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 857 / 857
+[Lote] Completado en 201 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=201 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2044–2224 | 868 envíos | 6099 vuelos disponibles
+[ALNS] Iniciando | Envíos: 868 | Vuelos: 6099 | Fitness inicial: 621037
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 621037 ? 621037 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 868 / 868
+[Lote] Completado en 265 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=265 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2224–2404 | 832 envíos | 6072 vuelos disponibles
+[ALNS] Iniciando | Envíos: 832 | Vuelos: 6072 | Fitness inicial: 622784
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 622784 ? 622784 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 832 / 832
+[Lote] Completado en 244 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=244 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2404–2584 | 577 envíos | 6083 vuelos disponibles
+[ALNS] Iniciando | Envíos: 577 | Vuelos: 6083 | Fitness inicial: 432518
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 432518 ? 432518 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 577 / 577
+[Lote] Completado en 157 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=157 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2584–2764 | 517 envíos | 6096 vuelos disponibles
+[ALNS] Iniciando | Envíos: 517 | Vuelos: 6096 | Fitness inicial: 405886
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 405886 ? 405886 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 517 / 517
+[Lote] Completado en 136 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=136 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2764–2944 | 852 envíos | 6082 vuelos disponibles
+[ALNS] Iniciando | Envíos: 852 | Vuelos: 6082 | Fitness inicial: 591864
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 591864 ? 591864 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 852 / 852
+[Lote] Completado en 224 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=224 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 2944–3124 | 725 envíos | 6050 vuelos disponibles
+[ALNS] Iniciando | Envíos: 725 | Vuelos: 6050 | Fitness inicial: 467898
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 467898 ? 467898 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.72
+[Lote] Rutas: 725 / 725
+[Lote] Completado en 210 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=210 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3124–3304 | 891 envíos | 6084 vuelos disponibles
+[ALNS] Iniciando | Envíos: 891 | Vuelos: 6084 | Fitness inicial: 624624
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 624624 ? 624624 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 891 / 891
+[Lote] Completado en 248 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=248 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3304–3484 | 934 envíos | 6075 vuelos disponibles
+[ALNS] Iniciando | Envíos: 934 | Vuelos: 6075 | Fitness inicial: 642052
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 642052 ? 642052 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 934 / 934
+[Lote] Completado en 279 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=279 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3484–3664 | 928 envíos | 6099 vuelos disponibles
+[ALNS] Iniciando | Envíos: 928 | Vuelos: 6099 | Fitness inicial: 626025
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 626025 ? 626025 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 928 / 928
+[Lote] Completado en 267 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=267 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3664–3844 | 928 envíos | 6072 vuelos disponibles
+[ALNS] Iniciando | Envíos: 928 | Vuelos: 6072 | Fitness inicial: 652230
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 652230 ? 652230 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 928 / 928
+[Lote] Completado en 266 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=266 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 3844–4024 | 752 envíos | 6083 vuelos disponibles
+[ALNS] Iniciando | Envíos: 752 | Vuelos: 6083 | Fitness inicial: 535782
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 535782 ? 535782 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 752 / 752
+[Lote] Completado en 219 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=219 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4024–4204 | 545 envíos | 6096 vuelos disponibles
+[ALNS] Iniciando | Envíos: 545 | Vuelos: 6096 | Fitness inicial: 425944
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 425944 ? 425944 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 545 / 545
+[Lote] Completado en 183 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=183 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4204–4384 | 854 envíos | 6082 vuelos disponibles
+[ALNS] Iniciando | Envíos: 854 | Vuelos: 6082 | Fitness inicial: 599663
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 599663 ? 599663 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 854 / 854
+[Lote] Completado en 253 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=253 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4384–4564 | 807 envíos | 6050 vuelos disponibles
+[ALNS] Iniciando | Envíos: 807 | Vuelos: 6050 | Fitness inicial: 549863
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 549863 ? 549863 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 807 / 807
+[Lote] Completado en 241 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=241 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4564–4744 | 993 envíos | 6084 vuelos disponibles
+[ALNS] Iniciando | Envíos: 993 | Vuelos: 6084 | Fitness inicial: 691387
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 691387 ? 691387 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 993 / 993
+[Lote] Completado en 285 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=285 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4744–4924 | 1033 envíos | 6075 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1033 | Vuelos: 6075 | Fitness inicial: 747638
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 747638 ? 747638 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1033 / 1033
+[Lote] Completado en 308 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=308 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 4924–5104 | 1025 envíos | 6099 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1025 | Vuelos: 6099 | Fitness inicial: 719782
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 719782 ? 719782 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 1025 / 1025
+[Lote] Completado en 298 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=298 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5104–5284 | 1004 envíos | 6072 vuelos disponibles
+[ALNS] Iniciando | Envíos: 1004 | Vuelos: 6072 | Fitness inicial: 715403
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 715403 ? 715403 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 1004 / 1004
+[Lote] Completado en 282 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=282 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5284–5464 | 816 envíos | 6083 vuelos disponibles
+[ALNS] Iniciando | Envíos: 816 | Vuelos: 6083 | Fitness inicial: 589089
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 589089 ? 589089 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.72 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 816 / 816
+[Lote] Completado en 220 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=220 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5464–5644 | 540 envíos | 6096 vuelos disponibles
+[ALNS] Iniciando | Envíos: 540 | Vuelos: 6096 | Fitness inicial: 413958
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 413958 ? 413958 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 540 / 540
+[Lote] Completado en 158 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=158 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5644–5824 | 792 envíos | 6082 vuelos disponibles
+[ALNS] Iniciando | Envíos: 792 | Vuelos: 6082 | Fitness inicial: 524456
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 524456 ? 524456 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 792 / 792
+[Lote] Completado en 253 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=253 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 5824–6004 | 699 envíos | 6050 vuelos disponibles
+[ALNS] Iniciando | Envíos: 699 | Vuelos: 6050 | Fitness inicial: 446738
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 446738 ? 446738 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.72
+[Lote] Rutas: 699 / 699
+[Lote] Completado en 220 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=220 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6004–6184 | 867 envíos | 6084 vuelos disponibles
+[ALNS] Iniciando | Envíos: 867 | Vuelos: 6084 | Fitness inicial: 573258
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 573258 ? 573258 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 867 / 867
+[Lote] Completado en 248 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=248 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6184–6364 | 902 envíos | 6075 vuelos disponibles
+[ALNS] Iniciando | Envíos: 902 | Vuelos: 6075 | Fitness inicial: 602114
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 602114 ? 602114 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.72 R3=1.98
+[Lote] Rutas: 902 / 902
+[Lote] Completado en 281 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=281 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6364–6544 | 901 envíos | 6099 vuelos disponibles
+[ALNS] Iniciando | Envíos: 901 | Vuelos: 6099 | Fitness inicial: 595881
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 595881 ? 595881 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 901 / 901
+[Lote] Completado en 259 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=259 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6544–6724 | 809 envíos | 6072 vuelos disponibles
+[ALNS] Iniciando | Envíos: 809 | Vuelos: 6072 | Fitness inicial: 568994
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 568994 ? 568994 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.72
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.40
+[Lote] Rutas: 809 / 809
+[Lote] Completado en 231 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=231 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6724–6904 | 585 envíos | 6083 vuelos disponibles
+[ALNS] Iniciando | Envíos: 585 | Vuelos: 6083 | Fitness inicial: 406323
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 406323 ? 406323 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 585 / 585
+[Lote] Completado en 173 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=173 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 6904–7084 | 492 envíos | 6096 vuelos disponibles
+[ALNS] Iniciando | Envíos: 492 | Vuelos: 6096 | Fitness inicial: 372813
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 372813 ? 372813 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.72 R2=1.98 R3=1.98
+[Lote] Rutas: 492 / 492
+[Lote] Completado en 269 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=269 ms | estable=true
+[Lote] Ventana 7084–7264 | 786 envíos | 5957 vuelos disponibles
+[ALNS] Iniciando | Envíos: 786 | Vuelos: 5957 | Fitness inicial: 535062
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 535062 ? 535062 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 786 / 786
+[Lote] Completado en 394 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=394 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[Lote] Ventana 7264–7444 | 723 envíos | 5600 vuelos disponibles
+[ALNS] Iniciando | Envíos: 723 | Vuelos: 5600 | Fitness inicial: 472991
+[ALNS] Early stopping en iter 39 | 40 iteraciones sin mejora
+[ALNS] Finalizado | Iters: 40 | Fitness: 472991 ? 472991 | Mejoras: 0 | Aceptadas SA: 40
+[ALNS] Pesos Destructores: D0=1.98 D1=1.98 D2=1.98
+[ALNS] Pesos Reparadores:  R0=1.98 R1=1.98 R2=1.98 R3=1.98
+[Lote] Rutas: 723 / 723
+[Lote] Simulación completada.
+[Lote] Completado en 243 ms (animación sugerida: 120000 ms)
+[Planificacion fija][Lote] Sa=120000 ms | K=90 | Sc=180 min | Ta=243 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true
+[ShipmentParser] Cargados 2 envios desde BD.
+[Planificacion fija][Tiempo real] Sa=120000 ms | K=1 | Sc=2 min | Ta=0 ms | estable=true

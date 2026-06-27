@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react"
-import { useLocation } from "react-router-dom"
 import {
   advanceBatchSimulationRequest,
   getCurrentBatchSimulationRequest,
@@ -7,32 +6,12 @@ import {
 } from "../../../api/simulationApi"
 import type { SimulationData } from "../types"
 
-const PAUSED_KEY = "tasf.simulation5d.paused"
-const STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
 const POLL_MS = 5_000
 const DEFAULT_BATCH_MINUTES = 180
 const DEFAULT_BATCH_INTERVAL_MS = 120_000
 
-function isPausedLocally() {
-  try {
-    return window.localStorage.getItem(PAUSED_KEY) === "true"
-  } catch {
-    return false
-  }
-}
-
-function isStoppedLocally(data: SimulationData) {
-  if (!data.simulationId) return false
-
-  try {
-    return window.localStorage.getItem(STOPPED_KEY) === data.simulationId
-  } catch {
-    return false
-  }
-}
-
 function shouldAdvanceBatch(data: SimulationData) {
-  if (!data.simulationId || data.status === "COMPLETED") return false
+  if (!data.simulationId || data.status !== "RUNNING") return false
 
   const tick = data.tick ?? data.startOffsetMinutes ?? 0
   if (tick >= (data.maxTick ?? Number.POSITIVE_INFINITY)) return false
@@ -49,20 +28,18 @@ function shouldAdvanceBatch(data: SimulationData) {
 }
 
 export function BatchSimulationCoordinator() {
-  const location = useLocation()
   const advancingRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
 
     const coordinate = async () => {
-      if (cancelled || location.pathname === "/" || advancingRef.current || isPausedLocally()) {
+      if (cancelled || advancingRef.current) {
         return
       }
 
       try {
         const current = await getCurrentBatchSimulationRequest()
-        if (current && isStoppedLocally(current)) return
         if (current && !ownsBatchSimulation(current)) return
         if (cancelled || !current || !shouldAdvanceBatch(current) || !current.simulationId) return
 
@@ -86,7 +63,7 @@ export function BatchSimulationCoordinator() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [location.pathname])
+  }, [])
 
   return null
 }

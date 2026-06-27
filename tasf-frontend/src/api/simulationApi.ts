@@ -1,4 +1,4 @@
-import type { Airport, Flight, SimulationData } from "../features/simulation/types";
+import type { Airport, Flight, ShipmentPage, SimulationData } from "../features/simulation/types";
 import { SIMULATION_DAYS } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
 
@@ -129,6 +129,22 @@ export async function stopBatchSimulationRequest(
   });
 }
 
+export async function pauseBatchSimulationRequest(
+  simulationId: string,
+  paused: boolean
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(
+    `/simulations/batch/${simulationId}/pause`,
+    {
+      paused,
+      clientId: getBatchClientId(),
+      controlToken: getBatchControlToken(simulationId),
+    }
+  );
+  rememberBatchControlToken(response.data);
+  return response.data;
+}
+
 export async function cancelBatchFlightRequest(
   simulationId: string,
   flightId: string
@@ -141,6 +157,31 @@ export async function cancelBatchFlightRequest(
 }
 
 // ── Tiempo real (sesión tick-a-tick) ─────────────────────────────────────────
+
+export async function getBatchShipmentsPageRequest(
+  simulationId: string,
+  params: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    origin?: string;
+    destination?: string;
+    status?: string;
+  }
+): Promise<ShipmentPage> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page));
+  query.set("pageSize", String(params.pageSize));
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.origin?.trim()) query.set("origin", params.origin.trim());
+  if (params.destination?.trim()) query.set("destination", params.destination.trim());
+  if (params.status?.trim()) query.set("status", params.status.trim());
+
+  const response = await api.get<ShipmentPage>(
+    `/simulations/batch/${simulationId}/shipments?${query.toString()}`
+  );
+  return response.data;
+}
 
 let realtimeOperationPromise: Promise<SimulationData> | null = null;
 

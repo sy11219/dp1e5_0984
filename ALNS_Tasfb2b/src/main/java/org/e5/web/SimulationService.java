@@ -5,8 +5,6 @@ import org.e5.model.Airport;
 import org.e5.model.Flight;
 import org.e5.model.Route;
 import org.e5.model.Shipment;
-import org.e5.parser.AirportParser;
-import org.e5.parser.FlightPlanParser;
 import org.e5.parser.ShipmentParser;
 import org.e5.planner.ALNS;
 
@@ -20,7 +18,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +27,7 @@ public class SimulationService {
     private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter ISO_DATE_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     private static final ZoneId SERVER_ZONE = ZoneId.systemDefault();
+    private final RuntimeCatalogService catalogService = new RuntimeCatalogService();
 
     public String runAlns(String startDate, int days) throws Exception {
         validate(startDate, days);
@@ -37,16 +35,12 @@ public class SimulationService {
         LocalDateTime realStartedAt = LocalDateTime.now(SERVER_ZONE);
         long startedNanos = System.nanoTime();
 
-        AirportParser airportParser = new AirportParser();
-        List<Airport> airports = airportParser.parse();
-        Map<String, Airport> airportMap = new LinkedHashMap<>();
-        for (Airport airport : airports) {
-            airportMap.put(airport.getCode(), airport);
-        }
-
         int flightDays = days + 2;
-        FlightPlanParser flightParser = new FlightPlanParser();
-        List<Flight> flights = flightParser.parseScheduledFromDatabase(startDate, flightDays, airportMap);
+        RuntimeCatalogService.RuntimeCatalog catalog =
+                catalogService.loadRuntimeCatalog(startDate, flightDays);
+        List<Airport> airports = catalog.airports();
+        Map<String, Airport> airportMap = catalog.airportMap();
+        List<Flight> flights = catalog.flights();
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
         List<Shipment> shipments = shipmentParser.parseAll(startDate, days);

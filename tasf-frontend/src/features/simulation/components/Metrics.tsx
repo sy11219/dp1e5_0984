@@ -25,6 +25,8 @@ export function Metrics({ data }: MetricsProps) {
   const metrics = data.metrics;
   const plannedPct = percent(metrics.plannedShipments, metrics.shipments);
   const onTimePct = percent(metrics.onTimeShipments, metrics.shipments);
+  const deliveredShipments = metrics.deliveredShipments ?? metrics.onTimeShipments;
+  const deliveredPct = percent(deliveredShipments, metrics.shipments);
 
   return (
     <div className="metrics">
@@ -32,6 +34,11 @@ export function Metrics({ data }: MetricsProps) {
         label="Envíos planificados"
         value={`${metrics.plannedShipments}/${metrics.shipments}`}
         sub={`${plannedPct}%`}
+      />
+      <Metric
+        label="Entregados 120h"
+        value={`${deliveredShipments}/${metrics.shipments}`}
+        sub={`${deliveredPct}%`}
       />
       <Metric
         label="A tiempo"

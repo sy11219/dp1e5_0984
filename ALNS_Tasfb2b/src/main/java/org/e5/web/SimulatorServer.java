@@ -11,8 +11,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.CountDownLatch;
@@ -26,6 +29,7 @@ public class SimulatorServer {
     private static final Pattern START_DATE = Pattern.compile("\"startDate\"\\s*:\\s*\"(\\d{8})\"");
     private static final Pattern DAYS = Pattern.compile("\"days\"\\s*:\\s*(\\d+)");
     private static final Pattern ACTIVE = Pattern.compile("\"active\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PAUSED = Pattern.compile("\"paused\"\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
     private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
     private static final Pattern AIRPORT_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})$");
     private static final Pattern FLIGHT_PATH = Pattern.compile("^/api/flights/([^/]+)$");
@@ -497,6 +501,36 @@ public class SimulatorServer {
                 return;
             }
 
+            Matcher pauseMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/pause$").matcher(path);
+            if (pauseMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
+                Boolean paused = readBoolean(PAUSED, body);
+                if (paused == null) {
+                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    return;
+                }
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.pauseBatchSimulation(
+                                pauseMatcher.group(1), paused, clientId, controlToken));
+                return;
+            }
+
+            Matcher shipmentsMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/shipments$").matcher(path);
+            if (shipmentsMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                Map<String, String> query = queryParams(exchange);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.batchShipments(
+                                shipmentsMatcher.group(1),
+                                queryInt(query, "page", 1),
+                                queryInt(query, "pageSize", 25),
+                                query.getOrDefault("search", ""),
+                                query.getOrDefault("origin", ""),
+                                query.getOrDefault("destination", ""),
+                                query.getOrDefault("status", "")));
+                return;
+            }
+
             Matcher cancelMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/cancel-flight$").matcher(path);
             if (cancelMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 String flightId = readString(FLIGHT_ID, body, "");
@@ -573,6 +607,33 @@ public class SimulatorServer {
         if (path.endsWith(".js")) return "application/javascript";
         if (path.endsWith(".svg")) return "image/svg+xml";
         return "text/html";
+    }
+
+    private Map<String, String> queryParams(HttpExchange exchange) {
+        Map<String, String> params = new HashMap<>();
+        String query = exchange.getRequestURI().getRawQuery();
+        if (query == null || query.isBlank()) return params;
+
+        for (String pair : query.split("&")) {
+            if (pair.isBlank()) continue;
+            int eq = pair.indexOf('=');
+            String key = eq >= 0 ? pair.substring(0, eq) : pair;
+            String value = eq >= 0 ? pair.substring(eq + 1) : "";
+            params.put(
+                    URLDecoder.decode(key, StandardCharsets.UTF_8),
+                    URLDecoder.decode(value, StandardCharsets.UTF_8));
+        }
+        return params;
+    }
+
+    private int queryInt(Map<String, String> query, String key, int fallback) {
+        String value = query.get(key);
+        if (value == null || value.isBlank()) return fallback;
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private String readString(Pattern pattern, String body, String fallback) {

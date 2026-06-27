@@ -6,8 +6,6 @@ import org.e5.model.Airport;
 import org.e5.model.Flight;
 import org.e5.model.Route;
 import org.e5.model.Shipment;
-import org.e5.parser.AirportParser;
-import org.e5.parser.FlightPlanParser;
 import org.e5.parser.ShipmentParser;
 import org.e5.planner.ALNS;
 
@@ -64,6 +62,27 @@ public class RealtimeSimulationService {
     public static final long BATCH_INTERVAL_MS = readPositiveLong(
             "TASF_SIMULATION_SA_MS",
             SIMULATION_PLANNING_INTERVAL_MINUTES * MINUTE_MS);
+    private static final int BATCH_ALNS_MIN_ITERATIONS = readPositiveInt(
+            "TASF_BATCH_ALNS_MIN_ITERATIONS", 35);
+    private static final int BATCH_ALNS_MAX_ITERATIONS = readPositiveInt(
+            "TASF_BATCH_ALNS_MAX_ITERATIONS", 120);
+    private static final int BATCH_ALNS_ITERATIONS_PER_SHIPMENT = readPositiveInt(
+            "TASF_BATCH_ALNS_ITERATIONS_PER_SHIPMENT", 2);
+    private static final int BATCH_ALNS_DESTROY_CAP = readPositiveInt(
+            "TASF_BATCH_ALNS_DESTROY_CAP", 30);
+    private static final int BATCH_ALNS_MAX_ESCALAS = readPositiveInt(
+            "TASF_BATCH_ALNS_MAX_ESCALAS", 2);
+    private static final boolean BATCH_CANCEL_GLOBAL_REOPT = readBoolean(
+            "TASF_BATCH_CANCEL_GLOBAL_REOPT", false);
+    private static final int MAX_DELIVERY_DEADLINE_MINUTES = 2880;
+    private static final int BATCH_SNAPSHOT_TRAILING_MINUTES = readPositiveInt(
+            "TASF_BATCH_SNAPSHOT_TRAILING_MINUTES", 360);
+    private static final int BATCH_SNAPSHOT_LOOKAHEAD_MINUTES = readPositiveInt(
+            "TASF_BATCH_SNAPSHOT_LOOKAHEAD_MINUTES", 180);
+    private static final int BATCH_SNAPSHOT_MAX_SHIPMENTS = readPositiveInt(
+            "TASF_BATCH_SNAPSHOT_MAX_SHIPMENTS", 300);
+    private static final int BATCH_SNAPSHOT_MAX_EVENTS = readPositiveInt(
+            "TASF_BATCH_SNAPSHOT_MAX_EVENTS", 6_000);
 
     // ── Parámetros del loop de tiempo real ────────────────────────────────────
     private static final int INTERVALO_TICK    = 1;
@@ -79,8 +98,9 @@ public class RealtimeSimulationService {
 
     private final Map<String, RealtimeSession> sessions = new ConcurrentHashMap<>();
     private final FlightPlanService flightPlanService = new FlightPlanService();
-    private final ScheduledExecutorService realtimeScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread thread = new Thread(r, "tasf-realtime-scheduler");
+    private final RuntimeCatalogService catalogService = new RuntimeCatalogService();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "tasf-simulation-scheduler");
         thread.setDaemon(true);
         return thread;
     });
@@ -89,8 +109,8 @@ public class RealtimeSimulationService {
     private volatile String lastCreatedSessionId;
 
     public RealtimeSimulationService() {
-        realtimeScheduler.scheduleWithFixedDelay(
-                this::advanceSharedRealtimeIfDue,
+        scheduler.scheduleWithFixedDelay(
+                this::advanceSharedSessionsIfDue,
                 REALTIME_SCHEDULER_POLL_MS,
                 REALTIME_SCHEDULER_POLL_MS,
                 TimeUnit.MILLISECONDS);
@@ -131,6 +151,18 @@ public class RealtimeSimulationService {
         return start(startDate, days, ZoneId.systemDefault().getId());
     }
 
+    private static boolean readBoolean(String name, boolean defaultValue) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.isBlank()) {
+            return defaultValue;
+        }
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "1", "true", "yes", "y", "on" -> true;
+            case "0", "false", "no", "n", "off" -> false;
+            default -> defaultValue;
+        };
+    }
+
     public synchronized String start(String startDate, int days, String timeZone) throws Exception {
         return start(startDate, days, "00:00", timeZone);
     }
@@ -138,7 +170,7 @@ public class RealtimeSimulationService {
     public synchronized String start(String startDate, int days, String startTime, String timeZone) throws Exception {
         validate(startDate, days, false);
         RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
-        if (current != null && !current.completed) return current.snapshotJson();
+        if (current != null && !current.completed) return current.snapshotJsonForRead();
         int startOffsetMinutes = parseStartTime(startTime);
         String json = createSession(startDate, days, "TIEMPO_REAL", startOffsetMinutes, timeZone);
         sharedRealtimeSessionId = lastCreatedSessionId;
@@ -155,7 +187,12 @@ public class RealtimeSimulationService {
 
     public String currentRealtime() {
         RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
-        return current == null ? "{}" : current.snapshotJson();
+        return current == null ? "{}" : current.snapshotJsonForRead();
+    }
+
+    private void advanceSharedSessionsIfDue() {
+        advanceSharedRealtimeIfDue();
+        advanceSharedBatchIfDue();
     }
 
     private void advanceSharedRealtimeIfDue() {
@@ -165,6 +202,16 @@ public class RealtimeSimulationService {
             current.advanceRealtimeIfDue();
         } catch (Exception e) {
             System.err.printf("[Tiempo real] Error en scheduler: %s%n", e.getMessage());
+        }
+    }
+
+    private void advanceSharedBatchIfDue() {
+        try {
+            RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+            if (current == null || current.completed) return;
+            current.advanceBatchIfDue();
+        } catch (Exception e) {
+            System.err.printf("[Lote] Error en scheduler: %s%n", e.getMessage());
         }
     }
 
@@ -198,6 +245,10 @@ public class RealtimeSimulationService {
         RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         if (current != null && !current.completed) {
             requireBatchControl(current, clientId, controlToken);
+            current.completed = true;
+            sessions.remove(current.id);
+        } else if (current != null) {
+            sessions.remove(current.id);
         }
         int startOffsetMinutes = parseStartTime(startTime);
         String ownerClientId = normalizeClientId(clientId);
@@ -209,7 +260,7 @@ public class RealtimeSimulationService {
 
     public String currentSimulation() {
         RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
-        return current == null ? "{}" : current.snapshotJson();
+        return current == null ? "{}" : current.snapshotJsonForRead();
     }
 
     public synchronized String stopBatchSimulation(String id) {
@@ -230,8 +281,22 @@ public class RealtimeSimulationService {
         return "{}";
     }
 
+    public synchronized String pauseBatchSimulation(String id, boolean paused,
+                                                    String clientId, String controlToken) {
+        RealtimeSession session = require(id);
+        if (!"SIMULACION_LOTES".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+        }
+        requireBatchControl(session, clientId, controlToken);
+        session.setPaused(paused);
+        return session.snapshotJson();
+    }
+
     public String state(String id) {
-        return require(id).snapshotJson();
+        RealtimeSession session = sessions.get(id);
+        if (session != null) return session.snapshotJsonForRead();
+        RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        return current == null ? "{}" : current.snapshotJsonForRead();
     }
 
     /**
@@ -254,11 +319,15 @@ public class RealtimeSimulationService {
     }
 
     public String advance(String id, int steps, int expectedTick, String clientId, String controlToken) {
-        RealtimeSession session = require(id);
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+            return current == null ? "{}" : current.snapshotJsonForRead();
+        }
         synchronized (session) {
             if ("SIMULACION_LOTES".equals(session.scenario)) {
                 requireBatchControl(session, clientId, controlToken);
-                if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJson();
+                if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJsonForRead();
                 session.advanceBatch(BATCH_MINUTES);
             } else {
                 session.advanceRealtimeIfDue();
@@ -272,7 +341,11 @@ public class RealtimeSimulationService {
      * Rechaza con excepción si el vuelo ya despegó en el tick actual.
      */
     public String cancelFlight(String id, String flightId) {
-        RealtimeSession session = require(id);
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
         session.cancel(flightId, flightPlanService);
         return session.snapshotJson();
     }
@@ -280,6 +353,20 @@ public class RealtimeSimulationService {
     // ════════════════════════════════════════════════════════════════════════
     //  Internos
     // ════════════════════════════════════════════════════════════════════════
+
+    public String batchShipments(String id, int page, int pageSize,
+                                 String search, String origin,
+                                 String destination, String status) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (!"SIMULACION_LOTES".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+        }
+        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status);
+    }
 
     private static int parseStartTime(String startTime) {
         if (startTime == null || startTime.isBlank()) return 0;
@@ -312,17 +399,11 @@ public class RealtimeSimulationService {
                                  int startOffsetMinutes, String timeZone,
                                  String ownerClientId) throws Exception {
         ZoneId sessionZone = resolveZone(timeZone);
-        AirportParser airportParser = new AirportParser();
-        List<Airport> airports = airportParser.parse();
-        Map<String, Airport> airportMap = new LinkedHashMap<>();
-        for (Airport airport : airports) {
-            airport.resetLoad();
-            airportMap.put(airport.getCode(), airport);
-        }
-
-        FlightPlanParser flightParser = new FlightPlanParser();
-        List<Flight> flights = flightParser.parseScheduledFromDatabase(startDate, days + 2, airportMap);
-        for (Flight flight : flights) flight.resetLoad();
+        RuntimeCatalogService.RuntimeCatalog catalog =
+                catalogService.loadRuntimeCatalog(startDate, days + 2);
+        List<Airport> airports = catalog.airports();
+        Map<String, Airport> airportMap = catalog.airportMap();
+        List<Flight> flights = catalog.flights();
         flights.sort(Comparator
                 .comparingInt(Flight::absoluteDepartureMinute)
                 .thenComparing(Flight::getFlightId));
@@ -420,14 +501,19 @@ public class RealtimeSimulationService {
         final long realStartedAtMs = System.currentTimeMillis();
         int tick;
         final int maxTick;
+        final int planningMaxTick;
         boolean completed = false;
+        volatile boolean planningInProgress = false;
+        volatile String lastSnapshotJson = "{}";
         int lastBatchStart = -1;
         int lastBatchEnd = -1;
         int batchCount = 0;
         long lastBatchRuntimeMs = 0;
+        boolean paused = false;
         long lastRealtimeAdvanceMs = 0;
         long lastRealtimeExecutionMs = 0;
         long lastRealtimeShipmentRefreshMs = 0;
+        long lastBatchSchedulerCheckMs = 0;
         long visualWindowStartedAtMs;
         int visualWindowStartTick;
         int visualWindowEndTick;
@@ -461,6 +547,9 @@ public class RealtimeSimulationService {
             }
             this.tick = startOffsetMinutes;
             this.maxTick = startOffsetMinutes + days * 1440;
+            this.planningMaxTick = isBatchScenario()
+                    ? this.maxTick + MAX_DELIVERY_DEADLINE_MINUTES
+                    : this.maxTick;
             this.visualWindowStartedAtMs = System.currentTimeMillis();
             this.visualWindowStartTick = startOffsetMinutes;
             this.visualWindowEndTick = startOffsetMinutes;
@@ -510,6 +599,34 @@ public class RealtimeSimulationService {
                     && lastBatchRuntimeMs >= Math.round(planningIntervalMs() * 0.80);
         }
 
+        private int currentVisualTick(long nowMs) {
+            if (visualWindowEndTick <= visualWindowStartTick) return visualWindowEndTick;
+            long elapsed = Math.max(0L, nowMs - visualWindowStartedAtMs);
+            double progress = Math.min(1.0, elapsed / (double) Math.max(1L, planningIntervalMs()));
+            return (int) Math.round(visualWindowStartTick
+                    + (visualWindowEndTick - visualWindowStartTick) * progress);
+        }
+
+        synchronized void setPaused(boolean nextPaused) {
+            if (!isBatchScenario() || completed || paused == nextPaused) return;
+            long now = System.currentTimeMillis();
+            int visualTick = Math.min(tick, currentVisualTick(now));
+            if (nextPaused) {
+                paused = true;
+                visualWindowStartTick = visualTick;
+                visualWindowEndTick = visualTick;
+                visualWindowStartedAtMs = now;
+                events.add(new RealtimeEvent(visualTick, "SYSTEM", 0, "simulation_paused"));
+                return;
+            }
+
+            paused = false;
+            visualWindowStartTick = visualTick;
+            visualWindowEndTick = tick;
+            visualWindowStartedAtMs = now;
+            events.add(new RealtimeEvent(visualTick, "SYSTEM", 0, "simulation_resumed"));
+        }
+
         private int effectiveMaxTick() {
             return maxTick;
         }
@@ -529,8 +646,10 @@ public class RealtimeSimulationService {
          *      El frontend compara visualStartedAt + Sa para pedir el siguiente lote.
          */
         synchronized void advanceBatch(int steps) {
-            if (completed) return;
+            if (completed || paused) return;
 
+            planningInProgress = true;
+            try {
             long batchStartMs = System.currentTimeMillis();
             int batchStart = tick;
             int batchEnd   = Math.min(tick + steps, maxTick);
@@ -546,7 +665,8 @@ public class RealtimeSimulationService {
             }
 
             // 2. Vuelos disponibles: no cancelados y que aún no han despegado
-            List<Flight> vuelosDisponibles = availableFlightsFrom(batchStart);
+            int routeSearchHorizon = Math.min(planningMaxTick, batchEnd + MAX_DELIVERY_DEADLINE_MINUTES);
+            List<Flight> vuelosDisponibles = availableFlightsFrom(batchStart, routeSearchHorizon);
 
             System.out.printf("[Lote] Ventana %d–%d | %d envíos | %d vuelos disponibles%n",
                     batchStart, batchEnd, loteShipments.size(), vuelosDisponibles.size());
@@ -554,12 +674,13 @@ public class RealtimeSimulationService {
             // 3. Ejecutar ALNS incremental (conserva capacidad de lotes anteriores)
             if (!loteShipments.isEmpty()) {
                 int n       = loteShipments.size();
-                int iters   = Math.max(80, Math.min(400, n * 4));
-                int seg     = Math.max(10, iters / 15);
-                int nDestr  = Math.max(3, Math.min(n / 5 + 5, 60));
+                int iters   = Math.max(BATCH_ALNS_MIN_ITERATIONS,
+                        Math.min(BATCH_ALNS_MAX_ITERATIONS, n * BATCH_ALNS_ITERATIONS_PER_SHIPMENT));
+                int seg     = Math.max(8, iters / 10);
+                int nDestr  = Math.max(3, Math.min(n / 8 + 3, BATCH_ALNS_DESTROY_CAP));
                 boolean fastMode = plannerFastMode();
 
-                ALNS alns = new ALNS(iters, seg, nDestr, 300.0, 0.995, 2,
+                ALNS alns = new ALNS(iters, seg, nDestr, 260.0, 0.994, BATCH_ALNS_MAX_ESCALAS,
                         9.0, 3.0, 0.0, 0.8, fastMode);
 
                 Map<String, Route> resultado = alns.ejecutarIncremental(
@@ -593,6 +714,32 @@ public class RealtimeSimulationService {
                     lastBatchRuntimeMs, BATCH_INTERVAL_MS);
             System.out.printf("[Planificacion fija][Lote] Sa=%d ms | K=%d | Sc=%d min | Ta=%d ms | estable=%s%n",
                     planningIntervalMs(), planningTimeScale(), planningWindowMinutes(), lastBatchRuntimeMs, planningStable());
+            } finally {
+                planningInProgress = false;
+            }
+        }
+
+        synchronized boolean advanceBatchIfDue() {
+            if (!isBatchScenario() || completed || paused) return false;
+            long now = System.currentTimeMillis();
+            if (lastBatchSchedulerCheckMs > 0
+                    && now - lastBatchSchedulerCheckMs < Math.max(250L, REALTIME_SCHEDULER_POLL_MS)) {
+                return false;
+            }
+            lastBatchSchedulerCheckMs = now;
+
+            if (batchCount == 0) {
+                advanceBatch(planningWindowMinutes());
+                return true;
+            }
+
+            long referenceMs = visualWindowStartedAtMs > 0 ? visualWindowStartedAtMs : realStartedAtMs;
+            if (now - referenceMs < planningIntervalMs()) {
+                return false;
+            }
+
+            advanceBatch(planningWindowMinutes());
+            return true;
         }
 
         private void registrarEventosLote(List<Shipment> loteShipments, Map<String, Route> resultado) {
@@ -907,7 +1054,7 @@ public class RealtimeSimulationService {
         private Flight resolveCancellationFlight(String input) {
             Flight requested = findFlight(input);
             if (requested != null
-                    && requested.absoluteDepartureMinute() - tick > 60
+                    && requested.absoluteDepartureMinute() - tick >= 60
                     && !isCancelled(requested)
                     && !isPendingCancellation(requested)) {
                 return requested;
@@ -923,7 +1070,7 @@ public class RealtimeSimulationService {
             if (reference == null) return null;
 
             final Flight recurringReference = reference;
-            int minDeparture = tick + 61;
+            int minDeparture = tick + 60;
             return flights.stream()
                     .filter(f -> sameRecurringFlight(recurringReference, f))
                     .filter(f -> f.absoluteDepartureMinute() >= minDeparture)
@@ -1033,11 +1180,16 @@ public class RealtimeSimulationService {
 
             // Paso 1: replanificar afectados directos
             if (!afectados.isEmpty()) {
-                int iters = Math.max(50, Math.min(200, afectados.size() * 5));
+                int iters = Math.max(30, Math.min(120, afectados.size() * 3));
                 ALNS alns = new ALNS(iters, Math.max(10, iters / 5),
-                        Math.max(3, afectados.size() / 5), 150.0, 0.98, 2,
-                        9.0, 3.0, 0.0, 0.8);
-                Map<String, Route> replanDirectos = alns.ejecutar(afectados, disponibles, airportMap);
+                        Math.max(3, Math.min(afectados.size() / 8 + 2, BATCH_ALNS_DESTROY_CAP)),
+                        140.0, 0.985, BATCH_ALNS_MAX_ESCALAS, 9.0, 3.0, 0.0, 0.8, true);
+                List<Shipment> baseSinAfectados = todosLosShipmentsProcesados.stream()
+                        .filter(s -> !afectados.contains(s))
+                        .filter(Shipment::isPlanned)
+                        .toList();
+                Map<String, Route> replanDirectos = alns.ejecutarIncremental(
+                        afectados, disponibles, airportMap, baseSinAfectados);
                 solucionGlobal.putAll(replanDirectos);
                 System.out.printf("[Cancelación] Replanificados directos: %d / %d%n",
                         replanDirectos.size(), afectados.size());
@@ -1049,18 +1201,18 @@ public class RealtimeSimulationService {
             // Incluir también los pendientes en cola
             todosAReoptar.addAll(queue);
 
-            if (!todosAReoptar.isEmpty()) {
+            if (BATCH_CANCEL_GLOBAL_REOPT && !todosAReoptar.isEmpty()) {
                 System.out.printf("[Cancelación] Reoptimizando globalmente %d envíos...%n",
                         todosAReoptar.size());
                 for (Shipment s : todosAReoptar) s.resetPlanningState();
 
                 int n       = todosAReoptar.size();
-                int iters   = Math.max(120, Math.min(500, n * 3));
-                int seg     = Math.max(20, iters / 10);
-                int nDestr  = Math.max(5, Math.min(n / 4, 60));
+                int iters   = Math.max(60, Math.min(180, n * 2));
+                int seg     = Math.max(10, iters / 10);
+                int nDestr  = Math.max(5, Math.min(n / 8, BATCH_ALNS_DESTROY_CAP));
 
-                ALNS alnsGlobal = new ALNS(iters, seg, nDestr, 250.0, 0.995, 2,
-                        9.0, 3.0, 0.0, 0.8);
+                ALNS alnsGlobal = new ALNS(iters, seg, nDestr, 220.0, 0.992, BATCH_ALNS_MAX_ESCALAS,
+                        9.0, 3.0, 0.0, 0.8, true);
                 Map<String, Route> replanGlobal = alnsGlobal.ejecutar(todosAReoptar, disponibles, airportMap);
                 solucionGlobal.putAll(replanGlobal);
 
@@ -1096,11 +1248,16 @@ public class RealtimeSimulationService {
         // ── Utilidades ────────────────────────────────────────────────────────
 
         private List<Flight> availableFlightsFrom(int fromMinute) {
+            return availableFlightsFrom(fromMinute, planningMaxTick);
+        }
+
+        private List<Flight> availableFlightsFrom(int fromMinute, int untilMinute) {
             List<Flight> available = new ArrayList<>();
             int start = firstFlightAtOrAfter(flights, fromMinute);
+            int horizon = Math.min(untilMinute, planningMaxTick);
             for (int i = start; i < flights.size(); i++) {
                 Flight f = flights.get(i);
-                if (isBatchScenario() && f.absoluteDepartureMinute() > maxTick) break;
+                if (isBatchScenario() && f.absoluteDepartureMinute() > horizon) break;
                 if (!isCancelled(f)
                         && !isPendingCancellation(f))
                     available.add(f);
@@ -1143,6 +1300,205 @@ public class RealtimeSimulationService {
 
         // ── Snapshot JSON ─────────────────────────────────────────────────────
 
+        private int snapshotWindowStart() {
+            if (!isBatchScenario()) return 0;
+            int anchor = visualWindowStartTick > 0 ? visualWindowStartTick : tick;
+            return Math.max(0, anchor - BATCH_SNAPSHOT_TRAILING_MINUTES);
+        }
+
+        private int snapshotWindowEnd() {
+            if (!isBatchScenario()) return maxTick;
+            int anchor = Math.max(tick, visualWindowEndTick);
+            return Math.min(maxTick, anchor + BATCH_SNAPSHOT_LOOKAHEAD_MINUTES);
+        }
+
+        private List<Shipment> shipmentsForSnapshot(List<Shipment> source, int windowStart, int windowEnd) {
+            if (!isBatchScenario()) return source;
+
+            List<Shipment> visible = new ArrayList<>();
+            for (Shipment shipment : source) {
+                if (shipment.getRequestMinute() >= windowStart && shipment.getRequestMinute() <= windowEnd) {
+                    visible.add(shipment);
+                    continue;
+                }
+
+                Route route = shipment.getAssignedRoute();
+                if (route == null || !route.isValid()) continue;
+                for (Flight flight : route.getFlights()) {
+                    if (flight.absoluteArrivalMinute() >= windowStart
+                            && flight.absoluteDepartureMinute() <= windowEnd) {
+                        visible.add(shipment);
+                        break;
+                    }
+                }
+            }
+
+            if (visible.size() <= BATCH_SNAPSHOT_MAX_SHIPMENTS) return visible;
+            return new ArrayList<>(visible.subList(
+                    visible.size() - BATCH_SNAPSHOT_MAX_SHIPMENTS,
+                    visible.size()));
+        }
+
+        private List<RealtimeEvent> eventsForSnapshot(int windowStart, int windowEnd) {
+            if (!isBatchScenario()) return new ArrayList<>(events);
+
+            Map<String, Integer> baseline = new LinkedHashMap<>();
+            List<RealtimeEvent> visible = new ArrayList<>();
+            for (RealtimeEvent event : events) {
+                if (event.minute <= windowStart) {
+                    baseline.merge(event.airport, event.delta, Integer::sum);
+                } else if (event.minute <= windowEnd) {
+                    visible.add(event);
+                }
+            }
+
+            visible.sort(Comparator
+                    .comparingInt(RealtimeEvent::minute)
+                    .thenComparing(RealtimeEvent::airport)
+                    .thenComparingInt(e -> eventPriority(e.type))
+                    .thenComparing(RealtimeEvent::type));
+            if (visible.size() > BATCH_SNAPSHOT_MAX_EVENTS) {
+                visible = new ArrayList<>(visible.subList(
+                        visible.size() - BATCH_SNAPSHOT_MAX_EVENTS,
+                        visible.size()));
+            }
+
+            List<RealtimeEvent> snapshot = new ArrayList<>(baseline.size() + visible.size());
+            for (Map.Entry<String, Integer> entry : baseline.entrySet()) {
+                int load = Math.max(0, entry.getValue());
+                if (load > 0) {
+                    snapshot.add(new RealtimeEvent(windowStart, entry.getKey(), load, "snapshot_baseline"));
+                }
+            }
+            snapshot.addAll(visible);
+            snapshot.sort(Comparator
+                    .comparingInt(RealtimeEvent::minute)
+                    .thenComparing(RealtimeEvent::airport)
+                    .thenComparingInt(e -> eventPriority(e.type))
+                    .thenComparing(RealtimeEvent::type));
+            return snapshot;
+        }
+
+        synchronized String shipmentsPageJson(int page, int pageSize,
+                                               String search, String origin,
+                                               String destination, String statusFilter) {
+            int safePageSize = Math.max(1, Math.min(100, pageSize));
+            int safePage = Math.max(1, page);
+            String normalizedSearch = normalizeFilter(search);
+            String normalizedOrigin = normalizeFilter(origin);
+            String normalizedDestination = normalizeFilter(destination);
+            String normalizedStatus = normalizeFilter(statusFilter);
+
+            List<Shipment> source = isBatchScenario()
+                    ? todosLosShipmentsProcesados : shipments;
+            List<Shipment> filtered = new ArrayList<>();
+            for (Shipment shipment : source) {
+                if (!matchesShipmentFilters(
+                        shipment,
+                        normalizedSearch,
+                        normalizedOrigin,
+                        normalizedDestination,
+                        normalizedStatus)) {
+                    continue;
+                }
+                filtered.add(shipment);
+            }
+            filtered.sort(Comparator
+                    .comparingInt(Shipment::getRequestMinute)
+                    .thenComparing(Shipment::getShipmentId));
+
+            int total = filtered.size();
+            int totalPages = total == 0 ? 1 : (int) Math.ceil(total / (double) safePageSize);
+            safePage = Math.min(safePage, totalPages);
+            int from = Math.min(total, (safePage - 1) * safePageSize);
+            int to = Math.min(total, from + safePageSize);
+
+            Json json = new Json();
+            json.objStart();
+            json.prop("page", safePage).comma();
+            json.prop("pageSize", safePageSize).comma();
+            json.prop("total", total).comma();
+            json.prop("totalPages", totalPages).comma();
+            json.name("items").arrayStart();
+            for (int i = from; i < to; i++) {
+                writeShipment(json, filtered.get(i));
+                if (i < to - 1) json.comma();
+            }
+            json.arrayEnd();
+            json.objEnd();
+            return json.toString();
+        }
+
+        private String normalizeFilter(String value) {
+            if (value == null || value.isBlank()) return "";
+            String trimmed = value.trim();
+            if ("any".equalsIgnoreCase(trimmed)
+                    || "all".equalsIgnoreCase(trimmed)
+                    || "cualquiera".equalsIgnoreCase(trimmed)) {
+                return "";
+            }
+            return trimmed.toLowerCase(Locale.ROOT);
+        }
+
+        private boolean matchesShipmentFilters(Shipment shipment,
+                                               String search,
+                                               String origin,
+                                               String destination,
+                                               String statusFilter) {
+            if (!origin.isBlank()
+                    && !shipment.getOriginCode().toLowerCase(Locale.ROOT).equals(origin)) {
+                return false;
+            }
+            if (!destination.isBlank()
+                    && !shipment.getDestCode().toLowerCase(Locale.ROOT).equals(destination)) {
+                return false;
+            }
+            if (!statusFilter.isBlank() && !matchesShipmentStatus(shipment, statusFilter)) {
+                return false;
+            }
+            if (search.isBlank()) return true;
+
+            if (shipment.getShipmentId().toLowerCase(Locale.ROOT).contains(search)
+                    || shipment.getClientId().toLowerCase(Locale.ROOT).contains(search)
+                    || shipment.getOriginCode().toLowerCase(Locale.ROOT).contains(search)
+                    || shipment.getDestCode().toLowerCase(Locale.ROOT).contains(search)) {
+                return true;
+            }
+
+            Route route = shipment.getAssignedRoute();
+            if (route == null) return false;
+            for (Flight flight : route.getFlights()) {
+                if (flight.getFlightId().toLowerCase(Locale.ROOT).contains(search)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean matchesShipmentStatus(Shipment shipment, String statusFilter) {
+            return switch (statusFilter) {
+                case "planned", "planificado" -> shipment.isPlanned();
+                case "unplanned", "sin-ruta", "sin_ruta" -> !shipment.isPlanned();
+                case "ontime", "on-time", "a-tiempo", "a_tiempo" -> shipment.isPlanned() && shipment.isOnTime();
+                case "late", "tarde" -> shipment.isPlanned() && !shipment.isOnTime();
+                case "delivered", "entregado" -> shipment.isPlanned()
+                        && shipment.getEstimatedArrival() > 0
+                        && shipment.getEstimatedArrival() <= maxTick;
+                case "pending", "pendiente" -> !shipment.isPlanned()
+                        || shipment.getEstimatedArrival() <= 0
+                        || shipment.getEstimatedArrival() > maxTick;
+                default -> true;
+            };
+        }
+
+        String snapshotJsonForRead() {
+            String cached = lastSnapshotJson;
+            if (planningInProgress && cached != null && !cached.isBlank() && !"{}".equals(cached)) {
+                return cached;
+            }
+            return snapshotJson();
+        }
+
         synchronized String snapshotJson() {
             return snapshotJson(false);
         }
@@ -1153,14 +1509,11 @@ public class RealtimeSimulationService {
             // Para lotes: mostrar lo consumido; para tiempo real: mostrar todo lo conocido desde BD.
             List<Shipment> shipmentSource = isBatchScenario()
                     ? todosLosShipmentsProcesados : shipments;
-            int processedShipmentCount = isBatchScenario()
-                    ? todosLosShipmentsProcesados.size() : processed.size();
-
-            int planned    = (int) shipmentSource.stream().filter(Shipment::isPlanned).count();
-            int onTime     = (int) shipmentSource.stream().filter(Shipment::isOnTime).count();
-            int totalBags  = shipmentSource.stream().mapToInt(Shipment::getSuitcaseCount).sum();
-            int plannedBags = shipmentSource.stream()
-                    .filter(Shipment::isPlanned).mapToInt(Shipment::getSuitcaseCount).sum();
+            int snapshotStart = snapshotWindowStart();
+            int snapshotEnd = snapshotWindowEnd();
+            List<Shipment> shipmentPayload = shipmentsForSnapshot(shipmentSource, snapshotStart, snapshotEnd);
+            PlanningMetrics planMetrics = calculatePlanningMetrics(shipmentSource);
+            int processedShipmentCount = planMetrics.totalShipments;
             int usedFlights = (int) flights.stream()
                     .filter(this::flightVisibleInSnapshot)
                     .filter(f -> f.getAssignedLoad() > 0)
@@ -1173,7 +1526,8 @@ public class RealtimeSimulationService {
             json.objStart();
             json.prop("simulationId", id).comma();
             json.prop("scenario", scenarioLabel()).comma();
-            json.prop("status", completed ? "COMPLETED" : "RUNNING").comma();
+            json.prop("status", completed ? "COMPLETED" : paused ? "PAUSED" : "RUNNING").comma();
+            json.prop("paused", paused).comma();
             json.prop("ownerClientId", ownerClientId).comma();
             if (includeControlToken && !controlToken.isBlank()) {
                 json.prop("controlToken", controlToken).comma();
@@ -1181,6 +1535,7 @@ public class RealtimeSimulationService {
             json.prop("days", days).comma();
             json.prop("tick", tick).comma();
             json.prop("maxTick", effectiveMaxTick()).comma();
+            json.prop("planningMaxTick", planningMaxTick).comma();
             json.prop("startOffsetMinutes", startOffsetMinutes).comma();
             json.prop("batchMinutes", planningWindowMinutes()).comma();
             json.prop("batchIntervalMs", planningIntervalMs()).comma();
@@ -1200,6 +1555,9 @@ public class RealtimeSimulationService {
             json.prop("lastBatchRuntimeMs", lastBatchRuntimeMs).comma();
             json.prop("visualStartTick", visualWindowStartTick).comma();
             json.prop("visualEndTick", visualWindowEndTick).comma();
+            json.prop("snapshotWindowStart", snapshotStart).comma();
+            json.prop("snapshotWindowEnd", snapshotEnd).comma();
+            json.prop("snapshotLimited", isBatchScenario()).comma();
             json.prop("visualStartedAt", java.time.Instant.ofEpochMilli(visualWindowStartedAtMs).toString()).comma();
             json.prop("realtimeExecutionIntervalMs", REALTIME_EXECUTION_INTERVAL_MS).comma();
             json.prop("pendingCancellationCount", pendingCancellations.size() + queuedCancellationRequests.size()).comma();
@@ -1230,14 +1588,26 @@ public class RealtimeSimulationService {
 
             // metrics
             json.name("metrics").objStart();
-            json.prop("shipments", shipmentSource.size()).comma();
+            json.prop("shipments", planMetrics.totalShipments).comma();
             json.prop("processedShipments", processedShipmentCount).comma();
             json.prop("queuedShipments", queue.size()).comma();
-            json.prop("plannedShipments", planned).comma();
-            json.prop("onTimeShipments", onTime).comma();
-            json.prop("totalBags", totalBags).comma();
-            json.prop("plannedBags", plannedBags).comma();
+            json.prop("plannedShipments", planMetrics.plannedShipments).comma();
+            json.prop("onTimeShipments", planMetrics.onTimeShipments).comma();
+            json.prop("deliveredShipments", planMetrics.deliveredShipments).comma();
+            json.prop("deliveredOnTimeShipments", planMetrics.deliveredOnTimeShipments).comma();
+            json.prop("unplannedShipments", planMetrics.unplannedShipments).comma();
+            json.prop("lateShipments", planMetrics.lateShipments).comma();
+            json.prop("totalBags", planMetrics.totalBags).comma();
+            json.prop("plannedBags", planMetrics.plannedBags).comma();
+            json.prop("onTimeBags", planMetrics.onTimeBags).comma();
+            json.prop("deliveredBags", planMetrics.deliveredBags).comma();
+            json.prop("deliveredOnTimeBags", planMetrics.deliveredOnTimeBags).comma();
+            json.prop("unplannedBags", planMetrics.unplannedBags).comma();
+            json.prop("lateBags", planMetrics.lateBags).comma();
+            json.prop("planningComplete", planMetrics.planningComplete).comma();
+            json.prop("deliveryCompleteWithinSimulation", planMetrics.deliveryCompleteWithinSimulation).comma();
             json.prop("usedFlights", usedFlights).comma();
+            json.prop("payloadShipments", shipmentPayload.size()).comma();
             json.prop("pendingCancellations", pendingCancellations.size() + queuedCancellationRequests.size()).comma();
             json.prop("fitnessInitial", 0).comma();
             json.prop("fitnessFinal", 0).comma();
@@ -1302,19 +1672,14 @@ public class RealtimeSimulationService {
 
             // shipments
             json.name("shipments").arrayStart();
-            for (int i = 0; i < shipmentSource.size(); i++) {
-                writeShipment(json, shipmentSource.get(i));
-                if (i < shipmentSource.size() - 1) json.comma();
+            for (int i = 0; i < shipmentPayload.size(); i++) {
+                writeShipment(json, shipmentPayload.get(i));
+                if (i < shipmentPayload.size() - 1) json.comma();
             }
             json.arrayEnd().comma();
 
             // airportEvents
-            List<RealtimeEvent> sortedEvents = new ArrayList<>(events);
-            sortedEvents.sort(Comparator
-                    .comparingInt(RealtimeEvent::minute)
-                    .thenComparing(RealtimeEvent::airport)
-                    .thenComparingInt(e -> eventPriority(e.type))
-                    .thenComparing(RealtimeEvent::type));
+            List<RealtimeEvent> sortedEvents = eventsForSnapshot(snapshotStart, snapshotEnd);
             json.name("airportEvents").arrayStart();
             for (int i = 0; i < sortedEvents.size(); i++) {
                 RealtimeEvent e = sortedEvents.get(i);
@@ -1329,7 +1694,110 @@ public class RealtimeSimulationService {
             json.arrayEnd();
 
             json.objEnd();
-            return json.toString();
+            String snapshot = json.toString();
+            lastSnapshotJson = snapshot;
+            return snapshot;
+        }
+
+        private PlanningMetrics calculatePlanningMetrics(List<Shipment> source) {
+            Map<String, ShipmentRollup> rollups = new LinkedHashMap<>();
+            for (Shipment shipment : source) {
+                String rootId = shipment.isSplitPart()
+                        ? shipment.getParentShipmentId()
+                        : shipment.getShipmentId();
+                rollups.computeIfAbsent(rootId, ignored -> new ShipmentRollup(shipment))
+                        .include(shipment, maxTick);
+            }
+
+            PlanningMetrics metrics = new PlanningMetrics();
+            metrics.totalShipments = rollups.size();
+            for (ShipmentRollup rollup : rollups.values()) {
+                int total = Math.max(0, rollup.totalBags);
+                int planned = Math.min(total, rollup.plannedBags);
+                int onTime = Math.min(total, rollup.onTimeBags);
+                int delivered = Math.min(total, rollup.deliveredBags);
+                int deliveredOnTime = Math.min(total, rollup.deliveredOnTimeBags);
+
+                metrics.totalBags += total;
+                metrics.plannedBags += planned;
+                metrics.onTimeBags += onTime;
+                metrics.deliveredBags += delivered;
+                metrics.deliveredOnTimeBags += deliveredOnTime;
+
+                if (total > 0 && planned >= total) {
+                    metrics.plannedShipments++;
+                }
+                if (total > 0 && onTime >= total) {
+                    metrics.onTimeShipments++;
+                }
+                if (total > 0 && delivered >= total) {
+                    metrics.deliveredShipments++;
+                }
+                if (total > 0 && deliveredOnTime >= total) {
+                    metrics.deliveredOnTimeShipments++;
+                }
+            }
+
+            metrics.unplannedShipments = Math.max(0, metrics.totalShipments - metrics.plannedShipments);
+            metrics.unplannedBags = Math.max(0, metrics.totalBags - metrics.plannedBags);
+            metrics.lateShipments = Math.max(0, metrics.plannedShipments - metrics.onTimeShipments);
+            metrics.lateBags = Math.max(0, metrics.plannedBags - metrics.onTimeBags);
+            metrics.planningComplete = metrics.totalShipments > 0
+                    && metrics.plannedShipments == metrics.totalShipments
+                    && metrics.plannedBags == metrics.totalBags;
+            metrics.deliveryCompleteWithinSimulation = metrics.totalShipments > 0
+                    && metrics.deliveredShipments == metrics.totalShipments
+                    && metrics.deliveredBags == metrics.totalBags;
+            return metrics;
+        }
+
+        private static class ShipmentRollup {
+            int totalBags;
+            int plannedBags;
+            int onTimeBags;
+            int deliveredBags;
+            int deliveredOnTimeBags;
+
+            ShipmentRollup(Shipment seed) {
+                totalBags = Math.max(0, seed.getOriginalSuitcaseCount());
+            }
+
+            void include(Shipment shipment, int simulationEndMinute) {
+                totalBags = Math.max(totalBags, shipment.getOriginalSuitcaseCount());
+                if (!shipment.isPlanned()) return;
+
+                int bags = Math.max(0, shipment.getSuitcaseCount());
+                plannedBags += bags;
+                if (shipment.isOnTime()) {
+                    onTimeBags += bags;
+                }
+                if (shipment.getEstimatedArrival() <= 0) return;
+                if (shipment.getEstimatedArrival() <= simulationEndMinute) {
+                    deliveredBags += bags;
+                    if (shipment.isOnTime()) {
+                        deliveredOnTimeBags += bags;
+                    }
+                }
+            }
+        }
+
+        private static class PlanningMetrics {
+            int totalShipments;
+            int plannedShipments;
+            int onTimeShipments;
+            int deliveredShipments;
+            int deliveredOnTimeShipments;
+            int unplannedShipments;
+            int lateShipments;
+            int totalBags;
+            int plannedBags;
+            int onTimeBags;
+            int deliveredBags;
+            int deliveredOnTimeBags;
+            int unplannedBags;
+            int lateBags;
+            boolean planningComplete;
+            boolean deliveryCompleteWithinSimulation;
         }
 
         private int eventPriority(String type) {

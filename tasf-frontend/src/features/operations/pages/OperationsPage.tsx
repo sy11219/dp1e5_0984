@@ -152,18 +152,18 @@ function LiveMetrics({
 }
 
 export const OperationsPage = () => {
+  const [initialMapFocus] = useState(() => readMapFocus(OPERATIONS_MAP_FOCUS_KEY));
   const [data, setData] = useState<SimulationData | null>(null);
   const [, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [flightToCancel, setFlightToCancel] = useState("");
-  const initialMapFocusRef = useRef(readMapFocus(OPERATIONS_MAP_FOCUS_KEY));
   const [selectedAirport, setSelectedAirport] = useState<string | null>(
-    () => initialMapFocusRef.current?.type === "airport" ? initialMapFocusRef.current.id : null
+    () => initialMapFocus?.type === "airport" ? initialMapFocus.id : null
   );
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
-    () => initialMapFocusRef.current?.type === "flight" ? initialMapFocusRef.current.id : null
+    () => initialMapFocus?.type === "flight" ? initialMapFocus.id : null
   );
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
@@ -423,7 +423,7 @@ export const OperationsPage = () => {
           <GlobalIndicators
             data={data}
             currentMinute={operationalMinute}
-            planningWindowMinutes={data?.planningWindowMinutes ?? data?.planningIntervalMinutes}
+            samplingIntervalMinutes={data?.planningIntervalMinutes}
           />
 
           <CapacityLegend />

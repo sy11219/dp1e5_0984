@@ -52,7 +52,10 @@ export interface AirportEvent {
     | "replan"
     | "flight_cancelled"
     | "flight_cancelled_pending"
-    | "flight_cancel_redirected";
+    | "flight_cancel_redirected"
+    | "simulation_paused"
+    | "simulation_resumed"
+    | "snapshot_baseline";
 }
 
 export interface Metrics {
@@ -61,10 +64,22 @@ export interface Metrics {
   processedShipments?: number;
   queuedShipments?: number;
   onTimeShipments: number;
+  deliveredShipments?: number;
+  deliveredOnTimeShipments?: number;
+  unplannedShipments?: number;
+  lateShipments?: number;
   plannedBags: number;
+  onTimeBags?: number;
+  deliveredBags?: number;
+  deliveredOnTimeBags?: number;
+  unplannedBags?: number;
+  lateBags?: number;
   totalBags: number;
   usedFlights: number;
   pendingCancellations?: number;
+  payloadShipments?: number;
+  planningComplete?: boolean;
+  deliveryCompleteWithinSimulation?: boolean;
   iterations: number;
   fitnessFinal: number;
   fitnessInitial: number;
@@ -92,10 +107,12 @@ export interface SimulationData {
   controlToken?: string;
   scenario: string;
   status?: string;
+  paused?: boolean;
   message?: string;
   days?: number;
   tick?: number;
   maxTick?: number;
+  planningMaxTick?: number;
   startOffsetMinutes?: number;
   batchMinutes?: number;
   batchIntervalMs?: number;
@@ -128,6 +145,14 @@ export interface SimulationData {
   simulationStartDateTime: string;
   simulationEndDateTime: string;
   runtimeMs: number;
+}
+
+export interface ShipmentPage {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  items: Shipment[];
 }
 
 export type AirportLoads = Record<string, number>;

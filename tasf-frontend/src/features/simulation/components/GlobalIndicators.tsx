@@ -1,12 +1,12 @@
 import type { SimulationData } from "../types";
-import { capacityStatus, computeActiveFlights, computeAirportLoads } from "../utils/calculations";
+import { capacityStatus, computeAirportLoads } from "../utils/calculations";
 
 type TrafficStatus = "green" | "yellow" | "red" | "gray";
 
 interface GlobalIndicatorsProps {
   data: SimulationData | null;
   currentMinute: number;
-  planningWindowMinutes?: number;
+  samplingIntervalMinutes?: number;
 }
 
 interface TrafficMetricProps {
@@ -15,10 +15,10 @@ interface TrafficMetricProps {
   denominator: number;
 }
 
-function sampledMinute(currentMinute: number, planningWindowMinutes?: number): number {
+function sampledMinute(currentMinute: number, samplingIntervalMinutes?: number): number {
   const interval =
-    planningWindowMinutes && planningWindowMinutes > 0 && planningWindowMinutes <= 4
-      ? planningWindowMinutes
+    samplingIntervalMinutes && samplingIntervalMinutes > 0 && samplingIntervalMinutes <= 4
+      ? samplingIntervalMinutes
       : 4;
 
   return Math.floor(Math.max(0, currentMinute) / interval) * interval;
@@ -55,7 +55,7 @@ function TrafficMetric({ label, numerator, denominator }: TrafficMetricProps) {
 export function GlobalIndicators({
   data,
   currentMinute,
-  planningWindowMinutes,
+  samplingIntervalMinutes,
 }: GlobalIndicatorsProps) {
   if (!data) {
     return (
@@ -66,25 +66,22 @@ export function GlobalIndicators({
     );
   }
 
-  const minute = sampledMinute(currentMinute, planningWindowMinutes);
+  const minute = sampledMinute(currentMinute, samplingIntervalMinutes);
   const airportLoads = computeAirportLoads(data, minute);
   const airportBags = data.airports.reduce((sum, airport) => {
-    const capacity = Math.max(0, airport.maxCapacity || 0);
     const load = Math.max(0, airportLoads[airport.code] || 0);
-    return sum + Math.min(load, capacity);
+    return sum + load;
   }, 0);
   const airportCapacity = data.airports.reduce(
     (sum, airport) => sum + Math.max(0, airport.maxCapacity || 0),
     0
   );
 
-  const activeFlights = computeActiveFlights(data, minute);
-  const assignedBags = activeFlights.reduce((sum, flight) => {
-    const capacity = Math.max(0, flight.maxCapacity || 0);
+  const assignedBags = data.flights.reduce((sum, flight) => {
     const load = Math.max(0, flight.assignedLoad || 0);
-    return sum + Math.min(load, capacity);
+    return sum + load;
   }, 0);
-  const fleetCapacity = activeFlights.reduce(
+  const fleetCapacity = data.flights.reduce(
     (sum, flight) => sum + Math.max(0, flight.maxCapacity || 0),
     0
   );

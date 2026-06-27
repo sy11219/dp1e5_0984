@@ -121,6 +121,7 @@ export function useSimulationPlayer(maxMinute: number) {
     playing,
     setPlaying,
     animateBatch,
+    stopAnimation: cancelFrame,
     reset,
     onBatchCompleteRef,
     BATCH_MINUTES,

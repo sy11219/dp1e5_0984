@@ -37,6 +37,7 @@ public class ALNS {
 
     // ── Pesos función objetivo ────────────────────────────────────────────────
     private static final double PESO_SIN_RUTA    = 100_000.0;
+    private static final double PESO_ENVIO_TARDE = 25_000.0;
     private static final double PESO_FUERA_PLAZO = 50.0;
 
     // ── Índices operadores destrucción ────────────────────────────────────────
@@ -731,7 +732,9 @@ public class ALNS {
         int llegada  = ruta.calculateArrivalMinute();
         int deadline = s.getRequestMinute() + finder.getDeadlineMinutes(s);
         double contrib = llegada - s.getRequestMinute();
-        if (llegada > deadline) contrib += PESO_FUERA_PLAZO * (llegada - deadline);
+        if (llegada > deadline) {
+            contrib += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
+        }
         return contrib;
     }
 
@@ -746,7 +749,9 @@ public class ALNS {
         int llegada  = ruta.calculateArrivalMinute();
         int deadline = s.getRequestMinute() + deadlineMin;
         double contrib = llegada - s.getRequestMinute();
-        if (llegada > deadline) contrib += PESO_FUERA_PLAZO * (llegada - deadline);
+        if (llegada > deadline) {
+            contrib += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
+        }
         return contrib;
     }
 
@@ -755,7 +760,9 @@ public class ALNS {
         int llegada = ruta.calculateArrivalMinute();
         int deadline = s.getRequestMinute() + finder.getDeadlineMinutes(s);
         double costo = llegada - s.getRequestMinute();
-        if (llegada > deadline) costo += PESO_FUERA_PLAZO * (llegada - deadline);
+        if (llegada > deadline) {
+            costo += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
+        }
         return costo;
     }
 

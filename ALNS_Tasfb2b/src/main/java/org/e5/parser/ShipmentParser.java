@@ -57,6 +57,8 @@ public class ShipmentParser {
 
     private static final String ENVIOS_FOLDER = "data/envios";
     private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final boolean ASSUME_SORTED_TXT_SHIPMENTS = readBoolean(
+            "TASF_ASSUME_SORTED_SHIPMENTS", true);
 
     // Patrón del nombre de archivo: _envios_SKBO_.txt  (o _envio_SKBO_.txt - ambos aceptados)
     private static final Pattern FILE_PATTERN = Pattern.compile(
@@ -234,6 +236,9 @@ public class ShipmentParser {
     public List<Shipment> parseFile(String filePath, String originCode,
                                      String simulationStartDate, int maxSimulationDays) throws IOException {
         List<Shipment> shipments = new ArrayList<>();
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
+        String earliestRelevantDate = startDate.minusDays(1).format(RAW_DATE);
+        String latestExclusiveDate = startDate.plusDays(maxSimulationDays + 1L).format(RAW_DATE);
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -252,6 +257,8 @@ public class ShipmentParser {
 
                 String shipmentId   = originCode + "-" + m.group(1);
                 String date         = m.group(2);  // aaaammdd
+                if (date.compareTo(earliestRelevantDate) < 0) continue;
+                if (date.compareTo(latestExclusiveDate) >= 0 && ASSUME_SORTED_TXT_SHIPMENTS) break;
                 String hourStr      = m.group(3);  // HH
                 String minuteStr    = m.group(4);  // MM
                 String destCode     = m.group(5);  // DEST
@@ -394,6 +401,14 @@ public class ShipmentParser {
         int  doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
         int  doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
         return era * 146097 + doe;
+    }
+
+    private static boolean readBoolean(String name, boolean defaultValue) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.isBlank()) return defaultValue;
+        if ("true".equalsIgnoreCase(raw) || "1".equals(raw) || "yes".equalsIgnoreCase(raw)) return true;
+        if ("false".equalsIgnoreCase(raw) || "0".equals(raw) || "no".equalsIgnoreCase(raw)) return false;
+        return defaultValue;
     }
 
 
