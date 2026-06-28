@@ -20,10 +20,12 @@ export function Timeline({ simMinute, maxMinute, setSimMinute, data, startDate }
     : `${startDate} ${formatSimMinute(startOffset)}`;
   const currentLabel = data
     ? formatFlightMoment(data, simMinute)
-    : formatSimMinute(simMinute);
+    : `${startDate} ${formatSimMinute(startOffset)}`;
   const endLabel = data
     ? formatFlightMoment(data, maxMinute)
-    : formatSimMinute(maxMinute);
+    : `${new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10)} ${formatSimMinute(startOffset)}`;
 
   return (
     <div className="timeline">

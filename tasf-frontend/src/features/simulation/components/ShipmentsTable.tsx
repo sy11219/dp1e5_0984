@@ -175,7 +175,7 @@ export function ShipmentsTable({ shipments, simMinute }: ShipmentsTableProps) {
               <div className="row" key={`${s.id}-${s.requestMinute}`}>
                 <span className={`dot ${status}`}></span>
                 <div className="row-main">
-                  <strong>{s.clientId}</strong>
+                  <strong>{s.id}</strong>
                   <span>{`${s.origin} → ${s.destination} · ${s.suitcases} maletas`}</span>
                   <span>{`Pedido: ${formatSimMinute(s.requestMinute)} · Llegada: ${arrivalLabel}`}</span>
                   <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
