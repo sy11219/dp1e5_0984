@@ -859,9 +859,6 @@ export function SimulationPage() {
             <ShipmentsTable
               shipments={visibleShipments}
               simMinute={simMinute}
-              simulationId={data?.simulationId}
-              refreshKey={data?.batchCount ?? data?.tick ?? 0}
-              airportOptions={displayData.airports.map((airport) => airport.code)}
             />
           </section>
           <section className="panel section">

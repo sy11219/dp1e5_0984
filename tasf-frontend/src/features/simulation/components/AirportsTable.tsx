@@ -35,18 +35,11 @@ export function AirportsTable({
     [airports]
   );
 
-  const ordered = useMemo(
-    () =>
-      [...airports].sort(
-        (a, b) =>
-          (loads[b.code] || 0) / b.maxCapacity -
-          (loads[a.code] || 0) / a.maxCapacity
-      ),
-    [airports, loads]
-  );
+  const [sortBy, setSortBy] = useState<"utilization">("utilization");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const filtered = useMemo(() => {
-    let result = ordered;
+    let result = [...airports];
 
     if (search.trim()) {
       const query = search.toLowerCase();
@@ -62,8 +55,15 @@ export function AirportsTable({
       result = result.filter((a) => a.continent === continentFilter);
     }
 
+    const direction = sortOrder === "asc" ? 1 : -1;
+    result.sort((a, b) => {
+      const aUtil = a.maxCapacity ? (loads[a.code] || 0) / a.maxCapacity : 0;
+      const bUtil = b.maxCapacity ? (loads[b.code] || 0) / b.maxCapacity : 0;
+      return (aUtil - bUtil) * direction;
+    });
+
     return result;
-  }, [search, continentFilter, ordered]);
+  }, [search, continentFilter, airports, loads, sortBy, sortOrder]);
 
   const visible = filtered.slice(0, 10);
 
@@ -96,6 +96,29 @@ export function AirportsTable({
                 {c}
               </option>
             ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
+        <label className="text-sm">
+          Ordenar por:
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "utilization")}
+          >
+            <option value="utilization">Ocupación</option>
+          </select>
+        </label>
+
+        <label className="text-sm">
+          Dirección:
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+          >
+            <option value="desc">Descendente</option>
+            <option value="asc">Ascendente</option>
           </select>
         </label>
       </div>
