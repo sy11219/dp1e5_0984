@@ -868,7 +868,8 @@ export function SimulationPage() {
                 airports={displayData.airports}
                 loads={airportLoads}
                 flights={displayData.flights}
-                shipments={displayData.shipments}
+                shipments={visibleShipments}
+                simMinute={simMinute}
                 selectedAirport={selectedAirport}
                 onSelectAirport={focusAirport}
               />

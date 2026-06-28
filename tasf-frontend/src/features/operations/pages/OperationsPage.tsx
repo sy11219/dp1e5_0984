@@ -527,7 +527,8 @@ export const OperationsPage = () => {
                 airports={data.airports}
                 loads={airportLoads}
                 flights={data.flights}
-                shipments={data.shipments}
+                shipments={visibleShipments}
+                simMinute={operationalMinute}
                 selectedAirport={selectedAirport}
                 onSelectAirport={focusAirport}
               />

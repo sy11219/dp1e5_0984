@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import type { Airport, AirportLoads, Flight, Shipment } from "../types";
 import { STATUS_COLOR } from "../utils/constants";
 import { capacityStatus } from "../utils/calculations";
-import { getShipmentsForAirport, getFlightsForAirport } from "../utils/airportRelations";
+import { getShipmentsForAirport, getFlightsForAirport, getNextFlightForAirport } from "../utils/airportRelations";
 import { AirportFlightsList } from "./AirportFlightsList";
 import { AirportShipmentsList } from "./AirportShipmentsList";
 
@@ -11,6 +11,7 @@ interface AirportsTableProps {
   loads: AirportLoads;
   flights: Flight[];
   shipments: Shipment[];
+  simMinute: number;
   selectedAirport?: string | null;
   onSelectAirport?: (code: string) => void;
 }
@@ -20,6 +21,7 @@ export function AirportsTable({
   loads,
   flights,
   shipments,
+  simMinute,
   selectedAirport: selectedAirportProp,
   onSelectAirport,
 }: AirportsTableProps) {
@@ -35,7 +37,7 @@ export function AirportsTable({
     [airports]
   );
 
-  const [sortBy, setSortBy] = useState<"utilization">("utilization");
+  const [sortBy, setSortBy] = useState<"utilization" | "nextFlight">("utilization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const filtered = useMemo(() => {
@@ -57,10 +59,23 @@ export function AirportsTable({
 
     const direction = sortOrder === "asc" ? 1 : -1;
     result.sort((a, b) => {
-      const aUtil = a.maxCapacity ? (loads[a.code] || 0) / a.maxCapacity : 0;
-      const bUtil = b.maxCapacity ? (loads[b.code] || 0) / b.maxCapacity : 0;
-      return (aUtil - bUtil) * direction;
+      if (sortBy === "utilization") {
+        const aUtil = a.maxCapacity ? (loads[a.code] || 0) / a.maxCapacity : 0;
+        const bUtil = b.maxCapacity ? (loads[b.code] || 0) / b.maxCapacity : 0;
+        return (aUtil - bUtil) * direction;
+      }
+
+      if (sortBy === "nextFlight") {
+        const aNext = getNextFlightForAirport(flights, a.code, simMinute);
+        const bNext = getNextFlightForAirport(flights, b.code, simMinute);
+        const aTime = aNext?.time ?? Infinity;
+        const bTime = bNext?.time ?? Infinity;
+        return (aTime - bTime) * direction;
+      }
+
+      return 0;
     });
+
 
     return result;
   }, [search, continentFilter, airports, loads, sortBy, sortOrder]);
@@ -108,6 +123,7 @@ export function AirportsTable({
             onChange={(e) => setSortBy(e.target.value as "utilization")}
           >
             <option value="utilization">Ocupación</option>
+            <option value="nextFlight">Próximo vuelo</option>
           </select>
         </label>
 
@@ -230,7 +246,7 @@ export function AirportsTable({
               </button>
               {modalShowFlights && (
                 <div style={{ marginTop: 8 }}>
-                  <AirportFlightsList flights={getFlightsForAirport(flights, flightsModalAirport)} />
+                  <AirportFlightsList flights={getFlightsForAirport(flights, flightsModalAirport, simMinute)} />
                 </div>
               )}
             </div>

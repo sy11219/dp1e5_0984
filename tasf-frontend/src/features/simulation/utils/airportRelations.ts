@@ -10,6 +10,7 @@ export type AirportFlight = {
   direction: "incoming" | "outgoing";
   counterpart: string;
   load: number;
+  time: number;
 };
 
 /**
@@ -57,7 +58,8 @@ export function getShipmentsForAirport(
  */
 export function getFlightsForAirport(
   flights: Flight[],
-  airportCode: string
+  airportCode: string,
+  simMinute: number
 ): AirportFlight[] {
   const results: AirportFlight[] = [];
 
@@ -68,6 +70,7 @@ export function getFlightsForAirport(
         direction: "incoming",
         counterpart: flight.origin,
         load: flight.assignedLoad,
+        time: flight.absoluteArrivalMinute,
       });
     }
 
@@ -77,9 +80,27 @@ export function getFlightsForAirport(
         direction: "outgoing",
         counterpart: flight.destination,
         load: flight.assignedLoad,
+        time: flight.absoluteDepartureMinute,
       });
     }
   }
 
-  return results;
+  // 🔹 Filtrar solo vuelos futuros
+  const upcoming = results.filter((f) => f.time > simMinute);
+
+  // 🔹 Ordenar de más pronto a más próximo
+  upcoming.sort((a, b) => a.time - b.time);
+
+  return upcoming;
 }
+
+
+export function getNextFlightForAirport(
+  flights: Flight[],
+  airportCode: string,
+  simMinute: number
+): AirportFlight | null {
+  const allFlights = getFlightsForAirport(flights, airportCode, simMinute);
+  return allFlights.length > 0 ? allFlights[0] : null;
+}
+
