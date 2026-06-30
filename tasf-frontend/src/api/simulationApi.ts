@@ -366,6 +366,15 @@ export type ShipmentRecord = {
   status: string;
 };
 
+export type ShipmentListRecord = {
+  shipment_code: string;
+  origin_airport_code: string;
+  destination_airport_code: string;
+  baggage_count: number;
+  shipment_date: string;
+  source: "TXT" | "BD" | string;
+};
+
 export type ShipmentBatchCreatePayload = {
   originAirportCode: string;
   fileContent: string;
@@ -384,6 +393,14 @@ export async function createShipmentRequest(
     ...payload,
     departureDate: toUtcIsoIfLocalDateTime(payload.departureDate),
   });
+  return response.data;
+}
+
+export async function getShipmentsRequest(date?: string): Promise<ShipmentListRecord[]> {
+  const params = new URLSearchParams();
+  if (date) params.set("date", date.replaceAll("-", ""));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const response = await api.get<ShipmentListRecord[]>(`/shipments${suffix}`);
   return response.data;
 }
 

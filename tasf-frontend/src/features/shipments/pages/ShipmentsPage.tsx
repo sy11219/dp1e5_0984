@@ -3,17 +3,33 @@ import {
   createShipmentBatchRequest,
   createShipmentRequest,
   getAirportsRequest,
+  getShipmentsRequest,
   type ShipmentBatchResult,
   type ShipmentCreatePayload,
+  type ShipmentListRecord,
   type ShipmentRecord,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
 
+const PAGE_SIZE = 12;
+
 function currentDateTimeLocalValue() {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 19);
+}
+
+function currentDateValue() {
+  return currentDateTimeLocalValue().slice(0, 10);
+}
+
+function formatShipmentDate(value: string) {
+  if (!value) return "--";
+  if (/^\d{8}\s\d{2}:\d{2}$/.test(value)) {
+    return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)} ${value.slice(9)}`;
+  }
+  return value.replace("T", " ").replace("Z", " UTC");
 }
 
 function emptyForm(defaultAirportCode = ""): ShipmentCreatePayload {
@@ -33,6 +49,7 @@ type ShipmentBatchForm = {
 
 export function ShipmentsPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
+  const [shipments, setShipments] = useState<ShipmentListRecord[]>([]);
   const [form, setForm] = useState<ShipmentCreatePayload | null>(null);
   const [batchForm, setBatchForm] = useState<ShipmentBatchForm | null>(null);
   const [created, setCreated] = useState<ShipmentRecord | null>(null);
@@ -41,32 +58,68 @@ export function ShipmentsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [modalError, setModalError] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [listDate] = useState(currentDateValue);
+
+  const loadPageData = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [airportPayload, shipmentPayload] = await Promise.all([
+        getAirportsRequest(),
+        getShipmentsRequest(listDate),
+      ]);
+      setAirports(airportPayload);
+      setShipments(shipmentPayload);
+      setPage(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar los envios.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let ignore = false;
+    void loadPageData();
+  }, [listDate]);
 
-    void getAirportsRequest()
-      .then((payload) => {
-        if (!ignore) setAirports(payload);
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setError(err instanceof Error ? err.message : "No se pudieron cargar aeropuertos.");
-        }
-      })
-      .finally(() => {
-        if (!ignore) setLoading(false);
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const airportOptions = useMemo(
     () => [...airports].sort((a, b) => a.code.localeCompare(b.code)),
     [airports]
   );
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return shipments
+      .filter((shipment) => {
+        if (!query) return true;
+        return [
+          shipment.shipment_code,
+          shipment.origin_airport_code,
+          shipment.destination_airport_code,
+          shipment.baggage_count,
+          shipment.shipment_date,
+        ].some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort(
+        (a, b) =>
+          a.shipment_date.localeCompare(b.shipment_date) ||
+          a.origin_airport_code.localeCompare(b.origin_airport_code) ||
+          a.shipment_code.localeCompare(b.shipment_code)
+      );
+  }, [shipments, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const totalBags = shipments.reduce((sum, shipment) => sum + shipment.baggage_count, 0);
 
   const openCreator = () => {
     setCreated(null);
@@ -112,6 +165,7 @@ export function ShipmentsPage() {
       });
       setCreated(createdShipment);
       setForm(null);
+      await loadPageData();
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "No se pudo registrar el envio.");
     } finally {
@@ -138,6 +192,7 @@ export function ShipmentsPage() {
       });
       setCreatedBatch(result);
       setBatchForm(null);
+      await loadPageData();
     } catch (err) {
       setModalError(err instanceof Error ? err.message : "No se pudo registrar el lote.");
     } finally {
@@ -167,6 +222,19 @@ export function ShipmentsPage() {
 
         {error && <div className="error">{error}</div>}
 
+        <section className="dashboard-grid">
+          <div className="panel section metric-panel">
+            <span>Total</span>
+            <strong>{shipments.length}</strong>
+            <small>envios restantes de hoy</small>
+          </div>
+          <div className="panel section metric-panel">
+            <span>Maletas</span>
+            <strong>{totalBags.toLocaleString("es-PE")}</strong>
+            <small>desde ahora hasta fin del dia</small>
+          </div>
+        </section>
+
         <section className="panel section shipments-panel">
           {createdBatch ? (
             <div className="success">
@@ -178,10 +246,83 @@ export function ShipmentsPage() {
               {`Envio registrado: ${created.shipment_code} (${created.baggage_count} maletas).`}
             </div>
           ) : (
-            <div className="empty-state">
-              {loading ? "Cargando aeropuertos..." : "Usa Nuevo para registrar un envio."}
-            </div>
+            <div className="empty-state">{`Mostrando envios desde ahora hasta el final del ${listDate}.`}</div>
           )}
+        </section>
+
+        <section className="panel section shipments-panel">
+          <div className="airports-toolbar">
+            <div className="field">
+              <label>Buscar</label>
+              <input
+                type="search"
+                placeholder="Codigo, origen o destino"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="airports-table-wrap">
+            <table className="data-table airports-data-table">
+              <thead>
+                <tr>
+                  <th>CODIGO</th>
+                  <th>AEROPUERTO_ORIGEN</th>
+                  <th>AEROPUERTO_DESTINO</th>
+                  <th>MALETAS</th>
+                  <th>FECHA_ENVIO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((shipment, index) => (
+                  <tr key={`${shipment.source}-${shipment.shipment_code}-${index}`}>
+                    <td>
+                      <strong>{shipment.shipment_code}</strong>
+                    </td>
+                    <td>{shipment.origin_airport_code}</td>
+                    <td>{shipment.destination_airport_code}</td>
+                    <td>{shipment.baggage_count.toLocaleString("es-PE")}</td>
+                    <td>{formatShipmentDate(shipment.shipment_date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {!visible.length && (
+              <div className="empty-state">
+                {loading ? "Cargando envios..." : "No se encontraron envios pendientes para hoy."}
+              </div>
+            )}
+          </div>
+
+          <div className="pagination">
+            <span>
+              {filtered.length
+                ? `${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(
+                    safePage * PAGE_SIZE,
+                    filtered.length
+                  )} de ${filtered.length}`
+                : "0 de 0"}
+            </span>
+            <div>
+              <button
+                className="ghost"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={safePage === 1}
+              >
+                Anterior
+              </button>
+              <strong>{`${safePage} / ${pageCount}`}</strong>
+              <button
+                className="ghost"
+                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                disabled={safePage === pageCount}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         </section>
       </main>
 

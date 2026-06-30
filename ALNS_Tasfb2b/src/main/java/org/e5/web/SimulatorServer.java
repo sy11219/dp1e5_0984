@@ -358,8 +358,22 @@ public class SimulatorServer {
             return;
         }
 
+        if ("GET".equalsIgnoreCase(exchange.getRequestMethod())
+                && ("/api/shipments".equals(path) || "/api/shipments/".equals(path))) {
+            try {
+                String date = queryParams(exchange).get("date");
+                send(exchange, 200, "application/json", shipmentService.listShipmentsForDate(date));
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudieron cargar los envios\"}");
+            }
+            return;
+        }
+
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-            send(exchange, 405, "application/json", "{\"error\":\"Use POST\"}");
+            send(exchange, 405, "application/json", "{\"error\":\"Use GET o POST\"}");
             return;
         }
 
