@@ -852,6 +852,8 @@ export function SimulationPage() {
             <FlightsTable
               flights={displayData.flights}
               activeFlightIds={activeFlightIds}
+              shipments={visibleShipments}
+              simMinute={simMinute}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
             />

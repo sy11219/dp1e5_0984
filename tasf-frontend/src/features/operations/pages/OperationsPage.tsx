@@ -513,6 +513,8 @@ export const OperationsPage = () => {
             <FlightsTable
               flights={data?.flights || []}
               activeFlightIds={activeFlightIds}
+              shipments={visibleShipments}
+              simMinute={operationalMinute}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
             />
