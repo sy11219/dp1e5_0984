@@ -184,6 +184,7 @@ export const OperationsPage = () => {
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [now, setNow] = useState(new Date());
   const focusTokenRef = useRef(0);
   const refreshingRef = useRef(false);
@@ -319,13 +320,15 @@ export const OperationsPage = () => {
     [activeFlights]
   )
   const visibleShipments = useMemo(
-    () =>
-      (data?.shipments ?? []).filter(
+    () => {
+      const historyMinutes = shipmentHistoryHours * 60;
+      return (data?.shipments ?? []).filter(
         (shipment) =>
           shipment.requestMinute <= operationalMinute &&
-          (!shipment.planned || operationalMinute <= shipment.estimatedArrival + 60)
-      ),
-    [data, operationalMinute]
+          (!shipment.planned || operationalMinute <= shipment.estimatedArrival + historyMinutes)
+      );
+    },
+    [data, operationalMinute, shipmentHistoryHours]
   );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
   const displayGmtOffset = assignedAirportTime?.gmtOffset;
@@ -536,6 +539,8 @@ export const OperationsPage = () => {
             <FlightsTable
               flights={data?.flights || []}
               activeFlightIds={activeFlightIds}
+              shipments={visibleShipments}
+              simMinute={operationalMinute}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
               displayGmtOffset={displayGmtOffset}
@@ -543,7 +548,22 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
-            <h3>Envios</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+              <h3>Envios</h3>
+              <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                Mostrar finalizados hace
+                <input
+                  type="number"
+                  min={0}
+                  max={24}
+                  step={1}
+                  value={shipmentHistoryHours}
+                  onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
+                  style={{ width: "4.5rem" }}
+                />
+                h
+              </label>
+            </div>
             <ShipmentsTable
               shipments={visibleShipments}
               simMinute={operationalMinute}
