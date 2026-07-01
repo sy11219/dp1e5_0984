@@ -9,6 +9,7 @@ import {
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
+import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
 const PAGE_SIZE = 12;
 type EditorMode = "create" | "edit";
@@ -58,6 +59,7 @@ function emptyFlightForm(defaultAirportCode = ""): FlightPlanUpdatePayload {
 }
 
 export function FlightsPage() {
+  const assignedAirportTime = useAssignedAirportTime();
   const [flights, setFlights] = useState<FlightPlanRecord[]>([]);
   const [airports, setAirports] = useState<Airport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ export function FlightsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, status]);
+  }, [search, status, assignedAirportTime?.code]);
 
   const statuses = useMemo(
     () => Array.from(new Set(flights.map(statusLabel).filter(Boolean))).sort(),
@@ -105,8 +107,13 @@ export function FlightsPage() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const assignedCode = assignedAirportTime?.code;
 
     return flights
+      .filter((flight) => {
+        if (!assignedCode) return true;
+        return flight.origin === assignedCode || flight.destination === assignedCode;
+      })
       .filter((flight) => {
         if (!query) return true;
         return [
@@ -128,7 +135,7 @@ export function FlightsPage() {
           a.departure_time_utc.localeCompare(b.departure_time_utc) ||
           a.flight_code.localeCompare(b.flight_code)
       );
-  }, [flights, search, status]);
+  }, [assignedAirportTime?.code, flights, search, status]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -242,6 +249,14 @@ export function FlightsPage() {
         </section>
 
         <section className="panel section flights-panel">
+          {assignedAirportTime && (
+            <div className="success" style={{ marginBottom: "1rem" }}>
+              {`Mostrando vuelos con origen o destino en ${assignedAirportTime.code} - ${
+                assignedAirportTime.city || "aeropuerto asignado"
+              }.`}
+            </div>
+          )}
+
           <div className="flights-toolbar">
             <div className="field">
               <label>Buscar</label>

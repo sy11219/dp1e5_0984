@@ -5,11 +5,12 @@ import { formatSimMinute } from "../utils/formatters";
 
 type Props = {
   flights: AirportFlight[];
+  displayGmtOffset?: number;
 };
 
 const PAGE_SIZE = 15;
 
-export function AirportFlightsList({ flights }: Props) {
+export function AirportFlightsList({ flights, displayGmtOffset }: Props) {
   const incoming = useMemo(() => flights.filter((f) => f.direction === "incoming"), [flights]);
   const outgoing = useMemo(() => flights.filter((f) => f.direction === "outgoing"), [flights]);
 
@@ -62,7 +63,9 @@ export function AirportFlightsList({ flights }: Props) {
                           <strong>{flight.id}</strong>
                         </td>
                         <td>{counterpart}</td>
-                      <td className="text-right">{formatSimMinute(flight.absoluteArrivalMinute)}</td>
+                      <td className="text-right">
+                        {formatSimMinute(flight.absoluteArrivalMinute, displayGmtOffset ?? 0)}
+                      </td>
                         <td className="text-right">{load}</td>
                       </tr>
                   ))}
@@ -113,7 +116,9 @@ export function AirportFlightsList({ flights }: Props) {
                         <strong>{flight.id}</strong>
                       </td>
                       <td>{counterpart}</td>
-                      <td className="text-right">{formatSimMinute(flight.absoluteDepartureMinute)}</td>
+                      <td className="text-right">
+                        {formatSimMinute(flight.absoluteDepartureMinute, displayGmtOffset ?? 0)}
+                      </td>
                       <td className="text-right">{load}</td>
                     </tr>
                   ))}

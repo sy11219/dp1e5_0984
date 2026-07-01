@@ -7,25 +7,33 @@ interface TimelineProps {
   setSimMinute: (minute: number) => void;
   data: SimulationData | null;
   startDate: string;
+  displayGmtOffset?: number;
 }
 
-export function Timeline({ simMinute, maxMinute, setSimMinute, data, startDate }: TimelineProps) {
+export function Timeline({
+  simMinute,
+  maxMinute,
+  setSimMinute,
+  data,
+  startDate,
+  displayGmtOffset,
+}: TimelineProps) {
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSimMinute(Number(event.target.value));
   };
 
   const startOffset = data?.startOffsetMinutes ?? 0;
   const startLabel = data
-    ? formatFlightMoment(data, startOffset)
-    : `${startDate} ${formatSimMinute(startOffset)}`;
+    ? formatFlightMoment(data, startOffset, displayGmtOffset)
+    : `${startDate} ${formatSimMinute(startOffset, displayGmtOffset ?? 0)}`;
   const currentLabel = data
-    ? formatFlightMoment(data, simMinute)
-    : `${startDate} ${formatSimMinute(startOffset)}`;
+    ? formatFlightMoment(data, simMinute, displayGmtOffset)
+    : `${startDate} ${formatSimMinute(startOffset, displayGmtOffset ?? 0)}`;
   const endLabel = data
-    ? formatFlightMoment(data, maxMinute)
+    ? formatFlightMoment(data, maxMinute, displayGmtOffset)
     : `${new Date(new Date(startDate).getTime() + 5 * 24 * 60 * 60 * 1000)
           .toISOString()
-          .slice(0, 10)} ${formatSimMinute(startOffset)}`;
+          .slice(0, 10)} ${formatSimMinute(startOffset, displayGmtOffset ?? 0)}`;
 
   return (
     <div className="timeline">

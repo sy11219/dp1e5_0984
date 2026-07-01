@@ -28,6 +28,7 @@ import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../util
 import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 import { SimulationResultModal } from "../components/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
+import { useAssignedAirportTime } from "../utils/assignedAirportTime"
 
 const BATCH_SIMULATION_PAUSED_KEY = "tasf.simulation5d.paused"
 const BATCH_SIMULATION_STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
@@ -144,6 +145,7 @@ function markFinalReportDismissed(data: SimulationData | null) {
  *   – Se reanuda la animación desde el tick actual.
  */
 export function SimulationPage() {
+  const assignedAirportTime = useAssignedAirportTime()
   const [initialMapFocus] = useState(() => readMapFocus(SIMULATION_MAP_FOCUS_KEY))
   const [startDate, setStartDate]     = useState(DEFAULT_START_DATE)
   const [startTime, setStartTime]     = useState(DEFAULT_START_TIME)
@@ -557,6 +559,10 @@ export function SimulationPage() {
   const controlsBusy = loading || fetching || cancelling
   const ownsCurrentSimulation = ownsBatchSimulation(data)
   const canControlSimulation = !data?.simulationId || ownsCurrentSimulation
+  const displayGmtOffset = assignedAirportTime?.gmtOffset
+  const displayAirportLabel = assignedAirportTime
+    ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
+    : undefined
 
   const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
     const updateAirport = (airport: Airport) =>
@@ -681,7 +687,13 @@ export function SimulationPage() {
   return (
     <div className="app-shell">
       <Navbar />
-      <Topbar data={data} simMinute={simMinute} durationMs={realTimeMs} />
+      <Topbar
+        data={data}
+        simMinute={simMinute}
+        durationMs={realTimeMs}
+        displayGmtOffset={displayGmtOffset}
+        displayAirportLabel={displayAirportLabel}
+      />
 
       <main
         className={[
@@ -792,6 +804,7 @@ export function SimulationPage() {
             selectedAirport={selectedAirport}
             selectedFlightId={selectedFlightId}
             focusTarget={mapFocusTarget}
+            displayGmtOffset={displayGmtOffset}
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
             onClearSelection={clearMapSelection}
@@ -802,6 +815,7 @@ export function SimulationPage() {
             setSimMinute={setSimMinute}
             data={data}
             startDate={startDate}
+            displayGmtOffset={displayGmtOffset}
           />
         </section>
 
@@ -851,6 +865,7 @@ export function SimulationPage() {
               activeFlightIds={activeFlightIds}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
+              displayGmtOffset={displayGmtOffset}
             />
           </section>
           <section className="panel section">
@@ -859,6 +874,7 @@ export function SimulationPage() {
             <ShipmentsTable
               shipments={visibleShipments}
               simMinute={simMinute}
+              displayGmtOffset={displayGmtOffset}
             />
           </section>
           <section className="panel section">
@@ -871,6 +887,7 @@ export function SimulationPage() {
                 shipments={visibleShipments}
                 simMinute={simMinute}
                 selectedAirport={selectedAirport}
+                displayGmtOffset={displayGmtOffset}
                 onSelectAirport={focusAirport}
               />
             ) : (

@@ -23,6 +23,7 @@ import {
   formatTimeOnly,
   percent,
 } from "../../simulation/utils/formatters";
+import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
 const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
 const REALTIME_STATUS_POLL_MS = 5_000;
@@ -58,9 +59,13 @@ function StatusItem({
 function OperationsTopbar({
   data,
   operationalMinute,
+  displayGmtOffset,
+  displayAirportLabel,
 }: {
   data: SimulationData | null;
   operationalMinute: number;
+  displayGmtOffset?: number;
+  displayAirportLabel?: string;
 }) {
   return (
     <header className="topbar">
@@ -72,7 +77,11 @@ function OperationsTopbar({
         <StatusItem
           label="Minuto operativo"
           value={formatOperationalMinute(operationalMinute)}
-          sub={data ? formatFlightMoment(data, operationalMinute) : "avanza con el reloj real"}
+          sub={
+            data
+              ? formatFlightMoment(data, operationalMinute, displayGmtOffset)
+              : "avanza con el reloj real"
+          }
         />
         <StatusItem
           label="Estado"
@@ -81,8 +90,14 @@ function OperationsTopbar({
         />
         <StatusItem
           label="Ultima lectura"
-          value={data ? formatTimeOnly(data.realFinishedAt) : "--"}
-          sub={data ? formatDateOnly(data.realFinishedAt) : "--"}
+          value={data ? formatTimeOnly(data.realFinishedAt, displayGmtOffset) : "--"}
+          sub={
+            data
+              ? `${formatDateOnly(data.realFinishedAt, displayGmtOffset)}${
+                  displayAirportLabel ? ` - ${displayAirportLabel}` : ""
+                }`
+              : "--"
+          }
         />
         <StatusItem
           label="Pedidos procesados"
@@ -152,6 +167,7 @@ function LiveMetrics({
 }
 
 export const OperationsPage = () => {
+  const assignedAirportTime = useAssignedAirportTime();
   const [initialMapFocus] = useState(() => readMapFocus(OPERATIONS_MAP_FOCUS_KEY));
   const [data, setData] = useState<SimulationData | null>(null);
   const [, setLoading] = useState(true);
@@ -312,6 +328,10 @@ export const OperationsPage = () => {
     [data, operationalMinute]
   );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
+  const displayGmtOffset = assignedAirportTime?.gmtOffset;
+  const displayAirportLabel = assignedAirportTime
+    ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
+    : undefined;
 
   const clearMapSelection = useCallback(() => {
     setSelectedAirport(null);
@@ -364,7 +384,12 @@ export const OperationsPage = () => {
   return (
     <div className="app-shell">
       <Navbar />
-      <OperationsTopbar data={data} operationalMinute={operationalMinute} />
+      <OperationsTopbar
+        data={data}
+        operationalMinute={operationalMinute}
+        displayGmtOffset={displayGmtOffset}
+        displayAirportLabel={displayAirportLabel}
+      />
 
       <main
         className={[
@@ -389,11 +414,11 @@ export const OperationsPage = () => {
             <div className="metrics current-time-metrics">
               <div className="metric">
                 <span>Fecha actual</span>
-                <strong>{formatDateOnly(now)}</strong>
+                <strong>{formatDateOnly(now, displayGmtOffset)}</strong>
               </div>
               <div className="metric">
                 <span>Hora actual</span>
-                <strong>{formatClock(now)}</strong>
+                <strong>{formatClock(now, displayGmtOffset)}</strong>
               </div>
             </div>
             <div className="control-grid">
@@ -459,6 +484,7 @@ export const OperationsPage = () => {
             selectedAirport={selectedAirport}
             selectedFlightId={selectedFlightId}
             focusTarget={mapFocusTarget}
+            displayGmtOffset={displayGmtOffset}
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
             onClearSelection={clearMapSelection}
@@ -512,12 +538,17 @@ export const OperationsPage = () => {
               activeFlightIds={activeFlightIds}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
+              displayGmtOffset={displayGmtOffset}
             />
           </section>
 
           <section className="panel section">
             <h3>Envios</h3>
-            <ShipmentsTable shipments={visibleShipments} simMinute={operationalMinute} />
+            <ShipmentsTable
+              shipments={visibleShipments}
+              simMinute={operationalMinute}
+              displayGmtOffset={displayGmtOffset}
+            />
           </section>
 
           <section className="panel section">
@@ -530,6 +561,7 @@ export const OperationsPage = () => {
                 shipments={visibleShipments}
                 simMinute={operationalMinute}
                 selectedAirport={selectedAirport}
+                displayGmtOffset={displayGmtOffset}
                 onSelectAirport={focusAirport}
               />
             ) : (

@@ -13,6 +13,7 @@ interface AirportsTableProps {
   shipments: Shipment[];
   simMinute: number;
   selectedAirport?: string | null;
+  displayGmtOffset?: number;
   onSelectAirport?: (code: string) => void;
 }
 
@@ -23,6 +24,7 @@ export function AirportsTable({
   shipments,
   simMinute,
   selectedAirport: selectedAirportProp,
+  displayGmtOffset,
   onSelectAirport,
 }: AirportsTableProps) {
   const [search, setSearch] = useState("");
@@ -246,7 +248,10 @@ export function AirportsTable({
               </button>
               {modalShowFlights && (
                 <div style={{ marginTop: 8 }}>
-                  <AirportFlightsList flights={getFlightsForAirport(flights, flightsModalAirport, simMinute)} />
+                  <AirportFlightsList
+                    flights={getFlightsForAirport(flights, flightsModalAirport, simMinute)}
+                    displayGmtOffset={displayGmtOffset}
+                  />
                 </div>
               )}
             </div>

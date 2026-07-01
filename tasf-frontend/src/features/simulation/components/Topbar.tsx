@@ -8,6 +8,8 @@ interface TopbarProps {
   durationMs?: number;
   title?: string;
   subtitle?: string;
+  displayGmtOffset?: number;
+  displayAirportLabel?: string;
 }
 
 interface StatusItemProps {
@@ -26,9 +28,9 @@ function StatusItem({ label, value, sub }: StatusItemProps) {
   );
 }
 
-function formatDateTime(value: string | Date | undefined): string {
+function formatDateTime(value: string | Date | undefined, gmtOffset?: number): string {
   if (!value) return "--";
-  return `${formatDateOnly(value)} ${formatTimeOnly(value)}`;
+  return `${formatDateOnly(value, gmtOffset)} ${formatTimeOnly(value, gmtOffset)}`;
 }
 
 function formatElapsedSimulation(minutes: number): string {
@@ -44,12 +46,14 @@ export function Topbar({
   simMinute,
   durationMs,
   title = "TASF.B2B - Simulador de equipaje",
-  subtitle = "Simulación 5 días",
+  subtitle = "Simulacion 5 dias",
+  displayGmtOffset,
+  displayAirportLabel,
 }: TopbarProps) {
   const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
   const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
   const simulatedDayLabel = data
-    ? `Día ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
+    ? `Dia ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
     : "--";
 
   return (
@@ -61,21 +65,21 @@ export function Topbar({
       <div className="status-strip">
         <StatusItem
           label="Fecha y Hora de Inicio"
-          value={formatDateTime(data?.simulationStartDateTime)}
-          sub={data ? "inicio programado" : "--"}
+          value={formatDateTime(data?.simulationStartDateTime, displayGmtOffset)}
+          sub={displayAirportLabel || (data ? "inicio programado" : "--")}
         />
         <StatusItem
-          label="Fecha y Hora en Simulación"
-          value={data ? formatFlightMoment(data, simMinute) : "--"}
+          label="Fecha y Hora en Simulacion"
+          value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
           sub={simulatedDayLabel}
         />
         <StatusItem
-          label="Duración de la simulación"
+          label="Duracion de la simulacion"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecución real"
+          sub="ejecucion real"
         />
         <StatusItem
-          label="Tiempo transcurrido en simulación"
+          label="Tiempo transcurrido en simulacion"
           value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
           sub="avance acumulado"
         />

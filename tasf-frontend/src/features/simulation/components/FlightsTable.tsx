@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Flight } from "../types";
 import { STATUS_COLOR } from "../utils/constants";
 import { hhmm } from "../utils/formatters";
@@ -8,6 +8,7 @@ interface FlightsTableProps {
   activeFlightIds: Set<string>;
   selectedFlightId?: string | null;
   onSelectFlight?: (id: string) => void;
+  displayGmtOffset?: number;
 }
 
 export function FlightsTable({
@@ -15,6 +16,7 @@ export function FlightsTable({
   activeFlightIds,
   selectedFlightId,
   onSelectFlight,
+  displayGmtOffset,
 }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
@@ -23,10 +25,7 @@ export function FlightsTable({
   const [sortBy, setSortBy] = useState<"utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination">("utilization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const origins = useMemo(
-    () => Array.from(new Set(flights.map((f) => f.origin))),
-    [flights]
-  );
+  const origins = useMemo(() => Array.from(new Set(flights.map((f) => f.origin))), [flights]);
   const destinations = useMemo(
     () => Array.from(new Set(flights.map((f) => f.destination))),
     [flights]
@@ -63,24 +62,23 @@ export function FlightsTable({
       const aActive = activeFlightIds.has(a.id);
       const bActive = activeFlightIds.has(b.id);
 
-      if (aActive !== bActive) {
-        return aActive ? -1 : 1;
-      }
+      if (aActive !== bActive) return aActive ? -1 : 1;
 
       const aVal = a[sortBy];
       const bVal = b[sortBy];
       if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortOrder === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
+        return sortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
       }
-      else return sortOrder === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+      return sortOrder === "asc"
+        ? (aVal as number) - (bVal as number)
+        : (bVal as number) - (aVal as number);
     });
 
     return result;
   }, [flights, search, originFilter, destinationFilter, statusFilter, sortBy, sortOrder, activeFlightIds]);
 
   const visibleFlights = filteredAndSortedFlights.slice(0, 10);
+  const gmtOffset = displayGmtOffset ?? 0;
 
   if (!flights.length) {
     return <div className="empty-state">No hay vuelos registrados.</div>;
@@ -98,21 +96,10 @@ export function FlightsTable({
         />
       </div>
 
-      <div
-        className="filters"
-        style={{
-          display: "flex",
-          gap: "1rem",
-          alignItems: "center",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Estado:
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "Todos" | "Activos" | "Inactivos")}
-          >
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "Todos" | "Activos" | "Inactivos")}>
             <option value="Todos">Todos</option>
             <option value="Activos">Activos</option>
             <option value="Inactivos">Inactivos</option>
@@ -121,10 +108,7 @@ export function FlightsTable({
 
         <label className="text-sm">
           Origen:
-          <select
-            value={originFilter}
-            onChange={(e) => setOriginFilter(e.target.value)}
-          >
+          <select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
             {origins.map((o) => (
               <option key={o} value={o}>
@@ -136,10 +120,7 @@ export function FlightsTable({
 
         <label className="text-sm">
           Destino:
-          <select
-            value={destinationFilter}
-            onChange={(e) => setDestinationFilter(e.target.value)}
-          >
+          <select value={destinationFilter} onChange={(e) => setDestinationFilter(e.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
             {destinations.map((d) => (
               <option key={d} value={d}>
@@ -150,22 +131,11 @@ export function FlightsTable({
         </label>
       </div>
 
-      <div
-        className="filters"
-        style={{
-          display: "flex",
-          gap: "1rem",
-          alignItems: "center",
-          marginBottom: "1rem",
-        }}
-      >
+      <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Ordenar por:
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}
-          >
-            <option value="utilization">Ocupación</option>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}>
+            <option value="utilization">Ocupacion</option>
             <option value="departureMinute">Hora de salida</option>
             <option value="arrivalMinute">Hora de llegada</option>
             <option value="origin">Origen</option>
@@ -174,11 +144,8 @@ export function FlightsTable({
         </label>
 
         <label className="text-sm">
-          Dirección:
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-          >
+          Direccion:
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}>
             <option value="asc">Ascendente</option>
             <option value="desc">Descendente</option>
           </select>
@@ -209,20 +176,10 @@ export function FlightsTable({
                 <span className={`dot ${flight.status}`}></span>
                 <div className="row-main">
                   <strong>{`${flight.origin} -> ${flight.destination}`}</strong>
-                  <span>{`Día ${flight.dayOffset} · ${hhmm(
-                    flight.departureMinute
-                  )}-${hhmm(flight.arrivalMinute)}`}</span>
+                  <span>{`Dia ${flight.dayOffset} · ${hhmm(flight.departureMinute, gmtOffset)}-${hhmm(flight.arrivalMinute, gmtOffset)}`}</span>
                 </div>
-                <span
-                  className="capacity-pill"
-                  style={{
-                    background: STATUS_COLOR[flight.status],
-                  }}
-                >
-                  {active
-                    ? `${Math.round(flight.utilization * 100)}%`
-                    : "Inactivo"
-                  }
+                <span className="capacity-pill" style={{ background: STATUS_COLOR[flight.status] }}>
+                  {active ? `${Math.round(flight.utilization * 100)}%` : "Inactivo"}
                 </span>
               </div>
             );

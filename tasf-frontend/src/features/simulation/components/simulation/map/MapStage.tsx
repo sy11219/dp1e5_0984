@@ -18,6 +18,7 @@ type MapStageProps = {
   selectedAirport: string | null;
   selectedFlightId?: string | null;
   focusTarget?: MapFocusTarget | null;
+  displayGmtOffset?: number;
   onSelectAirport: (code: string) => void;
   onSelectFlight?: (id: string) => void;
   onClearSelection?: () => void;
@@ -45,6 +46,7 @@ export default function MapStage({
   selectedAirport,
   selectedFlightId,
   focusTarget,
+  displayGmtOffset,
   onSelectAirport,
   onSelectFlight,
   onClearSelection,
@@ -328,7 +330,7 @@ export default function MapStage({
         const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
         if (dist < 15) {
           onSelectFlight?.(flight.id);
-          setMapInfo(createFlightInfo(data, flight, origin, destination));
+          setMapInfo(createFlightInfo(data, flight, origin, destination, displayGmtOffset));
           return;
         }
       }
@@ -342,7 +344,7 @@ export default function MapStage({
     return () => {
       mapContainer.removeEventListener("click", handleClick);
     };
-  }, [activeFlights, airportByCode, data, onClearSelection, onSelectFlight]);
+  }, [activeFlights, airportByCode, data, displayGmtOffset, onClearSelection, onSelectFlight]);
 
   useEffect(() => {
     const clearAutoCloseTimer = () => {
@@ -470,7 +472,8 @@ function createFlightInfo(
   data: SimulationData | null,
   flight: ActiveFlight,
   origin: Airport,
-  destination: Airport
+  destination: Airport,
+  displayGmtOffset?: number
 ): MapInfo {
   return {
     type: "flight",
@@ -481,8 +484,8 @@ function createFlightInfo(
       ["Codigo", flight.id],
       ["Origen", `${origin.code} - ${origin.city}`],
       ["Destino", `${destination.code} - ${destination.city}`],
-      ["Salida", formatFlightMoment(data, flight.absoluteDepartureMinute)],
-      ["Llegada", formatFlightMoment(data, flight.absoluteArrivalMinute)],
+      ["Salida", formatFlightMoment(data, flight.absoluteDepartureMinute, displayGmtOffset)],
+      ["Llegada", formatFlightMoment(data, flight.absoluteArrivalMinute, displayGmtOffset)],
       ["Avance", `${Math.round(flight.progress * 100)}%`],
       [
         "Carga",

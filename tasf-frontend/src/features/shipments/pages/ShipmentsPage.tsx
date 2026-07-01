@@ -11,6 +11,7 @@ import {
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
+import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
 const PAGE_SIZE = 12;
 
@@ -48,6 +49,7 @@ type ShipmentBatchForm = {
 };
 
 export function ShipmentsPage() {
+  const assignedAirportTime = useAssignedAirportTime();
   const [airports, setAirports] = useState<Airport[]>([]);
   const [shipments, setShipments] = useState<ShipmentListRecord[]>([]);
   const [form, setForm] = useState<ShipmentCreatePayload | null>(null);
@@ -87,7 +89,7 @@ export function ShipmentsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, assignedAirportTime?.code]);
 
   const airportOptions = useMemo(
     () => [...airports].sort((a, b) => a.code.localeCompare(b.code)),
@@ -96,8 +98,16 @@ export function ShipmentsPage() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const assignedCode = assignedAirportTime?.code;
 
     return shipments
+      .filter((shipment) => {
+        if (!assignedCode) return true;
+        return (
+          shipment.origin_airport_code === assignedCode ||
+          shipment.destination_airport_code === assignedCode
+        );
+      })
       .filter((shipment) => {
         if (!query) return true;
         return [
@@ -114,7 +124,7 @@ export function ShipmentsPage() {
           a.origin_airport_code.localeCompare(b.origin_airport_code) ||
           a.shipment_code.localeCompare(b.shipment_code)
       );
-  }, [shipments, search]);
+  }, [assignedAirportTime?.code, shipments, search]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -251,6 +261,14 @@ export function ShipmentsPage() {
         </section>
 
         <section className="panel section shipments-panel">
+          {assignedAirportTime && (
+            <div className="success" style={{ marginBottom: "1rem" }}>
+              {`Mostrando envios con origen o destino en ${assignedAirportTime.code} - ${
+                assignedAirportTime.city || "aeropuerto asignado"
+              }.`}
+            </div>
+          )}
+
           <div className="airports-toolbar">
             <div className="field">
               <label>Buscar</label>
