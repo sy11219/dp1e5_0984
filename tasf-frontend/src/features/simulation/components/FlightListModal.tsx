@@ -16,14 +16,14 @@ export function FlightListModal({ shipment, onClose }: FlightListModalProps) {
             const parts = flightId.split("-");
             const origin = parts[0] || "???";
             const destination = parts[1] || "???";
-            // const departureTime = parts[2] || "0000"; Descomentar cuando se arreglen las ids
-            // const formattedDeparture = `${departureTime.slice(0, 2)}:${departureTime.slice(2)}`;
+             const departureTime = parts[2] || "0000";
+             const formattedDeparture = `${departureTime.slice(0, 2)}:${departureTime.slice(2)}`;
 
             return (
               <div key={flightId} className="flight-item">
                 <div>{origin} → {destination}</div>
                 <div>ID: {flightId}</div>
-                {/* <div>Salida: {formattedDeparture}</div> */}
+                <div>Salida: {formattedDeparture}</div>
               </div>
             );
           })}
