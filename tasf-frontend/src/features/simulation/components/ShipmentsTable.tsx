@@ -1,26 +1,34 @@
 import { useMemo, useState } from "react";
-import type { Shipment } from "../types";
+import type { Flight, Shipment, SimulationData } from "../types";
 import { formatSimMinute } from "../utils/formatters";
 import { FlightListModal } from "./FlightListModal";
 
 interface ShipmentsTableProps {
   shipments: Shipment[];
+  flights: Flight[];
   simMinute: number;
+  data?: SimulationData | null;
   displayGmtOffset?: number;
+  selectedShipmentId?: string | null;
+  onSelectShipment?: (shipment: Shipment) => void;
+  onSelectFlight?: (id: string) => void;
 }
 
 const ANY = "Cualquiera";
 const PAGE_SIZE = 25;
 
-function getFirstFlightDepartureMinute(flightIds: string[], requestMinute: number): number | null {
+function getFirstFlightDepartureMinute(
+  flightIds: string[],
+  requestMinute: number
+): number | null {
   if (flightIds.length === 0) return null;
 
   const parts = flightIds[0].split("-");
   const departureTime = parts[2];
   if (!departureTime || departureTime.length !== 4) return null;
 
-  const hour = parseInt(departureTime.slice(0, 2), 10);
-  const min = parseInt(departureTime.slice(2), 10);
+  const hour = Number.parseInt(departureTime.slice(0, 2), 10);
+  const min = Number.parseInt(departureTime.slice(2), 10);
   const departureMinute = hour * 60 + min;
   const requestDay = Math.floor(requestMinute / 1440);
   const requestMinuteOfDay = requestMinute % 1440;
@@ -37,15 +45,22 @@ function getShipmentStatus(
 ): string {
   const isCompleted = shipment.planned && simMinute >= shipment.estimatedArrival;
   if (isCompleted) return "Entregado";
-
   if (absoluteDepartureMinute !== null) {
     return simMinute >= absoluteDepartureMinute ? "En curso" : "Planeado";
   }
-
-  return "Planeado";
+  return shipment.planned ? "Planeado" : "Sin ruta";
 }
 
-export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: ShipmentsTableProps) {
+export function ShipmentsTable({
+  shipments,
+  flights,
+  simMinute,
+  data,
+  displayGmtOffset,
+  selectedShipmentId,
+  onSelectShipment,
+  onSelectFlight,
+}: ShipmentsTableProps) {
   const [search, setSearch] = useState("");
   const [originAirport, setOriginAirport] = useState(ANY);
   const [destinationAirport, setDestinationAirport] = useState(ANY);
@@ -56,9 +71,9 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
 
   const airportOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const s of shipments) {
-      set.add(s.origin);
-      set.add(s.destination);
+    for (const shipment of shipments) {
+      set.add(shipment.origin);
+      set.add(shipment.destination);
     }
     return [...set].sort();
   }, [shipments]);
@@ -67,29 +82,33 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
     let result = [...shipments].sort((a, b) => a.requestMinute - b.requestMinute);
 
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const query = search.toLowerCase();
       result = result.filter(
-        (s) =>
-          s.clientId.toLowerCase().includes(q) ||
-          s.origin.toLowerCase().includes(q) ||
-          s.destination.toLowerCase().includes(q) ||
-          s.flightIds.some((id) => id.toLowerCase().includes(q))
+        (shipment) =>
+          shipment.id.toLowerCase().includes(query) ||
+          shipment.clientId.toLowerCase().includes(query) ||
+          shipment.origin.toLowerCase().includes(query) ||
+          shipment.destination.toLowerCase().includes(query) ||
+          shipment.flightIds.some((id) => id.toLowerCase().includes(query))
       );
     }
 
-    if (originAirport !== ANY) result = result.filter((s) => s.origin === originAirport);
-    if (destinationAirport !== ANY) result = result.filter((s) => s.destination === destinationAirport);
+    if (originAirport !== ANY) result = result.filter((shipment) => shipment.origin === originAirport);
+    if (destinationAirport !== ANY) {
+      result = result.filter((shipment) => shipment.destination === destinationAirport);
+    }
 
     if (statusFilter !== ANY) {
-      result = result.filter((s) => {
-        const absoluteDepartureMinute = getFirstFlightDepartureMinute(s.flightIds, s.requestMinute);
-        const shipmentStatus = getShipmentStatus(s, simMinute, absoluteDepartureMinute);
-
+      result = result.filter((shipment) => {
+        const absoluteDepartureMinute = getFirstFlightDepartureMinute(
+          shipment.flightIds,
+          shipment.requestMinute
+        );
+        const shipmentStatus = getShipmentStatus(shipment, simMinute, absoluteDepartureMinute);
         if (statusFilter === "in-progress") return shipmentStatus === "En curso";
         if (statusFilter === "delivered") return shipmentStatus === "Entregado";
         if (statusFilter === "planned") return shipmentStatus === "Planeado";
-        if (statusFilter === "unplanned") return !s.planned;
-
+        if (statusFilter === "unplanned") return !shipment.planned;
         return true;
       });
     }
@@ -100,9 +119,13 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
   const canGoBack = currentPage > 1;
   const canGoForward = currentPage < totalPages;
+
+  const handleSelectShipment = (shipment: Shipment) => {
+    setSelectedShipment(shipment);
+    onSelectShipment?.(shipment);
+  };
 
   if (!shipments.length) return <div className="empty-state">No hay envios registrados.</div>;
 
@@ -111,9 +134,12 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
       <div className="search-bar" style={{ marginBottom: "0.5rem" }}>
         <input
           type="text"
-          placeholder="Buscar por cliente, origen, destino o vuelo..."
+          placeholder="Buscar por envio, cliente, origen, destino o vuelo..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
           style={{ width: "100%" }}
         />
       </div>
@@ -121,29 +147,25 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
       <div className="filters" style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" }}>
         <label className="text-sm">
           Origen:
-          <select value={originAirport} onChange={(e) => setOriginAirport(e.target.value)}>
+          <select value={originAirport} onChange={(event) => setOriginAirport(event.target.value)}>
             <option value={ANY}>{ANY}</option>
-            {airportOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
+            {airportOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
             ))}
           </select>
         </label>
         <label className="text-sm">
           Destino:
-          <select value={destinationAirport} onChange={(e) => setDestinationAirport(e.target.value)}>
+          <select value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value)}>
             <option value={ANY}>{ANY}</option>
-            {airportOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
+            {airportOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
             ))}
           </select>
         </label>
         <label className="text-sm">
           Estado:
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value={ANY}>{ANY}</option>
             <option value="in-progress">En curso</option>
             <option value="delivered">Entregado</option>
@@ -157,10 +179,13 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
         {paginatedItems.length === 0 ? (
           <div className="empty-state">No se encontraron resultados.</div>
         ) : (
-          paginatedItems.map((s) => {
-            const status = !s.planned ? "red" : s.onTime ? "green" : "yellow";
-            const absoluteDepartureMinute = getFirstFlightDepartureMinute(s.flightIds, s.requestMinute);
-            const shipmentState = getShipmentStatus(s, simMinute, absoluteDepartureMinute);
+          paginatedItems.map((shipment) => {
+            const status = !shipment.planned ? "red" : shipment.onTime ? "green" : "yellow";
+            const absoluteDepartureMinute = getFirstFlightDepartureMinute(
+              shipment.flightIds,
+              shipment.requestMinute
+            );
+            const shipmentState = getShipmentStatus(shipment, simMinute, absoluteDepartureMinute);
             const statusColor =
               shipmentState === "Entregado"
                 ? "#2f855a"
@@ -169,21 +194,25 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
                   : shipmentState === "Planeado"
                     ? "#ffbf00"
                     : "#718096";
-            const arrivalLabel = s.planned ? formatSimMinute(s.estimatedArrival, gmtOffset) : "pendiente";
+            const arrivalLabel = shipment.planned
+              ? formatSimMinute(shipment.estimatedArrival, gmtOffset)
+              : "pendiente";
+            const isSelected = selectedShipmentId === shipment.id;
 
             return (
-              <div className="row" key={`${s.id}-${s.requestMinute}`}>
+              <div className={`row ${isSelected ? "selected" : ""}`} key={`${shipment.id}-${shipment.requestMinute}`}>
                 <span className={`dot ${status}`}></span>
                 <div className="row-main">
-                  <strong>{s.id}</strong>
-                  <span>{`${s.origin} -> ${s.destination} · ${s.suitcases} maletas`}</span>
-                  <span>{`Pedido: ${formatSimMinute(s.requestMinute, gmtOffset)} · Llegada: ${arrivalLabel}`}</span>
+                  <strong>{shipment.id}</strong>
+                  <span>{`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas`}</span>
+                  <span>{`Pedido: ${formatSimMinute(shipment.requestMinute, gmtOffset)} - Llegada: ${arrivalLabel}`}</span>
                   <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
                     <button
-                      onClick={() => setSelectedShipment(s)}
+                      type="button"
+                      onClick={() => handleSelectShipment(shipment)}
                       style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", background: "#4a5568", color: "#fff", border: "none", borderRadius: "4px" }}
                     >
-                      Ver vuelos ({s.flightIds.length})
+                      Ver ruta ({shipment.flightIds.length})
                     </button>
                     <span className="capacity-pill" style={{ background: statusColor, color: "#fff" }}>
                       {shipmentState}
@@ -198,19 +227,27 @@ export function ShipmentsTable({ shipments, simMinute, displayGmtOffset }: Shipm
 
       {filtered.length > 0 && (
         <div className="segmented" style={{ marginTop: "0.75rem", justifyContent: "space-between" }}>
-          <button type="button" disabled={!canGoBack} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+          <button type="button" disabled={!canGoBack} onClick={() => setPage((value) => Math.max(1, value - 1))}>
             Anterior
           </button>
           <span className="text-sm">
-            {currentPage}/{totalPages} · {filtered.length} envios
+            {currentPage}/{totalPages} - {filtered.length} envios
           </span>
-          <button type="button" disabled={!canGoForward} onClick={() => setPage((p) => p + 1)}>
+          <button type="button" disabled={!canGoForward} onClick={() => setPage((value) => value + 1)}>
             Siguiente
           </button>
         </div>
       )}
 
-      {selectedShipment && <FlightListModal shipment={selectedShipment} onClose={() => setSelectedShipment(null)} />}
+      {selectedShipment && (
+        <FlightListModal
+          shipment={selectedShipment}
+          flights={flights}
+          data={data}
+          onClose={() => setSelectedShipment(null)}
+          onSelectFlight={onSelectFlight}
+        />
+      )}
     </div>
   );
 }

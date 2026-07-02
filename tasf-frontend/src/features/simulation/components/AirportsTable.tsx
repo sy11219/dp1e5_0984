@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Airport, AirportLoads, Flight, Shipment } from "../types";
 import { STATUS_COLOR } from "../utils/constants";
 import { capacityStatus } from "../utils/calculations";
-import { getFlightsForAirport, getNextFlightForAirport, getShipmentsForAirport } from "../utils/airportRelations";
+import { getShipmentsForAirport, getFlightsForAirport, getNextFlightByAirport } from "../utils/airportRelations";
 import { AirportDataTable } from "./AirportDataTable";
 
 interface AirportsTableProps {
@@ -45,6 +45,18 @@ export function AirportsTable({
 
   const [sortBy, setSortBy] = useState<"utilization" | "nextFlight">("utilization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const nextFlightByAirport = useMemo(
+    () => sortBy === "nextFlight" ? getNextFlightByAirport(flights, simMinute) : new Map(),
+    [flights, simMinute, sortBy]
+  );
+  const expandedFlights = useMemo(
+    () => expandedAirportCode ? getFlightsForAirport(flights, expandedAirportCode, simMinute) : [],
+    [expandedAirportCode, flights, simMinute]
+  );
+  const expandedShipments = useMemo(
+    () => expandedAirportCode ? getShipmentsForAirport(shipments, flights, expandedAirportCode) : [],
+    [expandedAirportCode, flights, shipments]
+  );
 
   const filtered = useMemo(() => {
     let result = [...airports];
@@ -72,8 +84,8 @@ export function AirportsTable({
       }
 
       if (sortBy === "nextFlight") {
-        const aNext = getNextFlightForAirport(flights, a.code, simMinute);
-        const bNext = getNextFlightForAirport(flights, b.code, simMinute);
+        const aNext = nextFlightByAirport.get(a.code);
+        const bNext = nextFlightByAirport.get(b.code);
         const aTime = aNext?.time ?? Infinity;
         const bTime = bNext?.time ?? Infinity;
         return (aTime - bTime) * direction;
@@ -83,7 +95,7 @@ export function AirportsTable({
     });
 
     return result;
-  }, [airports, continentFilter, flights, loads, search, simMinute, sortBy, sortOrder]);
+  }, [search, continentFilter, airports, loads, sortBy, sortOrder, nextFlightByAirport]);
 
   const visible = filtered.slice(0, 10);
 
@@ -140,8 +152,8 @@ export function AirportsTable({
 
           <AirportDataTable
             viewType={expandedView}
-            flights={getFlightsForAirport(flights, expandedAirportCode, simMinute)}
-            shipments={getShipmentsForAirport(shipments, flights, expandedAirportCode)}
+            flights={expandedFlights}
+            shipments={expandedShipments}
             airportCode={expandedAirportCode}
             displayGmtOffset={displayGmtOffset}
           />
@@ -180,7 +192,7 @@ export function AirportsTable({
               Ordenar por:
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "utilization")}
+                onChange={(e) => setSortBy(e.target.value as "utilization" | "nextFlight")}
               >
                 <option value="utilization">Ocupacion</option>
                 <option value="nextFlight">Proximo vuelo</option>

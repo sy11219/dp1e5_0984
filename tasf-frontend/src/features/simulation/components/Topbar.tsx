@@ -18,7 +18,7 @@ interface StatusItemProps {
   sub?: string;
 }
 
-function StatusItem({ label, value, sub }: StatusItemProps) {
+export function StatusItem({ label, value, sub }: StatusItemProps) {
   return (
     <div className="status-item">
       <span>{label}</span>
@@ -85,5 +85,48 @@ export function Topbar({
         />
       </div>
     </header>
+  );
+}
+
+export function SimulationStatusCards({
+  data,
+  simMinute,
+  durationMs,
+  displayGmtOffset,
+  displayAirportLabel,
+}: Pick<TopbarProps, "data" | "simMinute" | "durationMs" | "displayGmtOffset" | "displayAirportLabel">) {
+  const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
+  const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
+  const simulatedDayLabel = data
+    ? `Dia ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
+    : "--";
+
+  return (
+    <>
+      <div className="status-strip map-status-strip map-status-strip-top-left">
+        <StatusItem
+          label="Fecha y Hora de Inicio"
+          value={formatDateTime(data?.simulationStartDateTime, displayGmtOffset)}
+          sub={displayAirportLabel || (data ? "inicio programado" : "--")}
+        />
+        <StatusItem
+          label="Fecha y Hora en Simulacion"
+          value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
+          sub={simulatedDayLabel}
+        />
+      </div>
+      <div className="status-strip map-status-strip map-status-strip-bottom-right">
+        <StatusItem
+          label="Duracion de la simulacion"
+          value={data ? formatRealTime(simulationDurationMs) : "--"}
+          sub="ejecucion real"
+        />
+        <StatusItem
+          label="Tiempo transcurrido en simulacion"
+          value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
+          sub="avance acumulado"
+        />
+      </div>
+    </>
   );
 }

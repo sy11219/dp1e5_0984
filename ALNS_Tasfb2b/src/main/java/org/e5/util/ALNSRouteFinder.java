@@ -31,6 +31,8 @@ public class ALNSRouteFinder {
             "TASF_ROUTE_MAX_FLIGHTS_PER_LEG", 180);
     private static final int MAX_FRACTIONAL_FIRST_FLIGHTS = readPositiveInt(
             "TASF_ROUTE_MAX_FRACTIONAL_FIRST_FLIGHTS", 80);
+    private static final int FRACTIONAL_CANDIDATE_ROUTES = readPositiveInt(
+            "TASF_ROUTE_FRACTIONAL_CANDIDATE_ROUTES", 8);
 
     private final Map<String, Airport> airportMap;
     private final int maxEscalas;
@@ -77,52 +79,22 @@ public class ALNSRouteFinder {
         int pending = shipment.getSuitcaseCount();
         if (pending <= 0) return result;
 
-        int maxArrival = shipment.getRequestMinute() + getDeadlineMinutes(shipment);
-        List<Flight> candidates = candidateFlightsFrom(
-                indexFlightsByOrigin(flights).getOrDefault(shipment.getOriginCode(), Collections.emptyList()),
-                shipment.getRequestMinute(),
-                maxArrival
-        );
-
         int partIndex = 1;
-        int evaluatedFirstFlights = 0;
-        for (Flight firstFlight : candidates) {
+        for (Route candidate : findCandidateRoutesCached(shipment, flights, FRACTIONAL_CANDIDATE_ROUTES)) {
             if (pending <= 0) break;
-            if (++evaluatedFirstFlights > MAX_FRACTIONAL_FIRST_FLIGHTS) break;
-            if (firstFlight.availableSpace() <= 0) continue;
 
-            int bags = Math.min(pending, firstFlight.availableSpace());
+            int bags = maxReservableBags(candidate, pending);
             if (bags <= 0) continue;
 
             String partId = shipment.getShipmentId() + "_p" + partIndex;
-            Route route;
-            if (firstFlight.getDestCode().equals(shipment.getDestCode())) {
-                route = new Route(
-                        partId,
-                        shipment.getOriginCode(),
-                        shipment.getDestCode(),
-                        List.of(firstFlight),
-                        bags,
-                        shipment.getRequestMinute()
-                );
-            } else {
-                Shipment partShipment = new Shipment(
-                        partId,
-                        shipment.getOriginCode(),
-                        shipment.getDestCode(),
-                        shipment.getRequestMinute(),
-                        bags,
-                        shipment.getClientId(),
-                        shipment.getRawDate(),
-                        shipment.getRawHour(),
-                        shipment.getRawMinuteStr(),
-                        shipment.getShipmentId(),
-                        partIndex,
-                        0,
-                        shipment.getSuitcaseCount()
-                );
-                route = findBestRouteCached(partShipment, flights);
-            }
+            Route route = new Route(
+                    partId,
+                    shipment.getOriginCode(),
+                    shipment.getDestCode(),
+                    candidate.getFlights(),
+                    bags,
+                    shipment.getRequestMinute()
+            );
 
             if (route != null && route.isValid() && esFeasible(route, bags)) {
                 reserve(route, bags);
@@ -132,7 +104,36 @@ public class ALNSRouteFinder {
             }
         }
 
+        if (pending > 0) {
+            for (PartialRoute partial : result) {
+                release(partial.ruta, partial.maletas);
+            }
+            return Collections.emptyList();
+        }
+
         return result;
+    }
+
+    private int maxReservableBags(Route route, int pending) {
+        if (route == null || !route.isValid() || pending <= 0) return 0;
+        int maxByFlights = pending;
+        for (Flight flight : route.getFlights()) {
+            maxByFlights = Math.min(maxByFlights, flight.availableSpace());
+            if (maxByFlights <= 0) return 0;
+        }
+        if (airportCapacityTimeline == null) return maxByFlights;
+
+        int low = 0;
+        int high = maxByFlights;
+        while (low < high) {
+            int mid = (low + high + 1) >>> 1;
+            if (airportCapacityTimeline.canReserve(route, mid)) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return low;
     }
 
     public List<Route> findCandidateRoutes(Shipment shipment, List<Flight> flights, int maxCandidates) {
@@ -311,6 +312,20 @@ public class ALNSRouteFinder {
         for (int i = 0; i < routeFlights.size() - 1; i++) {
             Airport airport = airportMap.get(routeFlights.get(i).getDestCode());
             if (airport != null) airport.addLoad(bags);
+        }
+    }
+
+    private void release(Route route, int bags) {
+        for (Flight flight : route.getFlights()) {
+            flight.releaseLoad(bags);
+        }
+        if (airportCapacityTimeline != null) {
+            airportCapacityTimeline.release(route, bags);
+        }
+        List<Flight> routeFlights = route.getFlights();
+        for (int i = 0; i < routeFlights.size() - 1; i++) {
+            Airport airport = airportMap.get(routeFlights.get(i).getDestCode());
+            if (airport != null) airport.removeLoad(bags);
         }
     }
 

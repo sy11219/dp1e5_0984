@@ -3,6 +3,7 @@ import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "
 import {
   cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
+  pauseRealtimeSessionRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
@@ -12,15 +13,14 @@ import { CapacityLegend } from "../../simulation/components/CapacityLegend";
 import { FlightsTable } from "../../simulation/components/FlightsTable";
 import { GlobalIndicators } from "../../simulation/components/GlobalIndicators";
 import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
+import { SimulationResultModal } from "../../simulation/components/SimulationResultModal";
 import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
-import type { AirportLoads, SimulationData } from "../../simulation/types";
+import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import {
   formatClock,
   formatDateOnly,
-  formatFlightMoment,
-  formatTimeOnly,
   percent,
 } from "../../simulation/utils/formatters";
 import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
@@ -28,95 +28,12 @@ import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTi
 const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
 const REALTIME_STATUS_POLL_MS = 5_000;
 
-function formatOperationalMinute(value: number) {
-  const minute = Math.max(0, Math.floor(value));
-  const day = Math.floor(minute / 1440);
-  const dayMinute = minute % 1440;
-  const hour = Math.floor(dayMinute / 60);
-  const min = dayMinute % 60;
-  const time = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
-  return day > 0 ? `Dia ${day} ${time}` : time;
-}
-
-function StatusItem({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
-  return (
-    <div className="status-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {sub && <small>{sub}</small>}
-    </div>
-  );
-}
-
-function OperationsTopbar({
-  data,
-  operationalMinute,
-  displayGmtOffset,
-  displayAirportLabel,
-}: {
-  data: SimulationData | null;
-  operationalMinute: number;
-  displayGmtOffset?: number;
-  displayAirportLabel?: string;
-}) {
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <strong>TASF.B2B - Tiempo real</strong>
-        <span>Tiempo real</span>
-      </div>
-      <div className="status-strip">
-        <StatusItem
-          label="Minuto operativo"
-          value={formatOperationalMinute(operationalMinute)}
-          sub={
-            data
-              ? formatFlightMoment(data, operationalMinute, displayGmtOffset)
-              : "avanza con el reloj real"
-          }
-        />
-        <StatusItem
-          label="Estado"
-          value={data?.status === "COMPLETED" ? "Cerrada" : data ? "En vivo" : "--"}
-          sub={data?.scenario || "--"}
-        />
-        <StatusItem
-          label="Ultima lectura"
-          value={data ? formatTimeOnly(data.realFinishedAt, displayGmtOffset) : "--"}
-          sub={
-            data
-              ? `${formatDateOnly(data.realFinishedAt, displayGmtOffset)}${
-                  displayAirportLabel ? ` - ${displayAirportLabel}` : ""
-                }`
-              : "--"
-          }
-        />
-        <StatusItem
-          label="Pedidos procesados"
-          value={String(data?.metrics.plannedShipments || 0)}
-          sub={`de ${data?.metrics.shipments || 0}`}
-        />
-        <StatusItem
-          label="Cola pendiente"
-          value={String(data?.metrics.queuedShipments || 0)}
-          sub="pedidos esperando ruta"
-        />
-        <StatusItem
-          label="Vuelos usados"
-          value={String(data?.metrics.usedFlights || 0)}
-          sub="con carga asignada"
-        />
-      </div>
-    </header>
-  );
+function elapsedOperationTimeMs(data: SimulationData | null) {
+  if (!data?.realStartedAt) return 0;
+  const startedAt = Date.parse(data.realStartedAt);
+  if (!Number.isFinite(startedAt)) return 0;
+  const finishedAt = data.realFinishedAt ? Date.parse(data.realFinishedAt) : Number.NaN;
+  return Math.max(0, (Number.isFinite(finishedAt) ? finishedAt : Date.now()) - startedAt);
 }
 
 function LiveMetrics({
@@ -181,13 +98,19 @@ export const OperationsPage = () => {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
     () => initialMapFocus?.type === "flight" ? initialMapFocus.id : null
   );
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
+  const [operationDayToggling, setOperationDayToggling] = useState(false);
+  const [operationSummaryOpen, setOperationSummaryOpen] = useState(false);
+  const [operationSummaryData, setOperationSummaryData] = useState<SimulationData | null>(null);
+  const [operationSummaryRealTimeMs, setOperationSummaryRealTimeMs] = useState(0);
   const [now, setNow] = useState(new Date());
   const focusTokenRef = useRef(0);
   const refreshingRef = useRef(false);
+  const selectedShipmentId = selectedShipment?.id ?? null;
 
   const operationalMinute = useMemo(() => {
     if (!data) return 0;
@@ -216,6 +139,7 @@ export const OperationsPage = () => {
     if (stored?.type === "airport" && payload.airports.some((airport) => airport.code === stored.id)) {
       setSelectedAirport(stored.id);
       setSelectedFlightId(null);
+      setSelectedShipment(null);
       setMapFocusTarget({ type: "airport", id: stored.id, token: ++focusTokenRef.current });
       return;
     }
@@ -223,6 +147,7 @@ export const OperationsPage = () => {
     if (stored?.type === "flight" && payload.flights.some((flight) => flight.id === stored.id)) {
       setSelectedAirport(null);
       setSelectedFlightId(stored.id);
+      setSelectedShipment(null);
       setMapFocusTarget({ type: "flight", id: stored.id, token: ++focusTokenRef.current });
       return;
     }
@@ -230,6 +155,7 @@ export const OperationsPage = () => {
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedShipment(null);
     setMapFocusTarget(null);
   }, []);
 
@@ -270,7 +196,7 @@ export const OperationsPage = () => {
   }, [restoreMapFocus]);
 
   useEffect(() => {
-    if (!data?.simulationId || data.status === "COMPLETED") return;
+    if (!data?.simulationId || data.status === "COMPLETED" || data.status === "PAUSED") return;
 
     let cancelled = false;
 
@@ -289,6 +215,9 @@ export const OperationsPage = () => {
             setSelectedFlightId(null);
             writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
           }
+          if (selectedShipmentId && !payload.shipments.some((shipment) => shipment.id === selectedShipmentId)) {
+            setSelectedShipment(null);
+          }
         })
         .catch((err) => {
           if (!cancelled) {
@@ -306,7 +235,7 @@ export const OperationsPage = () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId]);
+  }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId, selectedShipmentId]);
 
   const airportLoads = useMemo<AirportLoads>(() => {
     return computeAirportLoads(data, operationalMinute);
@@ -332,13 +261,12 @@ export const OperationsPage = () => {
   );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
   const displayGmtOffset = assignedAirportTime?.gmtOffset;
-  const displayAirportLabel = assignedAirportTime
-    ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
-    : undefined;
+  const operationsClosed = data?.status === "PAUSED";
 
   const clearMapSelection = useCallback(() => {
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedShipment(null);
     setMapFocusTarget(null);
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
   }, []);
@@ -351,6 +279,7 @@ export const OperationsPage = () => {
 
     setSelectedAirport(code);
     setSelectedFlightId(null);
+    setSelectedShipment(null);
     setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current });
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "airport", id: code });
   };
@@ -363,8 +292,61 @@ export const OperationsPage = () => {
 
     setSelectedAirport(null);
     setSelectedFlightId(id);
+    setSelectedShipment(null);
     setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current });
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "flight", id });
+  };
+
+  const focusShipment = (shipment: Shipment) => {
+    if (selectedShipment?.id === shipment.id) {
+      clearMapSelection();
+      return;
+    }
+
+    setSelectedAirport(null);
+    setSelectedFlightId(null);
+    setSelectedShipment(shipment);
+    setMapFocusTarget({ type: "shipment", id: shipment.id, token: ++focusTokenRef.current });
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
+  };
+
+  const toggleOperationDay = async () => {
+    if (!data?.simulationId || operationDayToggling) return;
+
+    const closingOperations = !operationsClosed;
+    setOperationDayToggling(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await pauseRealtimeSessionRequest(data.simulationId, !operationsClosed);
+      setData(updated);
+      if (closingOperations) {
+        setOperationSummaryData(updated);
+        setOperationSummaryRealTimeMs(updated.runtimeMs ?? elapsedOperationTimeMs(updated));
+        setOperationSummaryOpen(true);
+      } else {
+        setOperationSummaryOpen(false);
+        setOperationSummaryData(null);
+        setOperationSummaryRealTimeMs(0);
+      }
+      setNotice(
+        operationsClosed
+          ? "Operaciones del dia abiertas. La planificacion vuelve a ejecutarse."
+          : "Operaciones del dia finalizadas. La planificacion queda detenida."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar el estado de operaciones.");
+    } finally {
+      setOperationDayToggling(false);
+    }
+  };
+
+  const handleOperationSummaryOpenChange = (open: boolean) => {
+    setOperationSummaryOpen(open);
+    if (!open) {
+      setOperationSummaryData(null);
+      setOperationSummaryRealTimeMs(0);
+    }
   };
 
   const cancelFlight = async () => {
@@ -387,12 +369,6 @@ export const OperationsPage = () => {
   return (
     <div className="app-shell">
       <Navbar />
-      <OperationsTopbar
-        data={data}
-        operationalMinute={operationalMinute}
-        displayGmtOffset={displayGmtOffset}
-        displayAirportLabel={displayAirportLabel}
-      />
 
       <main
         className={[
@@ -464,6 +440,21 @@ export const OperationsPage = () => {
               <div className="empty-state">Esperando datos de tiempo real.</div>
             )}
           </section>
+
+          <section className="panel section operations-day-actions">
+            <button
+              type="button"
+              className={operationsClosed ? "primary" : "danger"}
+              onClick={toggleOperationDay}
+              disabled={!data?.simulationId || operationDayToggling}
+            >
+              {operationDayToggling
+                ? "Actualizando..."
+                : operationsClosed
+                  ? "Abrir operaciones del dia"
+                  : "Finalizar operaciones del dia"}
+            </button>
+          </section>
         </aside>
         ) : (
         <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
@@ -486,6 +477,7 @@ export const OperationsPage = () => {
             airportLoads={airportLoads}
             selectedAirport={selectedAirport}
             selectedFlightId={selectedFlightId}
+            selectedShipment={selectedShipment}
             focusTarget={mapFocusTarget}
             displayGmtOffset={displayGmtOffset}
             onSelectAirport={focusAirport}
@@ -566,8 +558,13 @@ export const OperationsPage = () => {
             </div>
             <ShipmentsTable
               shipments={visibleShipments}
+              flights={data?.flights || []}
+              data={data}
               simMinute={operationalMinute}
               displayGmtOffset={displayGmtOffset}
+              selectedShipmentId={selectedShipmentId}
+              onSelectShipment={focusShipment}
+              onSelectFlight={focusFlight}
             />
           </section>
 
@@ -603,6 +600,17 @@ export const OperationsPage = () => {
         </aside>
         )}
       </main>
+      <SimulationResultModal
+        open={operationSummaryOpen}
+        onOpenChange={handleOperationSummaryOpenChange}
+        data={operationSummaryData}
+        realTimeMs={operationSummaryRealTimeMs}
+        title="Resumen de operaciones del dia"
+        description=""
+        footerLabel="Cerrar"
+        closeOnOutside={false}
+        showHeaderClose={false}
+      />
     </div>
   );
 };

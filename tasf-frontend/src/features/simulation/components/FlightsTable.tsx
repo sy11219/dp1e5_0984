@@ -51,6 +51,16 @@ export function FlightsTable({
       .sort((a, b) => a.requestMinute - b.requestMinute);
   }, [shipments, selectedFlightShipments, simMinute]);
 
+  const relatedShipmentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const shipment of shipments) {
+      for (const flightId of shipment.flightIds) {
+        counts.set(flightId, (counts.get(flightId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [shipments]);
+
   const filteredAndSortedFlights = useMemo(() => {
     let result = [...flights];
 
@@ -97,7 +107,15 @@ export function FlightsTable({
     return result;
   }, [flights, search, originFilter, destinationFilter, statusFilter, sortBy, sortOrder, activeFlightIds]);
 
-  const visibleFlights = filteredAndSortedFlights.slice(0, 10);
+  const visibleFlights = useMemo(() => {
+    const base = filteredAndSortedFlights.slice(0, 10);
+    if (!selectedFlightId || base.some((flight) => flight.id === selectedFlightId)) {
+      return base;
+    }
+
+    const selected = flights.find((flight) => flight.id === selectedFlightId);
+    return selected ? [selected, ...base.slice(0, 9)] : base;
+  }, [filteredAndSortedFlights, flights, selectedFlightId]);
   const gmtOffset = displayGmtOffset ?? 0;
 
   if (viewMode === "flight-shipments" && selectedFlightShipments) {
@@ -212,6 +230,7 @@ export function FlightsTable({
         ) : (
           visibleFlights.map((flight) => {
             const active = activeFlightIds.has(flight.id);
+            const relatedCount = relatedShipmentCounts.get(flight.id) ?? 0;
 
             return (
               <div
@@ -244,8 +263,11 @@ export function FlightsTable({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {active ? `${Math.round(flight.utilization * 100)}%` : "Inactivo"}
-                  {active && (
+                  {active
+                    ? `${Math.round(flight.utilization * 100)}%`
+                    : "Inactivo"
+                  }
+                  {relatedCount > 0 && (
                     <button
                       type="button"
                       aria-label={`Ver envios del vuelo ${flight.id}`}

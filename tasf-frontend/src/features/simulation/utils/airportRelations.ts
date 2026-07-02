@@ -95,12 +95,48 @@ export function getFlightsForAirport(
 }
 
 
+export function getNextFlightByAirport(
+  flights: Flight[],
+  simMinute: number
+): Map<string, AirportFlight> {
+  const nextByAirport = new Map<string, AirportFlight>();
+
+  const setIfEarlier = (airportCode: string, nextFlight: AirportFlight) => {
+    const current = nextByAirport.get(airportCode);
+    if (!current || nextFlight.time < current.time) {
+      nextByAirport.set(airportCode, nextFlight);
+    }
+  };
+
+  for (const flight of flights) {
+    if (flight.absoluteArrivalMinute > simMinute) {
+      setIfEarlier(flight.destination, {
+        flight,
+        direction: "incoming",
+        counterpart: flight.origin,
+        load: flight.assignedLoad,
+        time: flight.absoluteArrivalMinute,
+      });
+    }
+
+    if (flight.absoluteDepartureMinute > simMinute) {
+      setIfEarlier(flight.origin, {
+        flight,
+        direction: "outgoing",
+        counterpart: flight.destination,
+        load: flight.assignedLoad,
+        time: flight.absoluteDepartureMinute,
+      });
+    }
+  }
+
+  return nextByAirport;
+}
+
 export function getNextFlightForAirport(
   flights: Flight[],
   airportCode: string,
   simMinute: number
 ): AirportFlight | null {
-  const allFlights = getFlightsForAirport(flights, airportCode, simMinute);
-  return allFlights.length > 0 ? allFlights[0] : null;
+  return getNextFlightByAirport(flights, simMinute).get(airportCode) ?? null;
 }
-

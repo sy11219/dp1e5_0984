@@ -395,7 +395,9 @@ public class SimulatorServer {
                     readRequiredInt(BAGGAGE_COUNT, body, "baggageCount"),
                     readRequiredString(SHIPMENT_ID, body, "shipmentId")
             );
-            send(exchange, 201, "application/json", shipmentService.createShipment(request));
+            String response = shipmentService.createShipment(request);
+            realtimeSimulationService.syncRegisteredShipmentsFromDatabase();
+            send(exchange, 201, "application/json", response);
         } catch (IllegalArgumentException e) {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {
@@ -443,6 +445,18 @@ public class SimulatorServer {
                 int steps = readInt(STEPS, body, 1);
                 int expectedTick = readInt(EXPECTED_TICK, body, -1);
                 send(exchange, 200, "application/json", realtimeSimulationService.advance(tickMatcher.group(1), steps, expectedTick));
+                return;
+            }
+
+            Matcher pauseMatcher = Pattern.compile("^/api/realtime/([^/]+)/pause$").matcher(path);
+            if (pauseMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                Boolean paused = readBoolean(PAUSED, body);
+                if (paused == null) {
+                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    return;
+                }
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.pauseRealtime(pauseMatcher.group(1), paused));
                 return;
             }
 

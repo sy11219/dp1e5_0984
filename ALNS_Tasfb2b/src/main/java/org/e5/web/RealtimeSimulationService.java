@@ -72,6 +72,17 @@ public class RealtimeSimulationService {
             "TASF_BATCH_ALNS_DESTROY_CAP", 30);
     private static final int BATCH_ALNS_MAX_ESCALAS = readPositiveInt(
             "TASF_BATCH_ALNS_MAX_ESCALAS", 2);
+    private static final long BATCH_ALNS_TIME_BUDGET_MS = readPositiveLong(
+            "TASF_BATCH_ALNS_TIME_BUDGET_MS",
+            Math.max(10_000L, Math.round(BATCH_INTERVAL_MS * 0.75)));
+    private static final int BATCH_BACKLOG_MAX_SHIPMENTS = readPositiveInt(
+            "TASF_BATCH_BACKLOG_MAX_SHIPMENTS", 1_500);
+    private static final int BATCH_BACKLOG_MAX_BAGS = readPositiveInt(
+            "TASF_BATCH_BACKLOG_MAX_BAGS", 4_500);
+    private static final int BATCH_PREVENTIVE_LOAD_THRESHOLD_PERCENT = readPositiveInt(
+            "TASF_BATCH_PREVENTIVE_LOAD_THRESHOLD_PERCENT", 75);
+    private static final int BATCH_PREVENTIVE_TOP_AIRPORTS = readPositiveInt(
+            "TASF_BATCH_PREVENTIVE_TOP_AIRPORTS", 6);
     private static final boolean BATCH_CANCEL_GLOBAL_REOPT = readBoolean(
             "TASF_BATCH_CANCEL_GLOBAL_REOPT", false);
     private static final int MAX_DELIVERY_DEADLINE_MINUTES = 2880;
@@ -190,6 +201,15 @@ public class RealtimeSimulationService {
         return current == null ? "{}" : current.snapshotJsonForRead();
     }
 
+    public synchronized String pauseRealtime(String id, boolean paused) {
+        RealtimeSession session = require(id);
+        if (!"TIEMPO_REAL".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es una operacion de tiempo real.");
+        }
+        session.setPaused(paused);
+        return session.snapshotJson();
+    }
+
     private void advanceSharedSessionsIfDue() {
         advanceSharedRealtimeIfDue();
         advanceSharedBatchIfDue();
@@ -198,7 +218,7 @@ public class RealtimeSimulationService {
     private void advanceSharedRealtimeIfDue() {
         try {
             RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
-            if (current == null || current.completed) return;
+            if (current == null || current.completed || current.paused) return;
             current.advanceRealtimeIfDue();
         } catch (Exception e) {
             System.err.printf("[Tiempo real] Error en scheduler: %s%n", e.getMessage());
@@ -212,6 +232,13 @@ public class RealtimeSimulationService {
             current.advanceBatchIfDue();
         } catch (Exception e) {
             System.err.printf("[Lote] Error en scheduler: %s%n", e.getMessage());
+        }
+    }
+
+    public void syncRegisteredShipmentsFromDatabase() {
+        RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        if (current != null && !current.completed) {
+            current.syncRegisteredShipmentsFromDatabase();
         }
     }
 
@@ -423,6 +450,9 @@ public class RealtimeSimulationService {
                 airports, airportMap, flights, shipments, ownerClientId);
         sessions.put(session.id, session);
         lastCreatedSessionId = session.id;
+        if ("TIEMPO_REAL".equals(scenario)) {
+            session.syncRegisteredShipmentsFromDatabase();
+        }
         return session.snapshotJson();
     }
 
@@ -482,6 +512,7 @@ public class RealtimeSimulationService {
         final List<Airport> airports;
         final Map<String, Airport> airportMap;
         final List<Flight> flights;
+        final Map<String, Flight> flightById;
         final List<Shipment> shipments;
 
         // Índice por minuto para acceso O(1)
@@ -497,6 +528,10 @@ public class RealtimeSimulationService {
         final Set<String> pendingCancellations = new HashSet<>();
         final Set<String> cancellations = new HashSet<>();
         final List<CancellationRequest> queuedCancellationRequests = new ArrayList<>();
+        final List<Shipment> batchPlanningBacklog = new ArrayList<>();
+        final Set<String> batchPlanningBacklogIds = new HashSet<>();
+        final Set<String> batchProcessedShipmentIds = new HashSet<>();
+        final Set<String> batchCreatedEventShipmentIds = new HashSet<>();
 
         final long realStartedAtMs = System.currentTimeMillis();
         int tick;
@@ -509,6 +544,7 @@ public class RealtimeSimulationService {
         int lastBatchEnd = -1;
         int batchCount = 0;
         long lastBatchRuntimeMs = 0;
+        long realFinishedAtMs = 0;
         boolean paused = false;
         long lastRealtimeAdvanceMs = 0;
         long lastRealtimeExecutionMs = 0;
@@ -540,6 +576,10 @@ public class RealtimeSimulationService {
             this.airports   = airports;
             this.airportMap = airportMap;
             this.flights    = flights;
+            this.flightById = new HashMap<>();
+            for (Flight flight : flights) {
+                this.flightById.putIfAbsent(flight.getFlightId(), flight);
+            }
             this.shipments  = shipments;
             for (Shipment s : shipments) {
                 knownShipmentIds.add(s.getShipmentId());
@@ -599,6 +639,105 @@ public class RealtimeSimulationService {
                     && lastBatchRuntimeMs >= Math.round(planningIntervalMs() * 0.80);
         }
 
+        private Map<String, Double> calcularPrioridadPreventivaOrigen(
+                List<Shipment> nuevosShipments,
+                List<Shipment> backlogDisponible,
+                int batchStart) {
+            Map<String, Integer> cargaActual = calcularCargaAeropuertosHasta(batchStart);
+            Map<String, Integer> maletasNuevas = sumarMaletasPorOrigen(nuevosShipments);
+            Map<String, Integer> maletasBacklog = sumarMaletasPorOrigen(backlogDisponible);
+            double umbral = Math.min(0.95,
+                    Math.max(0.50, BATCH_PREVENTIVE_LOAD_THRESHOLD_PERCENT / 100.0));
+
+            List<Map.Entry<String, Double>> prioridades = new ArrayList<>();
+            for (Airport airport : airports) {
+                int capacidad = Math.max(1, airport.getMaxCapacity());
+                int proyectado = cargaActual.getOrDefault(airport.getCode(), 0)
+                        + maletasNuevas.getOrDefault(airport.getCode(), 0);
+                double utilizacionProyectada = proyectado / (double) capacidad;
+                double presion = Math.max(0.0, (utilizacionProyectada - umbral) / (1.0 - umbral));
+                double backlogRatio = maletasBacklog.getOrDefault(airport.getCode(), 0) / (double) capacidad;
+                double prioridad = Math.min(4.0, presion + Math.min(1.5, backlogRatio));
+                if (prioridad > 0.0) {
+                    prioridades.add(Map.entry(airport.getCode(), prioridad));
+                }
+            }
+
+            prioridades.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+            Map<String, Double> resultado = new HashMap<>();
+            int limite = Math.min(BATCH_PREVENTIVE_TOP_AIRPORTS, prioridades.size());
+            for (int i = 0; i < limite; i++) {
+                resultado.put(prioridades.get(i).getKey(), prioridades.get(i).getValue());
+            }
+            return resultado;
+        }
+
+        private List<Shipment> seleccionarBacklogPreventivo(
+                List<Shipment> backlogDisponible,
+                int batchStart,
+                Map<String, Double> prioridadOrigen) {
+            if (backlogDisponible.isEmpty()) return Collections.emptyList();
+
+            List<Shipment> ordenados = new ArrayList<>(backlogDisponible);
+            ordenados.sort(Comparator
+                    .comparingDouble((Shipment s) ->
+                            -prioridadOrigen.getOrDefault(s.getOriginCode(), 0.0))
+                    .thenComparingInt(s -> tiempoRestanteSla(s, batchStart))
+                    .thenComparing(Comparator.comparingInt(Shipment::getSuitcaseCount))
+                    .thenComparingInt(Shipment::getRequestMinute));
+
+            List<Shipment> seleccionados = new ArrayList<>();
+            int maletas = 0;
+            for (Shipment shipment : ordenados) {
+                if (seleccionados.size() >= BATCH_BACKLOG_MAX_SHIPMENTS) break;
+                if (!seleccionados.isEmpty()
+                        && maletas + shipment.getSuitcaseCount() > BATCH_BACKLOG_MAX_BAGS) {
+                    break;
+                }
+                seleccionados.add(shipment);
+                maletas += Math.max(0, shipment.getSuitcaseCount());
+            }
+            return seleccionados;
+        }
+
+        private Map<String, Integer> calcularCargaAeropuertosHasta(int minute) {
+            Map<String, Integer> cargas = new HashMap<>();
+            for (RealtimeEvent event : events) {
+                if (event.minute() > minute) continue;
+                if (!airportMap.containsKey(event.airport())) continue;
+                cargas.merge(event.airport(), event.delta(), Integer::sum);
+            }
+            cargas.replaceAll((ignored, value) -> Math.max(0, value));
+            return cargas;
+        }
+
+        private Map<String, Integer> sumarMaletasPorOrigen(Collection<Shipment> source) {
+            Map<String, Integer> result = new HashMap<>();
+            for (Shipment shipment : source) {
+                if (shipment.isSplitPart()) continue;
+                result.merge(shipment.getOriginCode(),
+                        Math.max(0, shipment.getSuitcaseCount()),
+                        Integer::sum);
+            }
+            return result;
+        }
+
+        private int tiempoRestanteSla(Shipment shipment, int batchStart) {
+            Airport origin = airportMap.get(shipment.getOriginCode());
+            Airport destination = airportMap.get(shipment.getDestCode());
+            int deadline = Shipment.getDeadlineMinutes(
+                    origin != null ? origin.getContinent() : "",
+                    destination != null ? destination.getContinent() : "");
+            return shipment.getRequestMinute() + deadline - batchStart;
+        }
+
+        private void reencolarBacklogBatch(Shipment shipment) {
+            if (shipment == null) return;
+            if (batchPlanningBacklogIds.add(shipment.getShipmentId())) {
+                batchPlanningBacklog.add(shipment);
+            }
+        }
+
         private int currentVisualTick(long nowMs) {
             if (visualWindowEndTick <= visualWindowStartTick) return visualWindowEndTick;
             long elapsed = Math.max(0L, nowMs - visualWindowStartedAtMs);
@@ -608,7 +747,7 @@ public class RealtimeSimulationService {
         }
 
         synchronized void setPaused(boolean nextPaused) {
-            if (!isBatchScenario() || completed || paused == nextPaused) return;
+            if (completed || paused == nextPaused) return;
             long now = System.currentTimeMillis();
             int visualTick = Math.min(tick, currentVisualTick(now));
             if (nextPaused) {
@@ -632,7 +771,6 @@ public class RealtimeSimulationService {
         }
 
         // ── SIMULACION_LOTES: avance de un lote completo ─────────────────────
-
         /**
          * Avanza un lote de {@code steps} minutos simulados.
          *
@@ -645,6 +783,10 @@ public class RealtimeSimulationService {
          *   6. Devuelve Ta y marca el inicio real para que el frontend respete Sa.
          *      El frontend compara visualStartedAt + Sa para pedir el siguiente lote.
          */
+        synchronized void syncRegisteredShipmentsFromDatabase() {
+            refreshRealtimeShipmentsFromDatabase();
+        }
+
         synchronized void advanceBatch(int steps) {
             if (completed || paused) return;
 
@@ -658,11 +800,30 @@ public class RealtimeSimulationService {
             applyQueuedCancellationRequests();
 
             // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
-            List<Shipment> loteShipments = new ArrayList<>();
+            List<Shipment> nuevosShipments = new ArrayList<>();
             for (int min = batchStart; min < batchEnd; min++) {
                 List<Shipment> en = shipmentsByMinute.getOrDefault(min, Collections.emptyList());
-                loteShipments.addAll(en);
+                nuevosShipments.addAll(en);
             }
+            List<Shipment> backlogDisponible = new ArrayList<>(batchPlanningBacklog);
+            int backlogEntrante = backlogDisponible.size();
+            Map<String, Double> prioridadOrigen =
+                    calcularPrioridadPreventivaOrigen(nuevosShipments, backlogDisponible, batchStart);
+            List<Shipment> backlogSeleccionado =
+                    seleccionarBacklogPreventivo(backlogDisponible, batchStart, prioridadOrigen);
+            batchPlanningBacklog.clear();
+            batchPlanningBacklogIds.clear();
+            Set<String> backlogSeleccionadoIds = new HashSet<>();
+            for (Shipment shipment : backlogSeleccionado) {
+                backlogSeleccionadoIds.add(shipment.getShipmentId());
+            }
+            for (Shipment shipment : backlogDisponible) {
+                if (!backlogSeleccionadoIds.contains(shipment.getShipmentId())) {
+                    reencolarBacklogBatch(shipment);
+                }
+            }
+            List<Shipment> loteShipments = new ArrayList<>(backlogSeleccionado);
+            loteShipments.addAll(nuevosShipments);
 
             // 2. Vuelos disponibles: no cancelados y que aún no han despegado
             int routeSearchHorizon = Math.min(planningMaxTick, batchEnd + MAX_DELIVERY_DEADLINE_MINUTES);
@@ -670,6 +831,9 @@ public class RealtimeSimulationService {
 
             System.out.printf("[Lote] Ventana %d–%d | %d envíos | %d vuelos disponibles%n",
                     batchStart, batchEnd, loteShipments.size(), vuelosDisponibles.size());
+
+            System.out.printf("[Lote] Backlog preventivo: %d/%d seleccionados | origenes priorizados: %d%n",
+                    backlogSeleccionado.size(), backlogEntrante, prioridadOrigen.size());
 
             // 3. Ejecutar ALNS incremental (conserva capacidad de lotes anteriores)
             if (!loteShipments.isEmpty()) {
@@ -681,7 +845,9 @@ public class RealtimeSimulationService {
                 boolean fastMode = plannerFastMode();
 
                 ALNS alns = new ALNS(iters, seg, nDestr, 260.0, 0.994, BATCH_ALNS_MAX_ESCALAS,
-                        9.0, 3.0, 0.0, 0.8, fastMode);
+                        9.0, 3.0, 0.0, 0.8, fastMode)
+                        .withOriginPriorities(prioridadOrigen)
+                        .withTimeBudgetMillis(BATCH_ALNS_TIME_BUDGET_MS);
 
                 Map<String, Route> resultado = alns.ejecutarIncremental(
                         loteShipments, vuelosDisponibles, airportMap, todosLosShipmentsProcesados);
@@ -689,18 +855,21 @@ public class RealtimeSimulationService {
                 registrarEventosLote(loteShipments, resultado);
 
                 solucionGlobal.putAll(resultado);
-                processed.addAll(loteShipments);
-                todosLosShipmentsProcesados.addAll(loteShipments);
+                registrarBatchProcesados(loteShipments);
+                reencolarBatchNoPlanificados(loteShipments);
 
-                System.out.printf("[Lote] Rutas: %d / %d%n", resultado.size(), n);
+                System.out.printf("[Lote] Rutas: %d / %d | backlog entrante: %d | backlog saliente: %d%n",
+                        resultado.size(), n, backlogEntrante, batchPlanningBacklog.size());
             }
 
             batchCount++;
             tick = batchEnd;
+            boolean completedThisBatch = false;
             if (tick >= maxTick) {
                 tick = maxTick;
                 queue.clear();
                 completed = true;
+                completedThisBatch = true;
                 System.out.println("[Lote] Simulación completada.");
             }
 
@@ -710,6 +879,9 @@ public class RealtimeSimulationService {
             visualWindowStartedAtMs = batchStartMs;
             visualWindowStartTick = batchStart;
             visualWindowEndTick = tick;
+            if (completedThisBatch && realFinishedAtMs == 0) {
+                realFinishedAtMs = visualWindowStartedAtMs + BATCH_INTERVAL_MS;
+            }
             System.out.printf("[Lote] Completado en %d ms (animación sugerida: %d ms)%n",
                     lastBatchRuntimeMs, BATCH_INTERVAL_MS);
             System.out.printf("[Planificacion fija][Lote] Sa=%d ms | K=%d | Sc=%d min | Ta=%d ms | estable=%s%n",
@@ -743,11 +915,10 @@ public class RealtimeSimulationService {
         }
 
         private void registrarEventosLote(List<Shipment> loteShipments, Map<String, Route> resultado) {
-            Set<String> createdEvents = new HashSet<>();
             Set<String> routeEvents = new HashSet<>();
 
             for (Shipment s : loteShipments) {
-                if (!s.isSplitPart() && createdEvents.add(s.getShipmentId())) {
+                if (!s.isSplitPart() && batchCreatedEventShipmentIds.add(s.getShipmentId())) {
                     addVisibleEvent(s.getRequestMinute(),
                             s.getOriginCode(), s.getSuitcaseCount(), "shipment_created");
                 }
@@ -759,6 +930,56 @@ public class RealtimeSimulationService {
                     registrarEventosRuta(s, entry.getValue(), routeEvents);
                 }
             }
+        }
+
+        private void registrarBatchProcesados(List<Shipment> loteShipments) {
+            for (Shipment shipment : loteShipments) {
+                if (batchProcessedShipmentIds.add(shipment.getShipmentId())) {
+                    processed.add(shipment);
+                    todosLosShipmentsProcesados.add(shipment);
+                }
+            }
+        }
+
+        private void reencolarBatchNoPlanificados(List<Shipment> loteShipments) {
+            Map<String, ShipmentRollup> rollups = new LinkedHashMap<>();
+            for (Shipment shipment : loteShipments) {
+                String rootId = rootShipmentId(shipment);
+                Shipment root = findRootShipment(rootId, loteShipments);
+                rollups.computeIfAbsent(rootId, ignored -> new ShipmentRollup(root != null ? root : shipment))
+                        .include(shipment, maxTick);
+            }
+
+            int requeued = 0;
+            for (Map.Entry<String, ShipmentRollup> entry : rollups.entrySet()) {
+                Shipment root = findRootShipment(entry.getKey(), loteShipments);
+                if (root == null) continue;
+                ShipmentRollup rollup = entry.getValue();
+                int total = Math.max(0, rollup.totalBags);
+                int planned = Math.min(total, rollup.plannedBags);
+                if (total > 0 && planned < total) {
+                    root.resetPlanningState();
+                    reencolarBacklogBatch(root);
+                    requeued++;
+                }
+            }
+            if (requeued > 0) {
+                System.out.printf("[Lote] %d envios sin ruta quedan en backlog de planificacion%n", requeued);
+            }
+        }
+
+        private String rootShipmentId(Shipment shipment) {
+            return shipment.isSplitPart() ? shipment.getParentShipmentId() : shipment.getShipmentId();
+        }
+
+        private Shipment findRootShipment(String rootId, List<Shipment> loteShipments) {
+            for (Shipment shipment : loteShipments) {
+                if (!shipment.isSplitPart() && shipment.getShipmentId().equals(rootId)) return shipment;
+            }
+            for (Shipment shipment : shipments) {
+                if (!shipment.isSplitPart() && shipment.getShipmentId().equals(rootId)) return shipment;
+            }
+            return null;
         }
 
         private Shipment findShipmentById(String shipmentId, List<Shipment> loteShipments) {
@@ -810,7 +1031,7 @@ public class RealtimeSimulationService {
         // ── TIEMPO_REAL: avance tick a tick ───────────────────────────────────
 
         synchronized void advance(int steps) {
-            if (completed) return;
+            if (completed || paused) return;
             refreshRealtimeShipmentsFromDatabase();
             executeRealtimeCycleIfDue(true);
             int visualStart = tick;
@@ -822,7 +1043,7 @@ public class RealtimeSimulationService {
 
         synchronized boolean advanceRealtimeIfDue() {
             long now = System.currentTimeMillis();
-            if (completed) return false;
+            if (completed || paused) return false;
             long lastReferenceMs = Math.max(lastRealtimeAdvanceMs, lastRealtimeExecutionMs);
             if (lastReferenceMs > 0
                     && now - lastReferenceMs < REALTIME_EXECUTION_INTERVAL_MS) {
@@ -901,6 +1122,9 @@ public class RealtimeSimulationService {
             if (tick > maxTick) {
                 if (!queue.isEmpty()) planQueue();
                 completed = true;
+                if (realFinishedAtMs == 0) {
+                    realFinishedAtMs = System.currentTimeMillis();
+                }
             }
         }
 
@@ -1280,9 +1504,7 @@ public class RealtimeSimulationService {
         }
 
         private Flight findFlight(String flightId) {
-            for (Flight f : flights)
-                if (f.getFlightId().equals(flightId)) return f;
-            return null;
+            return flightById.get(flightId);
         }
 
         private boolean flightVisibleInSnapshot(Flight flight) {
@@ -1564,10 +1786,12 @@ public class RealtimeSimulationService {
             json.prop("message", message).comma();
             json.prop("simulationStartDateTime", simulationStartInstant).comma();
             json.prop("simulationEndDateTime", simulationEndInstant).comma();
-            long realFinishedAtMs = System.currentTimeMillis();
+            long effectiveRealFinishedAtMs = realFinishedAtMs > 0
+                    ? realFinishedAtMs
+                    : System.currentTimeMillis();
             json.prop("realStartedAt", java.time.Instant.ofEpochMilli(realStartedAtMs).toString()).comma();
-            json.prop("realFinishedAt", java.time.Instant.ofEpochMilli(realFinishedAtMs).toString()).comma();
-            json.prop("runtimeMs", realFinishedAtMs - realStartedAtMs).comma();
+            json.prop("realFinishedAt", java.time.Instant.ofEpochMilli(effectiveRealFinishedAtMs).toString()).comma();
+            json.prop("runtimeMs", effectiveRealFinishedAtMs - realStartedAtMs).comma();
 
             // cancelledFlightIds
             json.name("cancelledFlightIds").arrayStart();

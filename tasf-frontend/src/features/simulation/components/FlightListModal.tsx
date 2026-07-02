@@ -1,33 +1,103 @@
-import type { Shipment } from "../types";
+import { useMemo } from "react";
+import type { Flight, Shipment, SimulationData } from "../types";
+import { formatFlightMoment, formatSimMinute } from "../utils/formatters";
+import { resolveShipmentRoute } from "../utils/shipmentRoute";
 import "./flightListModal.css";
 
 interface FlightListModalProps {
   shipment: Shipment;
+  flights: Flight[];
+  data?: SimulationData | null;
   onClose: () => void;
+  onSelectFlight?: (id: string) => void;
 }
 
-export function FlightListModal({ shipment, onClose }: FlightListModalProps) {
+function formatWait(minutes?: number) {
+  if (minutes === undefined) return "";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h <= 0) return `${m} min`;
+  return `${h} h ${String(m).padStart(2, "0")} min`;
+}
+
+export function FlightListModal({
+  shipment,
+  flights,
+  data,
+  onClose,
+  onSelectFlight,
+}: FlightListModalProps) {
+  const route = useMemo(
+    () => resolveShipmentRoute(shipment, flights),
+    [flights, shipment]
+  );
+  const initialWait =
+    route[0]?.absoluteDepartureMinute !== undefined
+      ? Math.max(0, route[0].absoluteDepartureMinute - shipment.requestMinute)
+      : undefined;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3>Vuelos del envío {shipment.clientId}</h3>
+      <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+        <h3>Ruta del envio {shipment.id}</h3>
+        <p className="route-modal-summary">
+          {`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas - pedido ${formatSimMinute(
+            shipment.requestMinute
+          )}`}
+        </p>
+
+        {initialWait !== undefined && (
+          <div className="route-scale-card">
+            <strong>Espera inicial</strong>
+            <span>{formatWait(initialWait)}</span>
+          </div>
+        )}
+
         <div className="flight-list">
-          {shipment.flightIds.map((flightId) => {
-            const parts = flightId.split("-");
-            const origin = parts[0] || "???";
-            const destination = parts[1] || "???";
-             const departureTime = parts[2] || "0000";
-             const formattedDeparture = `${departureTime.slice(0, 2)}:${departureTime.slice(2)}`;
+          {route.map((leg, index) => {
+            const departure =
+              leg.absoluteDepartureMinute !== undefined
+                ? formatFlightMoment(data, leg.absoluteDepartureMinute)
+                : "No disponible";
+            const arrival =
+              leg.absoluteArrivalMinute !== undefined
+                ? formatFlightMoment(data, leg.absoluteArrivalMinute)
+                : "No disponible";
 
             return (
-              <div key={flightId} className="flight-item">
-                <div>{origin} → {destination}</div>
-                <div>ID: {flightId}</div>
-                <div>Salida: {formattedDeparture}</div>
+              <div key={`${leg.flightId}-${index}`} className="route-leg-block">
+                {index > 0 && (
+                  <div className="route-scale-card">
+                    <strong>{`Escala en ${leg.transferAirport ?? leg.origin}`}</strong>
+                    <span>{formatWait(leg.waitBeforeMinutes)}</span>
+                  </div>
+                )}
+                <div className="flight-item">
+                  <div>
+                    <strong>{`${index + 1}. ${leg.origin} -> ${leg.destination}`}</strong>
+                  </div>
+                  <div>ID: {leg.flightId}</div>
+                  <div>Salida: {departure}</div>
+                  <div>Llegada: {arrival}</div>
+                  {leg.flight && (
+                    <div>{`Carga: ${leg.flight.assignedLoad}/${leg.flight.maxCapacity} maletas`}</div>
+                  )}
+                  {onSelectFlight && (
+                    <button
+                      type="button"
+                      className="route-focus-button"
+                      onClick={() => onSelectFlight(leg.flightId)}
+                    >
+                      Enfocar vuelo
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
+
+        {!route.length && <div className="empty-state">El envio no tiene ruta asignada.</div>}
         <button onClick={onClose}>Cerrar</button>
       </div>
     </div>

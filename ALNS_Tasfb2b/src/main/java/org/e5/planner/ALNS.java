@@ -39,6 +39,7 @@ public class ALNS {
     private static final double PESO_SIN_RUTA    = 100_000.0;
     private static final double PESO_ENVIO_TARDE = 25_000.0;
     private static final double PESO_FUERA_PLAZO = 50.0;
+    private static final double PESO_ESPERA_ORIGEN_PREVENTIVA = 2.0;
 
     // ── Índices operadores destrucción ────────────────────────────────────────
     private static final int D_ALEATORIO      = 0;
@@ -73,6 +74,8 @@ public class ALNS {
 
     private final Random rnd = new Random();
     private AirportCapacityTimeline airportCapacityTimeline;
+    private Map<String, Double> prioridadOrigen = Collections.emptyMap();
+    private long timeBudgetNanos = 0L;
 
     // ── Constructores ─────────────────────────────────────────────────────────
 
@@ -103,6 +106,20 @@ public class ALNS {
         this.rewardNoAcepta     = rewardNoAcepta;
         this.decayPesos         = decayPesos;
         this.fastMode           = fastMode;
+    }
+
+    public ALNS withOriginPriorities(Map<String, Double> prioridadOrigen) {
+        this.prioridadOrigen = prioridadOrigen == null || prioridadOrigen.isEmpty()
+                ? Collections.emptyMap()
+                : new HashMap<>(prioridadOrigen);
+        return this;
+    }
+
+    public ALNS withTimeBudgetMillis(long timeBudgetMillis) {
+        this.timeBudgetNanos = timeBudgetMillis > 0
+                ? timeBudgetMillis * 1_000_000L
+                : 0L;
+        return this;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -156,6 +173,9 @@ public class ALNS {
                                         boolean preservarCapacidadExistente,
                                         Collection<Shipment> baseShipments) {
         if (shipments.isEmpty()) return new HashMap<>();
+        long deadlineNanos = timeBudgetNanos > 0
+                ? System.nanoTime() + timeBudgetNanos
+                : Long.MAX_VALUE;
 
         Map<Flight, Integer> cargaBaseVuelos =
                 snapshotCargasVuelos(flights, preservarCapacidadExistente);
@@ -189,10 +209,8 @@ public class ALNS {
                 allShipments, flights, finder, airportMap);
 
         // Propagar sub-envíos generados al fraccionamiento a la lista original
-        sincronizarShipments(shipments, allShipments);
-
         Map<String, Route> solMejor = new HashMap<>(solActual);
-        Map<String, Shipment> shipmentIndex = indexarShipments(allShipments);
+        List<Shipment> shipmentsMejor = new ArrayList<>(allShipments);
         Map<String, Double> contribActual = calcularContribuciones(solActual, allShipments, finder);
         double fitActual = sumarContribuciones(contribActual);
         double fitMejor  = fitActual;
@@ -218,32 +236,30 @@ public class ALNS {
 
         // 2. Bucle principal ALNS
         for (int iter = 0; iter < limiteIteraciones; iter++) {
+            if (tiempoAgotado(deadlineNanos)) {
+                System.out.printf("[ALNS] Corte por presupuesto de tiempo en iter %d%n", iter);
+                break;
+            }
             iteracionesEjecutadas++;
 
             int idxD = seleccionarPorRuleta(pesoDestructor);
             int idxR = seleccionarPorRuleta(pesoReparador);
 
+            List<Shipment> candidateShipments = new ArrayList<>(allShipments);
             Map<String, Route> solDestruida = new HashMap<>(solActual);
             List<Shipment> destruidos = destruir(
-                    idxD, solDestruida, allShipments, airportMap, n);
+                    idxD, solDestruida, candidateShipments, airportMap, n);
+            agregarSinRutaAReparacion(solDestruida, candidateShipments, destruidos, n);
 
-            reparar(idxR, solDestruida, destruidos, flights, finder, airportMap);
+            reparar(idxR, solDestruida, destruidos, candidateShipments, flights, finder, airportMap);
 
-            Set<String> idsCambiados = idsConCambios(solActual, solDestruida, destruidos);
-            Map<String, Double> contribNuevo = new HashMap<>(contribActual);
-            double fitNuevo = fitActual;
-            for (String id : idsCambiados) {
-                Shipment s = shipmentIndex.get(id);
-                if (s == null) continue;
-                double anterior = contribNuevo.getOrDefault(id, 0.0);
-                double nuevo = contribucionFitness(solDestruida.get(id), s, finder);
-                contribNuevo.put(id, nuevo);
-                fitNuevo += nuevo - anterior;
-            }
+            Map<String, Double> contribNuevo = calcularContribuciones(solDestruida, candidateShipments, finder);
+            double fitNuevo = sumarContribuciones(contribNuevo);
             double delta    = fitNuevo - fitActual;
 
             double reward;
             if (delta < 0 || rnd.nextDouble() < Math.exp(-delta / Math.max(T, 0.001))) {
+                allShipments = candidateShipments;
                 solActual = solDestruida;
                 fitActual = fitNuevo;
                 contribActual = contribNuevo;
@@ -251,6 +267,7 @@ public class ALNS {
 
                 if (fitActual < fitMejor) {
                     solMejor = new HashMap<>(solActual);
+                    shipmentsMejor = new ArrayList<>(allShipments);
                     fitMejor = fitActual;
                     reward   = rewardMejora;
                     mejorasGlobal++;
@@ -285,9 +302,10 @@ public class ALNS {
         }
 
         fitnessMejorFinal = fitMejor;
-        reconstruirCapacidad(solMejor, allShipments, flights, airportMap,
+        reconstruirCapacidad(solMejor, shipmentsMejor, flights, airportMap,
                 cargaBaseVuelos, cargaBaseAeropuertos);
-        registrarResultados(solMejor, allShipments, finder);
+        registrarResultados(solMejor, shipmentsMejor, finder);
+        sincronizarShipments(shipments, shipmentsMejor);
         imprimirResumen();
         return solMejor;
     }
@@ -334,11 +352,13 @@ public class ALNS {
 
         // Trabajar sobre una copia para poder iterar mientras se agregan partes
         List<Shipment> aRutar = new ArrayList<>(allShipments);
-        aRutar.sort(Comparator.comparingInt(s -> finder.getDeadlineMinutes(s)));
+        aRutar.sort(comparadorPlanificacion(finder));
 
         for (Shipment s : aRutar) {
+            if (!allShipments.contains(s)) continue;
+
             // 1. Intentar ruta completa
-            Route rutaCompleta = finder.findBestRouteCached(s, flights);
+            Route rutaCompleta = encontrarMejorRuta(s, flights, finder);
             if (rutaCompleta != null) {
                 solucion.put(s.getShipmentId(), rutaCompleta);
                 reservarCapacidad(rutaCompleta, s.getSuitcaseCount(), airportMap);
@@ -346,21 +366,10 @@ public class ALNS {
             }
 
             // 2. Fraccionar dinámicamente
-            List<ALNSRouteFinder.PartialRoute> parciales =
-                    finder.findFractionalRoutes(s, flights);
-
-            if (parciales.isEmpty()) continue; // sin ruta posible
-
+            fraccionarYRegistrar(s, solucion, allShipments, flights, finder, airportMap);
+            continue;
             // Crear sub-envíos con trazabilidad y agregarlos
-            List<Shipment> partes = crearSubEnvios(s, parciales);
-            allShipments.addAll(partes);
-
             // Registrar la ruta de cada parte en la solución
-            for (int i = 0; i < partes.size(); i++) {
-                Shipment parte = partes.get(i);
-                Route ruta = parciales.get(i).ruta;
-                solucion.put(parte.getShipmentId(), ruta);
-            }
         }
         return solucion;
     }
@@ -401,9 +410,43 @@ public class ALNS {
      * Propaga sub-envíos generados durante el greedy a la lista original
      * para que el bucle SA y el reporte los incluyan.
      */
+    private boolean fraccionarYRegistrar(Shipment original,
+                                          Map<String, Route> sol,
+                                          List<Shipment> allShipments,
+                                          List<Flight> flights,
+                                          ALNSRouteFinder finder,
+                                          Map<String, Airport> airportMap) {
+        if (original.isSplitPart()) return false;
+
+        List<ALNSRouteFinder.PartialRoute> parciales =
+                finder.findFractionalRoutes(original, flights);
+        if (parciales.isEmpty()) return false;
+
+        List<Shipment> partes = crearSubEnvios(original, parciales);
+        sol.remove(original.getShipmentId());
+        allShipments.remove(original);
+
+        for (int i = 0; i < partes.size(); i++) {
+            Shipment parte = partes.get(i);
+            Route ruta = parciales.get(i).ruta;
+            if (!contieneShipmentId(allShipments, parte.getShipmentId())) {
+                allShipments.add(parte);
+            }
+            sol.put(parte.getShipmentId(), ruta);
+        }
+        return true;
+    }
+
+    private boolean contieneShipmentId(List<Shipment> shipments, String shipmentId) {
+        for (Shipment shipment : shipments) {
+            if (shipment.getShipmentId().equals(shipmentId)) return true;
+        }
+        return false;
+    }
+
     private void sincronizarShipments(List<Shipment> original, List<Shipment> actualizado) {
         for (Shipment s : actualizado) {
-            if (!original.contains(s)) original.add(s);
+            if (!contieneShipmentId(original, s.getShipmentId())) original.add(s);
         }
     }
 
@@ -492,32 +535,62 @@ public class ALNS {
     //  OPERADORES DE REPARACIÓN
     // ════════════════════════════════════════════════════════════════════════
 
+    private void agregarSinRutaAReparacion(Map<String, Route> sol,
+                                            List<Shipment> shipments,
+                                            List<Shipment> destruidos,
+                                            int n) {
+        Set<String> yaIncluidos = new HashSet<>();
+        for (Shipment shipment : destruidos) {
+            yaIncluidos.add(shipment.getShipmentId());
+        }
+
+        List<Shipment> sinRuta = new ArrayList<>();
+        for (Shipment shipment : shipments) {
+            if (sol.containsKey(shipment.getShipmentId())) continue;
+            if (yaIncluidos.contains(shipment.getShipmentId())) continue;
+            sinRuta.add(shipment);
+        }
+        sinRuta.sort(Comparator
+                .comparingInt(Shipment::getRequestMinute)
+                .thenComparing(Comparator.comparingInt(Shipment::getSuitcaseCount).reversed()));
+
+        int limite = Math.max(n, fastMode ? 10 : 25);
+        for (Shipment shipment : sinRuta) {
+            if (limite-- <= 0) break;
+            destruidos.add(shipment);
+            yaIncluidos.add(shipment.getShipmentId());
+        }
+    }
+
     private void reparar(int idxOp, Map<String, Route> sol,
-                          List<Shipment> destruidos, List<Flight> flights,
+                          List<Shipment> destruidos, List<Shipment> allShipments,
+                          List<Flight> flights,
                           ALNSRouteFinder finder, Map<String, Airport> airportMap) {
         switch (idxOp) {
             case R_GREEDY_URGENCIA:
-                repararGreedyUrgencia(sol, destruidos, flights, finder, airportMap); break;
+                repararGreedyUrgencia(sol, destruidos, allShipments, flights, finder, airportMap); break;
             case R_GREEDY_COSTO:
-                repararGreedyCosto(sol, destruidos, flights, finder, airportMap); break;
+                repararGreedyCosto(sol, destruidos, allShipments, flights, finder, airportMap); break;
             case R_ALEATORIO:
-                repararAleatorio(sol, destruidos, flights, finder, airportMap); break;
+                repararAleatorio(sol, destruidos, allShipments, flights, finder, airportMap); break;
             case R_REGRET_K:
-                repararRegretK(sol, destruidos, flights, finder, airportMap); break;
+                repararRegretK(sol, destruidos, allShipments, flights, finder, airportMap); break;
             default:
-                repararGreedyUrgencia(sol, destruidos, flights, finder, airportMap);
+                repararGreedyUrgencia(sol, destruidos, allShipments, flights, finder, airportMap);
         }
     }
 
     private void repararGreedyUrgencia(Map<String, Route> sol, List<Shipment> destruidos,
+                                        List<Shipment> allShipments,
                                         List<Flight> flights, ALNSRouteFinder finder,
                                         Map<String, Airport> airportMap) {
         List<Shipment> ordenados = new ArrayList<>(destruidos);
-        ordenados.sort(Comparator.comparingInt(s -> finder.getDeadlineMinutes(s)));
-        asignarRutas(sol, ordenados, flights, finder, airportMap);
+        ordenados.sort(comparadorPlanificacion(finder));
+        asignarRutas(sol, ordenados, allShipments, flights, finder, airportMap);
     }
 
     private void repararGreedyCosto(Map<String, Route> sol, List<Shipment> destruidos,
+                                     List<Shipment> allShipments,
                                      List<Flight> flights, ALNSRouteFinder finder,
                                      Map<String, Airport> airportMap) {
         List<Shipment> ordenados = new ArrayList<>(destruidos);
@@ -525,29 +598,29 @@ public class ALNS {
             Airport orig = airportMap.get(s.getOriginCode());
             Airport dest = airportMap.get(s.getDestCode());
             if (orig == null || dest == null) return Double.MAX_VALUE;
-            return haversineKm(orig.getLatitude(), orig.getLongitude(),
+                return haversineKm(orig.getLatitude(), orig.getLongitude(),
                                dest.getLatitude(), dest.getLongitude());
         }));
-        asignarRutas(sol, ordenados, flights, finder, airportMap);
+        asignarRutas(sol, ordenados, allShipments, flights, finder, airportMap);
     }
 
     private void repararAleatorio(Map<String, Route> sol, List<Shipment> destruidos,
+                                   List<Shipment> allShipments,
                                    List<Flight> flights, ALNSRouteFinder finder,
                                    Map<String, Airport> airportMap) {
         List<Shipment> mezclados = new ArrayList<>(destruidos);
         Collections.shuffle(mezclados, rnd);
-        asignarRutas(sol, mezclados, flights, finder, airportMap);
+        asignarRutas(sol, mezclados, allShipments, flights, finder, airportMap);
     }
 
     private void repararRegretK(Map<String, Route> sol, List<Shipment> destruidos,
+                                List<Shipment> allShipments,
                                 List<Flight> flights, ALNSRouteFinder finder,
                                 Map<String, Airport> airportMap) {
         final int k = fastMode ? 2 : REGRET_K;
         final int evalLimit = fastMode ? REGRET_FAST_EVAL_LIMIT : REGRET_EVAL_LIMIT;
         List<Shipment> pendientes = new ArrayList<>(destruidos);
-        pendientes.sort(Comparator
-                .comparingInt((Shipment s) -> finder.getDeadlineMinutes(s))
-                .thenComparing(Comparator.comparingInt(Shipment::getSuitcaseCount).reversed()));
+        pendientes.sort(comparadorPlanificacion(finder));
 
         while (!pendientes.isEmpty()) {
             RegretChoice mejor = null;
@@ -590,7 +663,7 @@ public class ALNS {
         }
 
         if (!pendientes.isEmpty()) {
-            asignarRutas(sol, pendientes, flights, finder, airportMap);
+            asignarRutas(sol, pendientes, allShipments, flights, finder, airportMap);
         }
     }
 
@@ -601,11 +674,12 @@ public class ALNS {
      * porque ya están en allShipments desde el greedy inicial.
      */
     private void asignarRutas(Map<String, Route> sol, List<Shipment> ordenados,
+                               List<Shipment> allShipments,
                                List<Flight> flights, ALNSRouteFinder finder,
                                Map<String, Airport> airportMap) {
         for (Shipment s : ordenados) {
             // Si es sub-envío ya creado, buscar ruta directamente para su lote
-            Route ruta = finder.findBestRouteCached(s, flights);
+            Route ruta = encontrarMejorRuta(s, flights, finder);
             if (ruta != null) {
                 sol.put(s.getShipmentId(), ruta);
                 reservarCapacidad(ruta, s.getSuitcaseCount(), airportMap);
@@ -613,13 +687,7 @@ public class ALNS {
             }
 
             // Solo fraccionar envíos originales (no sub-envíos ya fraccionados)
-            if (!s.isSplitPart()) {
-                List<ALNSRouteFinder.PartialRoute> parciales =
-                        finder.findFractionalRoutes(s, flights);
-                for (ALNSRouteFinder.PartialRoute pr : parciales) {
-                    sol.put(pr.ruta.getShipmentId(), pr.ruta);
-                }
-            }
+            fraccionarYRegistrar(s, sol, allShipments, flights, finder, airportMap);
         }
     }
 
@@ -735,7 +803,7 @@ public class ALNS {
         if (llegada > deadline) {
             contrib += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
         }
-        return contrib;
+        return contrib + penalizacionPreventivaOrigen(ruta, s);
     }
 
     private double contribucionFitness(Route ruta, Shipment s,
@@ -752,7 +820,7 @@ public class ALNS {
         if (llegada > deadline) {
             contrib += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
         }
-        return contrib;
+        return contrib + penalizacionPreventivaOrigen(ruta, s);
     }
 
     private double costoRuta(Route ruta, Shipment s, ALNSRouteFinder finder) {
@@ -763,7 +831,43 @@ public class ALNS {
         if (llegada > deadline) {
             costo += PESO_ENVIO_TARDE + PESO_FUERA_PLAZO * (llegada - deadline);
         }
-        return costo;
+        return costo + penalizacionPreventivaOrigen(ruta, s);
+    }
+
+    private Route encontrarMejorRuta(Shipment shipment,
+                                     List<Flight> flights,
+                                     ALNSRouteFinder finder) {
+        Route mejor = null;
+        double mejorCosto = Double.POSITIVE_INFINITY;
+        for (Route ruta : finder.findCandidateRoutesCached(shipment, flights, 5)) {
+            if (!finder.esFeasible(ruta, shipment.getSuitcaseCount())) continue;
+            double costo = costoRuta(ruta, shipment, finder);
+            if (costo < mejorCosto) {
+                mejor = ruta;
+                mejorCosto = costo;
+            }
+        }
+        return mejor != null ? mejor : finder.findBestRouteCached(shipment, flights);
+    }
+
+    private Comparator<Shipment> comparadorPlanificacion(ALNSRouteFinder finder) {
+        return Comparator
+                .comparingDouble((Shipment s) ->
+                        -prioridadOrigen.getOrDefault(s.getOriginCode(), 0.0))
+                .thenComparingInt(s -> s.getRequestMinute() + finder.getDeadlineMinutes(s))
+                .thenComparing(Comparator.comparingInt(Shipment::getSuitcaseCount));
+    }
+
+    private double penalizacionPreventivaOrigen(Route ruta, Shipment shipment) {
+        double prioridad = prioridadOrigen.getOrDefault(shipment.getOriginCode(), 0.0);
+        if (prioridad <= 0.0 || ruta == null || ruta.getFlights().isEmpty()) return 0.0;
+        int salida = ruta.getFlights().get(0).absoluteDepartureMinute();
+        int esperaOrigen = Math.max(0, salida - shipment.getRequestMinute());
+        return prioridad * esperaOrigen * PESO_ESPERA_ORIGEN_PREVENTIVA;
+    }
+
+    private boolean tiempoAgotado(long deadlineNanos) {
+        return deadlineNanos != Long.MAX_VALUE && System.nanoTime() >= deadlineNanos;
     }
 
     private static class RegretChoice {

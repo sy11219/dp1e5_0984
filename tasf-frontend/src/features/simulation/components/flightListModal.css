@@ -6,11 +6,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 3000;
 }
 
 /* Contenedor principal del modal */
 .modal-content {
+  position: relative;
+  z-index: 3001;
   background: #fff;
   padding: 1.5rem;
   border-radius: 8px;
@@ -43,10 +45,35 @@
   gap: 0.5rem;
 }
 
+.route-modal-summary {
+  margin: -0.5rem 0 1rem;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.route-leg-block {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.route-scale-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px dashed #cbd5e0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.82rem;
+}
+
 /* Cada vuelo */
 .flight-item {
-  padding: 0.5rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
 }
 
 .flight-item div:first-child {
@@ -57,6 +84,10 @@
 .flight-item div:last-child {
   font-size: 0.875rem;
   color: #4a5568;
+}
+
+.route-focus-button {
+  width: fit-content;
 }
 
 /* Botón cerrar */

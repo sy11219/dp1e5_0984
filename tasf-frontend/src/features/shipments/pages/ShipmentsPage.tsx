@@ -393,7 +393,7 @@ export function ShipmentsPage() {
                 </select>
               </div>
               <div className="field">
-                <label>Fecha de salida</label>
+                <label>Fecha de salida (hora local del origen)</label>
                 <input
                   type="datetime-local"
                   step="1"

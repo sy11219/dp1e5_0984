@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import type { ReactNode } from "react";
 import L from "leaflet";
-import type { ActiveFlight, Airport, AirportLoads, MapInfoCard as MapInfo, SimulationData } from "../../../types";
+import type { ActiveFlight, Airport, AirportLoads, Flight, MapInfoCard as MapInfo, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR, MAP_CONFIG, PANE_Z_INDEX } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
 import { formatFlightMoment } from "../../../utils/formatters";
+import { resolveShipmentRoute, type ShipmentRouteLeg } from "../../../utils/shipmentRoute";
 
 const MAP_CENTER: L.LatLngTuple = [MAP_CONFIG.center[0], MAP_CONFIG.center[1]];
 const MAP_BOUNDS: L.LatLngBoundsLiteral = [
@@ -17,11 +19,13 @@ type MapStageProps = {
   airportLoads: AirportLoads;
   selectedAirport: string | null;
   selectedFlightId?: string | null;
+  selectedShipment?: Shipment | null;
   focusTarget?: MapFocusTarget | null;
   displayGmtOffset?: number;
   onSelectAirport: (code: string) => void;
   onSelectFlight?: (id: string) => void;
   onClearSelection?: () => void;
+  children?: ReactNode;
 };
 
 type AirportMarkerItem = {
@@ -30,7 +34,7 @@ type AirportMarkerItem = {
 };
 
 export type MapFocusTarget = {
-  type: "airport" | "flight";
+  type: "airport" | "flight" | "shipment";
   id: string;
   token: number;
 };
@@ -45,11 +49,13 @@ export default function MapStage({
   airportLoads,
   selectedAirport,
   selectedFlightId,
+  selectedShipment,
   focusTarget,
   displayGmtOffset,
   onSelectAirport,
   onSelectFlight,
   onClearSelection,
+  children,
 }: MapStageProps) {
   const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
   const mapElement = useRef<HTMLDivElement>(null);
@@ -64,9 +70,24 @@ export default function MapStage({
   const autoCloseFlightIdRef = useRef<string | null>(null);
 
   const airports = useMemo(() => data?.airports || [], [data]);
+  const activeAirports = useMemo(
+    () => airports.filter(isAirportActive),
+    [airports]
+  );
   const airportByCode = useMemo(
     () => Object.fromEntries(airports.map((airport) => [airport.code, airport])),
     [airports]
+  );
+  const selectedShipmentRoute = useMemo(
+    () => resolveShipmentRoute(selectedShipment, data?.flights ?? []),
+    [data?.flights, selectedShipment]
+  );
+  const selectedFlight = useMemo(
+    () =>
+      activeFlights.find((flight) => flight.id === selectedFlightId) ??
+      data?.flights.find((flight) => flight.id === selectedFlightId) ??
+      null,
+    [activeFlights, data?.flights, selectedFlightId]
   );
 
   useEffect(() => {
@@ -195,6 +216,10 @@ export default function MapStage({
       canvasRef.current.width,
       canvasRef.current.height,
       selectedFlightId ?? "",
+      selectedShipment?.id ?? "",
+      selectedShipmentRoute
+        .map((leg) => `${leg.flightId}:${leg.absoluteDepartureMinute ?? "x"}:${leg.absoluteArrivalMinute ?? "x"}`)
+        .join("|"),
       activeFlights
         .map((flight) => `${flight.id}:${Math.round(flight.progress * 1000)}:${flight.status}:${flight.assignedLoad}`)
         .join("|"),
@@ -208,6 +233,12 @@ export default function MapStage({
 
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+
+    if (selectedShipmentRoute.length > 0) {
+      drawShipmentRoute(ctx, mapRef.current, selectedShipmentRoute, airportByCode);
+    } else if (selectedFlight && !activeFlights.some((flight) => flight.id === selectedFlight.id)) {
+      drawStaticFlightRoute(ctx, mapRef.current, selectedFlight, airportByCode);
+    }
 
     for (const flight of activeFlights) {
       const origin = airportByCode[flight.origin];
@@ -234,7 +265,14 @@ export default function MapStage({
 
       drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, flightColor, isSelected);
     }
-  }, [activeFlights, airportByCode, selectedFlightId]);
+  }, [
+    activeFlights,
+    airportByCode,
+    selectedFlight,
+    selectedFlightId,
+    selectedShipment?.id,
+    selectedShipmentRoute,
+  ]);
 
   // Redibujar cuando cambian vuelos o mapa se mueve
   useEffect(() => {
@@ -256,20 +294,41 @@ export default function MapStage({
       return;
     }
 
-    const flight = activeFlights.find((item) => item.id === focusTarget.id);
+    if (focusTarget.type === "shipment") {
+      if (!selectedShipment || selectedShipmentRoute.length === 0) return;
+
+      const routeAirports = selectedShipmentRoute
+        .flatMap((leg) => [airportByCode[leg.origin], airportByCode[leg.destination]])
+        .filter(Boolean) as Airport[];
+      if (!routeAirports.length) return;
+
+      const bounds = L.latLngBounds(
+        routeAirports.map((airport) => [airport.latitude, airport.longitude])
+      );
+      map.fitBounds(bounds.pad(0.25), { maxZoom: FOCUS_ZOOM, animate: true });
+      setMapInfo(createShipmentInfo(data, selectedShipment, selectedShipmentRoute));
+      return;
+    }
+
+    const flight = selectedFlight?.id === focusTarget.id ? selectedFlight : null;
     if (!flight) return;
 
     const origin = airportByCode[flight.origin];
     const destination = airportByCode[flight.destination];
     if (!origin || !destination) return;
 
-    const lat = origin.latitude + (destination.latitude - origin.latitude) * flight.progress;
-    const lng = origin.longitude + (destination.longitude - origin.longitude) * flight.progress;
+    const progress =
+      "progress" in flight && typeof flight.progress === "number"
+        ? flight.progress
+        : 0.5;
+    const lat = origin.latitude + (destination.latitude - origin.latitude) * progress;
+    const lng = origin.longitude + (destination.longitude - origin.longitude) * progress;
     map.flyTo([lat, lng], Math.max(map.getZoom(), FOCUS_ZOOM), {
       animate: true,
       duration: 0.75,
     });
-  }, [activeFlights, airportByCode, focusTarget]);
+    setMapInfo(createFlightInfo(data, flight, origin, destination, displayGmtOffset));
+  }, [airportByCode, data, focusTarget, selectedFlight, selectedShipment, selectedShipmentRoute]);
 
   useEffect(() => {
     const resizeAndRedraw = () => {
@@ -360,6 +419,11 @@ export default function MapStage({
       return;
     }
 
+    if (selectedFlightId === mapInfo.id) {
+      clearAutoCloseTimer();
+      return;
+    }
+
     const stillActive = activeFlights.some((flight) => flight.id === mapInfo.id);
     if (stillActive) {
       clearAutoCloseTimer();
@@ -393,16 +457,21 @@ export default function MapStage({
   useEffect(() => {
     if (!data || !mapRef.current || !airports.length || didFitBoundsRef.current) return;
 
+    const airportsForBounds = activeAirports.length ? activeAirports : airports;
     const bounds = L.latLngBounds(
-      airports.map((airport) => [airport.latitude, airport.longitude])
+      airportsForBounds.map((airport) => [airport.latitude, airport.longitude])
     );
 
     window.setTimeout(() => {
       mapRef.current?.invalidateSize();
-      mapRef.current?.fitBounds(bounds.pad(0.16), { maxZoom: 3, animate: false });
+      mapRef.current?.fitBounds(bounds.pad(0.05), {
+        maxZoom: 3,
+        animate: false,
+        padding: [16, 16],
+      });
       didFitBoundsRef.current = true;
     }, 0);
-  }, [data, airports]);
+  }, [data, airports, activeAirports]);
 
   return (
     <div className="map-stage">
@@ -417,8 +486,14 @@ export default function MapStage({
         role="img"
         aria-label="Mapa mundial con aeropuertos y vuelos activos"
       />
+      {children}
     </div>
   );
+}
+
+function isAirportActive(airport: Airport) {
+  if (typeof airport.active === "boolean") return airport.active;
+  return (airport.operationalStatus ?? "ACTIVE").toUpperCase() !== "INACTIVE";
 }
 
 function MapInfoCard({ info, onClose }: { info: MapInfo; onClose: () => void }) {
@@ -470,11 +545,12 @@ function createAirportInfo(airport: Airport, load: number): MapInfo {
 
 function createFlightInfo(
   data: SimulationData | null,
-  flight: ActiveFlight,
+  flight: Flight | ActiveFlight,
   origin: Airport,
   destination: Airport,
   displayGmtOffset?: number
 ): MapInfo {
+  const progress = "progress" in flight ? `${Math.round(flight.progress * 100)}%` : "Planificado";
   return {
     type: "flight",
     id: flight.id,
@@ -486,13 +562,126 @@ function createFlightInfo(
       ["Destino", `${destination.code} - ${destination.city}`],
       ["Salida", formatFlightMoment(data, flight.absoluteDepartureMinute, displayGmtOffset)],
       ["Llegada", formatFlightMoment(data, flight.absoluteArrivalMinute, displayGmtOffset)],
-      ["Avance", `${Math.round(flight.progress * 100)}%`],
+      ["Avance", progress],
       [
         "Carga",
         `${flight.assignedLoad}/${flight.maxCapacity} maletas (${Math.round(flight.utilization * 100)}%)`,
       ],
     ],
   };
+}
+
+function createShipmentInfo(
+  data: SimulationData | null,
+  shipment: Shipment,
+  route: ShipmentRouteLeg[]
+): MapInfo {
+  const firstDeparture = route[0]?.absoluteDepartureMinute;
+  const lastArrival = [...route].reverse().find((leg) => leg.absoluteArrivalMinute !== undefined)
+    ?.absoluteArrivalMinute;
+  const scaleCount = Math.max(0, route.length - 1);
+
+  return {
+    type: "shipment",
+    id: shipment.id,
+    title: `Envio ${shipment.id}`,
+    subtitle: `${shipment.origin} -> ${shipment.destination}`,
+    rows: [
+      ["Maletas", shipment.suitcases],
+      ["Vuelos", route.length],
+      ["Escalas", scaleCount],
+      ["Pedido", formatFlightMoment(data, shipment.requestMinute)],
+      ["Primera salida", firstDeparture !== undefined ? formatFlightMoment(data, firstDeparture) : "--"],
+      ["Llegada estimada", lastArrival !== undefined ? formatFlightMoment(data, lastArrival) : "--"],
+      ["Estado", shipment.planned ? (shipment.onTime ? "A tiempo" : "Con retraso") : "Sin ruta"],
+    ],
+  };
+}
+
+function drawShipmentRoute(
+  ctx: CanvasRenderingContext2D,
+  map: L.Map,
+  route: ShipmentRouteLeg[],
+  airportByCode: Record<string, Airport>
+) {
+  route.forEach((leg, index) => {
+    const origin = airportByCode[leg.origin];
+    const destination = airportByCode[leg.destination];
+    if (!origin || !destination) return;
+
+    drawRouteSegment(ctx, map, origin, destination, {
+      color: "#f59e0b",
+      width: 4.2,
+      alpha: 0.86,
+      dash: index % 2 === 0 ? [10, 6] : [4, 5],
+      shadow: true,
+    });
+    drawRouteNode(ctx, map, origin, index === 0 ? "#22c55e" : "#f59e0b");
+    drawRouteNode(ctx, map, destination, index === route.length - 1 ? "#ef4444" : "#f59e0b");
+  });
+}
+
+function drawStaticFlightRoute(
+  ctx: CanvasRenderingContext2D,
+  map: L.Map,
+  flight: Flight,
+  airportByCode: Record<string, Airport>
+) {
+  const origin = airportByCode[flight.origin];
+  const destination = airportByCode[flight.destination];
+  if (!origin || !destination) return;
+
+  drawRouteSegment(ctx, map, origin, destination, {
+    color: STATUS_COLOR[flight.status] ?? "#111827",
+    width: 3.2,
+    alpha: 0.82,
+    dash: [8, 6],
+    shadow: true,
+  });
+  drawRouteNode(ctx, map, origin, "#111827");
+  drawRouteNode(ctx, map, destination, "#111827");
+}
+
+function drawRouteSegment(
+  ctx: CanvasRenderingContext2D,
+  map: L.Map,
+  origin: Airport,
+  destination: Airport,
+  options: { color: string; width: number; alpha: number; dash?: number[]; shadow?: boolean }
+) {
+  const { originPixel, destPixel } = getRouteGeometry(map, origin, destination, 0);
+  ctx.save();
+  ctx.strokeStyle = options.color;
+  ctx.lineWidth = options.width;
+  ctx.globalAlpha = options.alpha;
+  ctx.setLineDash(options.dash ?? []);
+  if (options.shadow) {
+    ctx.shadowColor = "rgba(15, 23, 42, 0.32)";
+    ctx.shadowBlur = 10;
+  }
+  ctx.beginPath();
+  ctx.moveTo(originPixel.x, originPixel.y);
+  ctx.lineTo(destPixel.x, destPixel.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRouteNode(
+  ctx: CanvasRenderingContext2D,
+  map: L.Map,
+  airport: Airport,
+  color: string
+) {
+  const point = map.latLngToContainerPoint([airport.latitude, airport.longitude]);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function setPaneZIndex(map: L.Map, paneName: string, zIndex: string) {

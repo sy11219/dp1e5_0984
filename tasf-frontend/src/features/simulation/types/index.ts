@@ -158,7 +158,7 @@ export interface ShipmentPage {
 export type AirportLoads = Record<string, number>;
 
 export interface MapInfoCard {
-  type: "airport" | "flight";
+  type: "airport" | "flight" | "shipment";
   id?: string;
   title: string;
   subtitle?: string;

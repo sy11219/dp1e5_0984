@@ -236,6 +236,17 @@ export async function advanceRealtimeSessionRequest(
   return response.data;
 }
 
+export async function pauseRealtimeSessionRequest(
+  simulationId: string,
+  paused: boolean
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(
+    `/realtime/${simulationId}/pause`,
+    { paused }
+  );
+  return response.data;
+}
+
 export async function cancelRealtimeFlightRequest(
   simulationId: string,
   flightId: string
