@@ -71,7 +71,15 @@ public class FlightPlanParser {
     }
 
     public List<Flight> parseScheduledFromDatabase(String startDate, int simulationDays, Map<String, Airport> airportMap) throws Exception {
-        return parseFromDatabase(startDate, simulationDays);
+        try {
+            return parseFromDatabase(startDate, simulationDays);
+        } catch (IllegalStateException e) {
+            System.err.printf("[FlightPlanParser] %s. Usando archivo local data/planes_vuelo.txt.%n", e.getMessage());
+            return parse("data/planes_vuelo.txt", simulationDays, airportMap);
+        } catch (SQLException e) {
+            System.err.printf("[FlightPlanParser] No se pudo conectar a la base de datos (%s). Usando archivo local data/planes_vuelo.txt.%n", e.getMessage());
+            return parse("data/planes_vuelo.txt", simulationDays, airportMap);
+        }
     }
 
     /**

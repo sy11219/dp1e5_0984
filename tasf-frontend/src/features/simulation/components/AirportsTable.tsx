@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Airport, AirportLoads, Flight, Shipment } from "../types";
+import type { Airport, AirportLoads, CapacityStatus, Flight, Shipment } from "../types";
 import { STATUS_COLOR } from "../utils/constants";
 import { capacityStatus } from "../utils/calculations";
 import { getShipmentsForAirport, getFlightsForAirport, getNextFlightByAirport } from "../utils/airportRelations";
@@ -14,9 +14,12 @@ interface AirportsTableProps {
   selectedAirport?: string | null;
   displayGmtOffset?: number;
   onSelectAirport?: (code: string) => void;
+  colorFilter?: ColorFilter;
+  onColorFilterChange?: (filter: ColorFilter) => void;
 }
 
 type ViewType = "incoming" | "outgoing" | "shipments";
+type ColorFilter = "Todos" | CapacityStatus;
 
 export function AirportsTable({
   airports,
@@ -27,9 +30,12 @@ export function AirportsTable({
   selectedAirport: selectedAirportProp,
   displayGmtOffset,
   onSelectAirport,
+  colorFilter: colorFilterProp,
+  onColorFilterChange,
 }: AirportsTableProps) {
   const [search, setSearch] = useState("");
   const [continentFilter, setContinentFilter] = useState("Cualquiera");
+  const [localColorFilter, setLocalColorFilter] = useState<ColorFilter>("Todos");
   const [localSelectedAirport, setLocalSelectedAirport] = useState<string | null>(null);
   const [expandedAirportCode, setExpandedAirportCode] = useState<string | null>(null);
   const [expandedView, setExpandedView] = useState<ViewType | null>(null);
@@ -37,6 +43,8 @@ export function AirportsTable({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
+  const colorFilter = colorFilterProp ?? localColorFilter;
+  const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
 
   const continents = useMemo(
     () => Array.from(new Set(airports.map((a) => a.continent))),
@@ -75,6 +83,14 @@ export function AirportsTable({
       result = result.filter((a) => a.continent === continentFilter);
     }
 
+    if (colorFilter !== "Todos") {
+      result = result.filter((a) => {
+        const load = loads[a.code] || 0;
+        const utilization = a.maxCapacity ? load / a.maxCapacity : 0;
+        return capacityStatus(utilization) === colorFilter;
+      });
+    }
+
     const direction = sortOrder === "asc" ? 1 : -1;
     result.sort((a, b) => {
       if (sortBy === "utilization") {
@@ -95,7 +111,7 @@ export function AirportsTable({
     });
 
     return result;
-  }, [search, continentFilter, airports, loads, sortBy, sortOrder, nextFlightByAirport]);
+  }, [search, continentFilter, colorFilter, airports, loads, sortBy, sortOrder, nextFlightByAirport]);
 
   const visible = filtered.slice(0, 10);
 
@@ -207,6 +223,19 @@ export function AirportsTable({
               >
                 <option value="desc">Descendente</option>
                 <option value="asc">Ascendente</option>
+              </select>
+            </label>
+
+            <label className="text-sm">
+              Color:
+              <select
+                value={colorFilter}
+                onChange={(e) => setColorFilter(e.target.value as ColorFilter)}
+              >
+                <option value="Todos">Todos</option>
+                <option value="green">Verde</option>
+                <option value="yellow">Amarillo</option>
+                <option value="red">Rojo</option>
               </select>
             </label>
           </div>
