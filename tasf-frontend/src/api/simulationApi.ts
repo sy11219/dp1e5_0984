@@ -358,7 +358,7 @@ export type ShipmentCreatePayload = {
   destinationAirportCode: string;
   departureDate: string;
   baggageCount: number;
-  shipmentId: string;
+  clientId: string;
 };
 
 function toUtcIsoIfLocalDateTime(value: string): string {
@@ -375,6 +375,7 @@ export type ShipmentRecord = {
   registered_at: string;
   max_delivery_at: string;
   status: string;
+  client_id?: string;
 };
 
 export type ShipmentListRecord = {

@@ -41,9 +41,11 @@ public class ShipmentService {
         validateRequest(request);
         String originCode = normalizeAirportCode(request.originAirportCode());
         String destinationCode = normalizeAirportCode(request.destinationAirportCode());
-        String shipmentCode = originCode + "-" + normalizeShipmentId(request.shipmentId());
+        String clientId = normalizeClientId(request.clientId());
 
         try (Connection connection = openConnection()) {
+            connection.setAutoCommit(false);
+
             AirportRef origin = findAirport(connection, originCode);
             AirportRef destination = findAirport(connection, destinationCode);
 
@@ -56,14 +58,15 @@ public class ShipmentService {
 
             OffsetDateTime registeredAtUtc = parseDateTimeAtOrigin(request.departureDate(), origin.offset());
             OffsetDateTime maxDeliveryAt = registeredAtUtc.plusDays(deadlineDays(origin, destination));
+            String shipmentCode = nextShipmentCode(connection, originCode);
 
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO shipments (
                       id, shipment_code, origin_airport_id, destination_airport_id,
-                      baggage_count, registered_at, max_delivery_at, status
+                      baggage_count, registered_at, max_delivery_at, status, client_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'REGISTERED')
-                    RETURNING shipment_code, baggage_count, registered_at, max_delivery_at, status
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'REGISTERED', ?)
+                    RETURNING shipment_code, baggage_count, registered_at, max_delivery_at, status, client_id
                     """)) {
                 statement.setObject(1, UUID.randomUUID());
                 statement.setString(2, shipmentCode);
@@ -72,11 +75,17 @@ public class ShipmentService {
                 statement.setInt(5, request.baggageCount());
                 statement.setObject(6, registeredAtUtc);
                 statement.setObject(7, maxDeliveryAt);
+                statement.setString(8, clientId);
 
                 try (ResultSet result = statement.executeQuery()) {
                     result.next();
-                    return shipmentJson(result, originCode, destinationCode);
+                    String json = shipmentJson(result, originCode, destinationCode);
+                    connection.commit();
+                    return json;
                 }
+            } catch (RuntimeException | SQLException e) {
+                connection.rollback();
+                throw e;
             }
         }
     }
@@ -297,7 +306,7 @@ public class ShipmentService {
         }
         normalizeAirportCode(request.originAirportCode());
         normalizeAirportCode(request.destinationAirportCode());
-        normalizeShipmentId(request.shipmentId());
+        normalizeClientId(request.clientId());
         validateDateTime(request.departureDate());
         if (request.baggageCount() <= 0) {
             throw new IllegalArgumentException("La cantidad de maletas debe ser mayor a cero.");
@@ -316,6 +325,36 @@ public class ShipmentService {
             throw new IllegalArgumentException("El id del envio debe tener hasta 9 digitos.");
         }
         return String.format("%09d", Integer.parseInt(shipmentId));
+    }
+
+    private String normalizeClientId(String clientId) {
+        if (clientId == null || !clientId.matches("\\d{7}")) {
+            throw new IllegalArgumentException("El id del cliente debe tener 7 digitos.");
+        }
+        return clientId;
+    }
+
+    private String nextShipmentCode(Connection connection, String originCode) throws SQLException {
+        try (PreparedStatement lock = connection.prepareStatement("SELECT pg_advisory_xact_lock(hashtext(?))")) {
+            lock.setString(1, "shipments:" + originCode);
+            lock.execute();
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT COALESCE(MAX(CAST(SUBSTRING(shipment_code FROM 6 FOR 9) AS INTEGER)), 0) + 1 AS next_id
+                FROM shipments
+                WHERE shipment_code ~ ?
+                """)) {
+            statement.setString(1, "^" + originCode + "-[0-9]{9}$");
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                int nextId = result.getInt("next_id");
+                if (nextId > 999_999_999) {
+                    throw new IllegalArgumentException("Se alcanzo el maximo de envios para " + originCode + ".");
+                }
+                return originCode + "-" + String.format("%09d", nextId);
+            }
+        }
     }
 
     private void validateDateTime(String value) {
@@ -380,7 +419,8 @@ public class ShipmentService {
         prop(json, "baggage_count", result.getInt("baggage_count")).append(",");
         prop(json, "registered_at", result.getObject("registered_at", OffsetDateTime.class).toString()).append(",");
         prop(json, "max_delivery_at", result.getObject("max_delivery_at", OffsetDateTime.class).toString()).append(",");
-        prop(json, "status", result.getString("status"));
+        prop(json, "status", result.getString("status")).append(",");
+        prop(json, "client_id", result.getString("client_id"));
         json.append("}");
         return json.toString();
     }
@@ -424,7 +464,7 @@ public class ShipmentService {
             String destinationAirportCode,
             String departureDate,
             int baggageCount,
-            String shipmentId
+            String clientId
     ) {}
 
     public record ShipmentBatchCreateRequest(

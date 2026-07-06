@@ -59,7 +59,6 @@ public class SimulatorServer {
     private static final Pattern FLIGHT_STATUS_FIELD = Pattern.compile("\"status\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern DEPARTURE_DATE = Pattern.compile("\"departureDate\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern BAGGAGE_COUNT = Pattern.compile("\"baggageCount\"\\s*:\\s*(\\d+)");
-    private static final Pattern SHIPMENT_ID = Pattern.compile("\"shipmentId\"\\s*:\\s*\"?([0-9]{1,9})\"?");
     private static final Pattern FILE_CONTENT_BASE64 = Pattern.compile("\"fileContentBase64\"\\s*:\\s*\"([^\"]*)\"");
 
     private final SimulationService simulationService = new SimulationService();
@@ -393,7 +392,7 @@ public class SimulatorServer {
                     readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
                     readRequiredString(DEPARTURE_DATE, body, "departureDate"),
                     readRequiredInt(BAGGAGE_COUNT, body, "baggageCount"),
-                    readRequiredString(SHIPMENT_ID, body, "shipmentId")
+                    readRequiredString(CLIENT_ID, body, "clientId")
             );
             String response = shipmentService.createShipment(request);
             realtimeSimulationService.syncRegisteredShipmentsFromDatabase();

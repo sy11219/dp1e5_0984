@@ -39,7 +39,7 @@ function emptyForm(defaultAirportCode = ""): ShipmentCreatePayload {
     destinationAirportCode: defaultAirportCode,
     departureDate: currentDateTimeLocalValue(),
     baggageCount: 1,
-    shipmentId: "",
+    clientId: "",
   };
 }
 
@@ -171,7 +171,7 @@ export function ShipmentsPage() {
         ...form,
         originAirportCode: form.originAirportCode.toUpperCase(),
         destinationAirportCode: form.destinationAirportCode.toUpperCase(),
-        shipmentId: form.shipmentId.padStart(9, "0"),
+        clientId: form.clientId,
       });
       setCreated(createdShipment);
       setForm(null);
@@ -414,16 +414,16 @@ export function ShipmentsPage() {
                 />
               </div>
               <div className="field">
-                <label>ID del envío</label>
+                <label>ID del cliente</label>
                 <input
                   inputMode="numeric"
-                  pattern="[0-9]{1,9}"
-                  maxLength={9}
-                  value={form.shipmentId}
+                  pattern="[0-9]{7}"
+                  maxLength={7}
+                  value={form.clientId}
                   onChange={(event) =>
-                    updateForm("shipmentId", event.target.value.replace(/\D/g, "").slice(0, 9))
+                    updateForm("clientId", event.target.value.replace(/\D/g, "").slice(0, 7))
                   }
-                  placeholder="000000001"
+                  placeholder="0005296"
                   required
                 />
               </div>
