@@ -170,8 +170,12 @@ public class ShipmentParser {
                     }
                 }
             }
+        } catch (IllegalStateException e) {
+            System.err.printf("[ShipmentParser] %s. Usando carpeta local data/envios.%n", e.getMessage());
+            return parseAll("data/envios", simulationStartDate, maxSimulationDays);
         } catch (SQLException e) {
-            throw new IOException("No se pudieron cargar envios desde la base de datos.", e);
+            System.err.printf("[ShipmentParser] No se pudo conectar a la base de datos (%s). Usando carpeta local data/envios.%n", e.getMessage());
+            return parseAll("data/envios", simulationStartDate, maxSimulationDays);
         }
 
         System.out.printf("[ShipmentParser] Cargados %d envios desde BD.%n", shipments.size());

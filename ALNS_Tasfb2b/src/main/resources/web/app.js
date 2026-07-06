@@ -8,6 +8,12 @@ const STATUS_COLOR = {
 
 const BATCH_MINUTES = 180;
 const BATCH_INTERVAL_MS = 120_000;
+const STATUS_FILTERS = [
+  { value: "all", label: "Todos" },
+  { value: "green", label: "Verde" },
+  { value: "yellow", label: "Amarillo" },
+  { value: "red", label: "Rojo" },
+];
 
 function App() {
   const [startDate, setStartDate] = useState("2026-07-01");
@@ -22,6 +28,8 @@ function App() {
   const [batchPhase, setBatchPhase] = useState("");
   const [error, setError] = useState("");
   const [selectedAirport, setSelectedAirport] = useState(null);
+  const [airportStatusFilter, setAirportStatusFilter] = useState("all");
+  const [flightStatusFilter, setFlightStatusFilter] = useState("all");
   const [now, setNow] = useState(new Date());
   const frame = useRef(null);
   const batchAbortRef = useRef(false);
@@ -185,6 +193,10 @@ function App() {
 
   const airportLoads = useMemo(() => computeAirportLoads(data, simMinute), [data, simMinute]);
   const activeFlights = useMemo(() => computeActiveFlights(data, simMinute), [data, simMinute]);
+  const filteredActiveFlights = useMemo(
+    () => activeFlights.filter((flight) => matchesStatusFilter(flight.status, flightStatusFilter)),
+    [activeFlights, flightStatusFilter]
+  );
   const selected = data?.airports.find((airport) => airport.code === selectedAirport);
 
   return (
@@ -279,8 +291,10 @@ function App() {
         React.createElement("section", { className: "panel map-panel" },
           React.createElement(MapStage, {
             data,
-            activeFlights,
+            activeFlights: filteredActiveFlights,
             airportLoads,
+            airportStatusFilter,
+            flightStatusFilter,
             selectedAirport,
             onSelectAirport: setSelectedAirport,
           }),
@@ -293,14 +307,46 @@ function App() {
           ),
           React.createElement("section", { className: "panel section" },
             React.createElement("h3", null, "Vuelos activos"),
-            React.createElement(FlightsTable, { flights: activeFlights })
+            React.createElement(StatusFilter, {
+              label: "Filtro por color",
+              value: flightStatusFilter,
+              onChange: setFlightStatusFilter,
+            }),
+            React.createElement(FlightsTable, { flights: filteredActiveFlights, statusFilter: flightStatusFilter })
           ),
           React.createElement("section", { className: "panel section" },
             React.createElement("h3", null, "Aeropuertos criticos"),
-            data ? React.createElement(AirportsTable, { airports: data.airports, loads: airportLoads }) : React.createElement("div", { className: "empty-state" }, "Sin datos.")
+            React.createElement(StatusFilter, {
+              label: "Filtro por color",
+              value: airportStatusFilter,
+              onChange: setAirportStatusFilter,
+            }),
+            data ? React.createElement(AirportsTable, {
+              airports: data.airports,
+              loads: airportLoads,
+              statusFilter: airportStatusFilter,
+            }) : React.createElement("div", { className: "empty-state" }, "Sin datos.")
           )
         )
       )
+    )
+  );
+}
+
+function StatusFilter({ label, value, onChange }) {
+  return React.createElement("div", { className: "status-filter" },
+    React.createElement("span", { className: "status-filter-label" }, label),
+    React.createElement("div", { className: "status-filter-options" },
+      STATUS_FILTERS.map((option) => React.createElement("button", {
+        key: option.value,
+        type: "button",
+        className: value === option.value ? "active" : "",
+        onClick: () => onChange(option.value),
+        "aria-pressed": value === option.value,
+      },
+        option.value !== "all" && React.createElement("span", { className: `dot ${option.value}` }),
+        React.createElement("span", null, option.label)
+      ))
     )
   );
 }
@@ -355,7 +401,7 @@ function Metric({ label, value, sub }) {
   );
 }
 
-function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelectAirport }) {
+function MapStage({ data, activeFlights, airportLoads, airportStatusFilter, flightStatusFilter, selectedAirport, onSelectAirport }) {
   const [mapInfo, setMapInfo] = useState(null);
   const mapElement = useRef(null);
   const mapRef = useRef(null);
@@ -365,6 +411,14 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
   const airportLoadsRef = useRef({});
   const airportMarkersRef = useRef(new Map());
   const airports = data?.airports || [];
+  const visibleAirports = useMemo(
+    () => airports.filter((airport) => {
+      const load = airportLoads[airport.code] || 0;
+      const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
+      return matchesStatusFilter(capacityStatus(utilization), airportStatusFilter);
+    }),
+    [airports, airportLoads, airportStatusFilter]
+  );
   const airportByCode = useMemo(() => Object.fromEntries(airports.map((airport) => [airport.code, airport])), [airports]);
   const usedPairs = useMemo(() => {
     if (!data) return [];
@@ -426,7 +480,7 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
 
     airportLayerRef.current.clearLayers();
     airportMarkersRef.current.clear();
-    for (const airport of airports) {
+    for (const airport of visibleAirports) {
       const load = airportLoadsRef.current[airport.code] || 0;
       const status = capacityStatus(load / airport.maxCapacity);
       const isSelected = airport.code === selectedAirport;
@@ -456,10 +510,10 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
         .addTo(airportLayerRef.current);
       airportMarkersRef.current.set(airport.code, { airport, marker });
     }
-  }, [airports, onSelectAirport]);
+  }, [visibleAirports, onSelectAirport]);
 
   useEffect(() => {
-    for (const airport of airports) {
+    for (const airport of visibleAirports) {
       const item = airportMarkersRef.current.get(airport.code);
       if (!item) continue;
       const load = airportLoads[airport.code] || 0;
@@ -468,7 +522,7 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
       if (!element) continue;
       element.className = `airport-marker ${status}${airport.code === selectedAirport ? " selected" : ""}`;
     }
-  }, [airports, airportLoads, selectedAirport]);
+  }, [visibleAirports, airportLoads, selectedAirport]);
 
   useEffect(() => {
     if (!mapRef.current || !planeLayerRef.current || !window.L) return;
@@ -520,8 +574,10 @@ function MapStage({ data, activeFlights, airportLoads, selectedAirport, onSelect
 
   return React.createElement("div", { className: "map-stage" },
     React.createElement("div", { className: "map-header" },
-      React.createElement("span", { className: "badge" }, data ? `${data.airports.length} aeropuertos` : "Mapa operativo"),
-      React.createElement("span", { className: "badge" }, data ? `${activeFlights.length} vuelos en aire` : "Simulacion")
+      React.createElement("span", { className: "badge" }, data ? `${visibleAirports.length}/${data.airports.length} aeropuertos` : "Mapa operativo"),
+      React.createElement("span", { className: "badge" }, data ? `${activeFlights.length} vuelos en aire` : "Simulacion"),
+      airportStatusFilter !== "all" && React.createElement("span", { className: "badge filter-badge" }, `Almacenes ${filterLabel(airportStatusFilter)}`),
+      flightStatusFilter !== "all" && React.createElement("span", { className: "badge filter-badge" }, `Vuelos ${filterLabel(flightStatusFilter)}`)
     ),
     mapInfo && React.createElement(MapInfoCard, { info: mapInfo, onClose: () => setMapInfo(null) }),
     React.createElement("div", { ref: mapElement, className: "leaflet-map", role: "img", "aria-label": "Mapa mundial con aeropuertos y vuelos activos" }),
@@ -626,8 +682,13 @@ function AirportDetail({ airport, load }) {
   );
 }
 
-function FlightsTable({ flights }) {
-  if (!flights.length) return React.createElement("div", { className: "empty-state" }, "No hay vuelos activos en este minuto.");
+function FlightsTable({ flights, statusFilter }) {
+  if (!flights.length) {
+    const message = statusFilter === "all"
+      ? "No hay vuelos activos en este minuto."
+      : `No hay vuelos activos ${filterLabel(statusFilter).toLowerCase()} en este minuto.`;
+    return React.createElement("div", { className: "empty-state" }, message);
+  }
   return React.createElement("div", { className: "table" },
     flights.slice(0, 10).map((flight) => React.createElement("div", { className: "row", key: flight.id },
       React.createElement("span", { className: `dot ${flight.status}` }),
@@ -640,8 +701,17 @@ function FlightsTable({ flights }) {
   );
 }
 
-function AirportsTable({ airports, loads }) {
-  const ordered = [...airports].sort((a, b) => (loads[b.code] || 0) / b.maxCapacity - (loads[a.code] || 0) / a.maxCapacity);
+function AirportsTable({ airports, loads, statusFilter }) {
+  const ordered = [...airports]
+    .filter((airport) => {
+      const load = loads[airport.code] || 0;
+      const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
+      return matchesStatusFilter(capacityStatus(utilization), statusFilter);
+    })
+    .sort((a, b) => (loads[b.code] || 0) / b.maxCapacity - (loads[a.code] || 0) / a.maxCapacity);
+  if (!ordered.length) {
+    return React.createElement("div", { className: "empty-state" }, `No hay almacenes ${filterLabel(statusFilter).toLowerCase()}.`);
+  }
   return React.createElement("div", { className: "table" },
     ordered.slice(0, 10).map((airport) => {
       const load = loads[airport.code] || 0;
@@ -694,6 +764,15 @@ function capacityStatus(utilization) {
   if (utilization < 0.70) return "green";
   if (utilization < 0.90) return "yellow";
   return "red";
+}
+
+function matchesStatusFilter(status, filter) {
+  return filter === "all" || status === filter;
+}
+
+function filterLabel(filter) {
+  const match = STATUS_FILTERS.find((option) => option.value === filter);
+  return match ? match.label : "Todos";
 }
 
 function compactDate(date) {

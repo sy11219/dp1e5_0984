@@ -78,8 +78,15 @@ public class AirportParser {
                         parseGmtOffset(result.getString("timezone"))
                 ));
             }
+        } catch (IOException e) {
+            System.err.printf("[AirportParser] %s. Usando archivo local data/aeropuertos.txt.%n", e.getMessage());
+            return parse("data/aeropuertos.txt");
+        } catch (IllegalStateException e) {
+            System.err.printf("[AirportParser] %s. Usando archivo local data/aeropuertos.txt.%n", e.getMessage());
+            return parse("data/aeropuertos.txt");
         } catch (SQLException e) {
-            throw new IOException("No se pudieron cargar aeropuertos desde la base de datos.", e);
+            System.err.printf("[AirportParser] No se pudo conectar a la base de datos (%s). Usando archivo local data/aeropuertos.txt.%n", e.getMessage());
+            return parse("data/aeropuertos.txt");
         }
 
         System.out.printf("[AirportParser] Cargados %d aeropuertos desde BD.%n", airports.size());

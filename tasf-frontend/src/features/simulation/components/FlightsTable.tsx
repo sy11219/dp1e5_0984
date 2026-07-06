@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Flight, Shipment } from "../types";
+import type { CapacityStatus, Flight, Shipment } from "../types";
 import { STATUS_COLOR } from "../utils/constants";
 import { hhmm } from "../utils/formatters";
 
@@ -11,7 +11,11 @@ interface FlightsTableProps {
   selectedFlightId?: string | null;
   onSelectFlight?: (id: string) => void;
   displayGmtOffset?: number;
+  colorFilter?: ColorFilter;
+  onColorFilterChange?: (filter: ColorFilter) => void;
 }
+
+type ColorFilter = "Todos" | CapacityStatus;
 
 export function FlightsTable({
   flights,
@@ -21,17 +25,22 @@ export function FlightsTable({
   selectedFlightId,
   onSelectFlight,
   displayGmtOffset,
+  colorFilter: colorFilterProp,
+  onColorFilterChange,
 }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
   const [destinationFilter, setDestinationFilter] = useState("Cualquiera");
   const [statusFilter, setStatusFilter] = useState<"Todos" | "Activos" | "Inactivos">("Todos");
+  const [localColorFilter, setLocalColorFilter] = useState<ColorFilter>("Todos");
   const [sortBy, setSortBy] = useState<
     "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination"
   >("utilization");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedFlightShipments, setSelectedFlightShipments] = useState<Flight | null>(null);
   const [viewMode, setViewMode] = useState<"flights" | "flight-shipments">("flights");
+  const colorFilter = colorFilterProp ?? localColorFilter;
+  const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
 
   const origins = useMemo(() => Array.from(new Set(flights.map((f) => f.origin))), [flights]);
   const destinations = useMemo(
@@ -88,6 +97,10 @@ export function FlightsTable({
       result = result.filter((f) => !activeFlightIds.has(f.id));
     }
 
+    if (colorFilter !== "Todos") {
+      result = result.filter((f) => f.status === colorFilter);
+    }
+
     result.sort((a, b) => {
       const aActive = activeFlightIds.has(a.id);
       const bActive = activeFlightIds.has(b.id);
@@ -105,7 +118,7 @@ export function FlightsTable({
     });
 
     return result;
-  }, [flights, search, originFilter, destinationFilter, statusFilter, sortBy, sortOrder, activeFlightIds]);
+  }, [flights, search, originFilter, destinationFilter, statusFilter, colorFilter, sortBy, sortOrder, activeFlightIds]);
 
   const visibleFlights = useMemo(() => {
     const base = filteredAndSortedFlights.slice(0, 10);
@@ -113,9 +126,9 @@ export function FlightsTable({
       return base;
     }
 
-    const selected = flights.find((flight) => flight.id === selectedFlightId);
+    const selected = filteredAndSortedFlights.find((flight) => flight.id === selectedFlightId);
     return selected ? [selected, ...base.slice(0, 9)] : base;
-  }, [filteredAndSortedFlights, flights, selectedFlightId]);
+  }, [filteredAndSortedFlights, selectedFlightId]);
   const gmtOffset = displayGmtOffset ?? 0;
 
   if (viewMode === "flight-shipments" && selectedFlightShipments) {
@@ -220,6 +233,17 @@ export function FlightsTable({
           <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}>
             <option value="asc">Ascendente</option>
             <option value="desc">Descendente</option>
+          </select>
+        </label>
+
+        <label className="text-sm">
+          Color:
+          <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
+            <option value="Todos">Todos</option>
+            <option value="green">Verde</option>
+            <option value="yellow">Amarillo</option>
+            <option value="red">Rojo</option>
+            <option value="gray">Gris</option>
           </select>
         </label>
       </div>

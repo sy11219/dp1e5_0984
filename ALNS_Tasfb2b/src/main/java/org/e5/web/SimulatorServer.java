@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -73,6 +74,31 @@ public class SimulatorServer {
         app.start(port);
     }
 
+    static int findAvailablePort(int preferredPort, int maxAttempts) {
+        if (isPortAvailable(preferredPort)) {
+            return preferredPort;
+        }
+
+        for (int offset = 1; offset <= maxAttempts; offset++) {
+            int candidate = preferredPort + offset;
+            if (isPortAvailable(candidate)) {
+                return candidate;
+            }
+        }
+
+        return preferredPort;
+    }
+
+    private static boolean isPortAvailable(int port) {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.setReuseAddress(false);
+            socket.bind(new InetSocketAddress("0.0.0.0", port));
+            return true;
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
     private static String envString(String name, String fallback) {
         String value = System.getenv(name);
         return value == null || value.isBlank() ? fallback : value.trim();
@@ -109,7 +135,12 @@ public class SimulatorServer {
     }
 
     private void start(int port) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
+        int resolvedPort = findAvailablePort(port, 10);
+        if (resolvedPort != port) {
+            System.out.printf("[Servidor] Puerto %d ocupado; usando %d en su lugar.%n", port, resolvedPort);
+        }
+
+        HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", resolvedPort), 0);
         server.createContext("/api/health", this::health);
         server.createContext("/api/simulations/alns", this::runAlns);
         server.createContext("/api/airports", this::airportStatus);
@@ -122,7 +153,7 @@ public class SimulatorServer {
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
         server.start();
-        System.out.printf("Simulador ALNS listo en http://localhost:%d/%n", port);
+        System.out.printf("Simulador ALNS listo en http://localhost:%d/%n", resolvedPort);
         startRealtimeOnBoot();
         try {
             new CountDownLatch(1).await();

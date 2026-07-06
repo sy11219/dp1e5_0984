@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import L from "leaflet";
-import type { ActiveFlight, Airport, AirportLoads, Flight, MapInfoCard as MapInfo, Shipment, SimulationData } from "../../../types";
+import type { ActiveFlight, Airport, AirportLoads, CapacityStatus, Flight, MapInfoCard as MapInfo, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR, MAP_CONFIG, PANE_Z_INDEX } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
 import { formatFlightMoment } from "../../../utils/formatters";
@@ -17,6 +17,7 @@ type MapStageProps = {
   data: SimulationData | null;
   activeFlights: ActiveFlight[];
   airportLoads: AirportLoads;
+  airportColorFilter?: "Todos" | CapacityStatus;
   selectedAirport: string | null;
   selectedFlightId?: string | null;
   selectedShipment?: Shipment | null;
@@ -47,6 +48,7 @@ export default function MapStage({
   data,
   activeFlights,
   airportLoads,
+  airportColorFilter = "Todos",
   selectedAirport,
   selectedFlightId,
   selectedShipment,
@@ -70,9 +72,18 @@ export default function MapStage({
   const autoCloseFlightIdRef = useRef<string | null>(null);
 
   const airports = useMemo(() => data?.airports || [], [data]);
+  const visibleAirports = useMemo(
+    () =>
+      airports.filter((airport) => {
+        if (airportColorFilter === "Todos") return true;
+        const load = airportLoads[airport.code] || 0;
+        return capacityStatus(load / airport.maxCapacity) === airportColorFilter;
+      }),
+    [airportColorFilter, airportLoads, airports]
+  );
   const activeAirports = useMemo(
-    () => airports.filter(isAirportActive),
-    [airports]
+    () => visibleAirports.filter(isAirportActive),
+    [visibleAirports]
   );
   const airportByCode = useMemo(
     () => Object.fromEntries(airports.map((airport) => [airport.code, airport])),
@@ -168,7 +179,7 @@ export default function MapStage({
     airportLayerRef.current.clearLayers();
     airportMarkersRef.current.clear();
 
-    for (const airport of airports) {
+    for (const airport of visibleAirports) {
       const load = airportLoadsRef.current[airport.code] || 0;
       const marker = L.marker([airport.latitude, airport.longitude], {
         icon: createAirportIcon(airport, load, airport.code === selectedAirport),
@@ -187,11 +198,11 @@ export default function MapStage({
 
       airportMarkersRef.current.set(airport.code, { airport, marker });
     }
-  }, [airports, onSelectAirport, selectedAirport]);
+  }, [onSelectAirport, selectedAirport, visibleAirports]);
 
   // Actualizar estado de aeropuertos (colores)
   useEffect(() => {
-    for (const airport of airports) {
+    for (const airport of visibleAirports) {
       const item = airportMarkersRef.current.get(airport.code);
       if (!item) continue;
 
@@ -203,7 +214,7 @@ export default function MapStage({
         element.className = `airport-marker ${status}${airport.code === selectedAirport ? " selected" : ""}`;
       }
     }
-  }, [airports, airportLoads, selectedAirport]);
+  }, [airportLoads, selectedAirport, visibleAirports]);
 
   // Función para dibujar en canvas
   const drawFlights = useCallback((force = false) => {
@@ -455,9 +466,9 @@ export default function MapStage({
   }, []);
 
   useEffect(() => {
-    if (!data || !mapRef.current || !airports.length || didFitBoundsRef.current) return;
+    if (!data || !mapRef.current || !visibleAirports.length || didFitBoundsRef.current) return;
 
-    const airportsForBounds = activeAirports.length ? activeAirports : airports;
+    const airportsForBounds = activeAirports.length ? activeAirports : visibleAirports;
     const bounds = L.latLngBounds(
       airportsForBounds.map((airport) => [airport.latitude, airport.longitude])
     );
@@ -471,12 +482,12 @@ export default function MapStage({
       });
       didFitBoundsRef.current = true;
     }, 0);
-  }, [data, airports, activeAirports]);
+  }, [data, visibleAirports, activeAirports]);
 
   return (
     <div className="map-stage">
       <div className="map-header">
-        <span className="badge">{data ? `${data.airports.length} aeropuertos` : "Mapa operativo"}</span>
+        <span className="badge">{data ? `${visibleAirports.length}/${data.airports.length} aeropuertos` : "Mapa operativo"}</span>
         <span className="badge">{data ? `${activeFlights.length} vuelos en aire` : "Simulación"}</span>
       </div>
       {mapInfo && <MapInfoCard info={mapInfo} onClose={() => setMapInfo(null)} />}

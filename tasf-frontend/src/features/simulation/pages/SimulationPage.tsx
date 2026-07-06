@@ -23,9 +23,9 @@ import MapStage, { type MapFocusTarget } from "../components/simulation/map/MapS
 import { Timeline } from "../components/Timeline"
 import { SimulationStatusCards } from "../components/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
-import type { Airport, Flight, Shipment, SimulationData } from "../types"
+import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../types"
 import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../utils/constants"
-import { computeActiveFlights, computeAirportLoads } from "../utils/calculations"
+import { capacityStatus, computeActiveFlights, computeAirportLoads } from "../utils/calculations"
 import { SimulationResultModal } from "../components/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
 import { useAssignedAirportTime } from "../utils/assignedAirportTime"
@@ -35,6 +35,7 @@ const BATCH_SIMULATION_STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
 const SIMULATION_MAP_FOCUS_KEY = "tasf.simulation5d.mapFocus"
 const FINAL_SUMMARY_KEY = "tasf.simulation5d.finalSummary"
 const DEFAULT_BATCH_INTERVAL_MS = 120_000
+type ColorFilter = "Todos" | CapacityStatus
 
 type FrozenSimulationSummary = {
   simulationId?: string
@@ -235,6 +236,8 @@ export function SimulationPage() {
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1)
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
+  const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos")
+  const [airportColorFilter, setAirportColorFilter] = useState<ColorFilter>("Todos")
 
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
   // para pasar el "from" correcto a animateBatch cuando llega la respuesta.
@@ -680,10 +683,31 @@ export function SimulationPage() {
     () => computeActiveFlights(displayData, simMinute),
     [displayData, simMinute]
   )
+  const filteredActiveFlights = useMemo(
+    () =>
+      flightColorFilter === "Todos"
+        ? activeFlights
+        : activeFlights.filter((flight) => flight.status === flightColorFilter),
+    [activeFlights, flightColorFilter]
+  )
   const activeFlightIds = useMemo(
     () => new Set(activeFlights.map(f => f.id)),
     [activeFlights]
   )
+  const mapSelectedFlightId = useMemo(() => {
+    if (!selectedFlightId) return null
+    if (flightColorFilter === "Todos") return selectedFlightId
+    const selectedFlight = displayData.flights.find((flight) => flight.id === selectedFlightId)
+    return selectedFlight?.status === flightColorFilter ? selectedFlightId : null
+  }, [displayData.flights, flightColorFilter, selectedFlightId])
+  const mapSelectedAirport = useMemo(() => {
+    if (!selectedAirport) return null
+    if (airportColorFilter === "Todos") return selectedAirport
+    const airport = displayData.airports.find((item) => item.code === selectedAirport)
+    if (!airport) return null
+    const load = airportLoads[airport.code] || 0
+    return capacityStatus(load / airport.maxCapacity) === airportColorFilter ? selectedAirport : null
+  }, [airportColorFilter, airportLoads, displayData.airports, selectedAirport])
   const visibleShipments = useMemo(
     () => {
       const historyMinutes = shipmentHistoryHours * 60
@@ -1031,10 +1055,11 @@ export function SimulationPage() {
         <section className="panel map-panel">
           <MapStage
             data={displayData}
-            activeFlights={activeFlights}
+            activeFlights={filteredActiveFlights}
             airportLoads={airportLoads}
-            selectedAirport={selectedAirport}
-            selectedFlightId={selectedFlightId}
+            airportColorFilter={airportColorFilter}
+            selectedAirport={mapSelectedAirport}
+            selectedFlightId={mapSelectedFlightId}
             selectedShipment={selectedShipment}
             focusTarget={mapFocusTarget}
             displayGmtOffset={displayGmtOffset}
@@ -1109,6 +1134,8 @@ export function SimulationPage() {
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
               displayGmtOffset={displayGmtOffset}
+              colorFilter={flightColorFilter}
+              onColorFilterChange={setFlightColorFilter}
             />
           </section>
           <section className="panel section">
@@ -1153,6 +1180,8 @@ export function SimulationPage() {
                 selectedAirport={selectedAirport}
                 displayGmtOffset={displayGmtOffset}
                 onSelectAirport={focusAirport}
+                colorFilter={airportColorFilter}
+                onColorFilterChange={setAirportColorFilter}
               />
             ) : (
               <div className="empty-state">Sin datos.</div>

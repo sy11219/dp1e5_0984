@@ -377,6 +377,55 @@ select {
   gap: 8px;
 }
 
+.status-filter {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+}
+
+.legend + .status-filter {
+  margin-top: 12px;
+}
+
+.status-filter-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.status-filter-options button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 1px solid #cfd7e3;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-filter-options button.active {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.status-filter-options button.active .dot {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.28);
+}
+
 .dot {
   width: 11px;
   height: 11px;
@@ -437,6 +486,12 @@ select {
   color: #334155;
   font-size: 12px;
   font-weight: 800;
+}
+
+.filter-badge {
+  background: rgba(17,24,39,0.9);
+  border-color: rgba(17,24,39,0.94);
+  color: #fff;
 }
 
 .map-stage {
