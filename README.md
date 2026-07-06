@@ -2,8 +2,8 @@
 
 Este repositorio contiene dos aplicaciones principales:
 
-- `ALNS_Tasfb2b`: backend Java/Maven con el motor de simulacion ALNS y API HTTP.
-- `tasf-frontend`: frontend React/Vite servido como archivos estaticos por Nginx.
+- `ALNS_Tasfb2b`: backend Java/Maven con el motor de simulación ALNS y API HTTP.
+- `tasf-frontend`: frontend React/Vite servido como archivos estáticos por Nginx.
 
 La arquitectura de despliegue recomendada en la VM es:
 
@@ -36,7 +36,7 @@ Versiones esperadas:
 - Nginx
 - Git
 
-Si falta Java 21, instalarlo antes de compilar el backend. El `pom.xml` compila con target 21; si se usa otro JDK aparecera el error:
+Si falta Java 21, instalarlo antes de compilar el backend. El `pom.xml` compila con target 21; si se usa otro JDK aparecerá el error:
 
 ```text
 invalid target release: 21
@@ -50,7 +50,7 @@ El repo debe estar en:
 /opt/tasf-app/dp1e5_0984
 ```
 
-Clonar si aun no existe:
+Clonar si aún no existe:
 
 ```bash
 sudo mkdir -p /opt/tasf-app
@@ -131,7 +131,7 @@ Ver logs:
 sudo journalctl -u tasf-backend -n 80 --no-pager
 ```
 
-Verificar que arranco:
+Verificar que arrancó:
 
 ```bash
 curl http://127.0.0.1:8090/api/health
@@ -163,7 +163,7 @@ Crear o editar el sitio:
 sudo nano /etc/nginx/sites-available/tasf
 ```
 
-Configuracion recomendada:
+Configuración recomendada:
 
 ```nginx
 server {
@@ -194,7 +194,7 @@ Habilitar el sitio:
 sudo ln -s /etc/nginx/sites-available/tasf /etc/nginx/sites-enabled/tasf
 ```
 
-Si ya existe el symlink, no repetirlo. Verificar configuracion:
+Si ya existe el symlink, no repetirlo. Verificar configuración:
 
 ```bash
 sudo nginx -t
@@ -363,7 +363,7 @@ sudo systemctl restart tasf-backend
 
 ### Error 404 al llamar endpoints desde el frontend
 
-Revisar que Nginx este enviando `/api` al puerto correcto:
+Revisar que Nginx esté enviando `/api` al puerto correcto:
 
 ```bash
 sudo nginx -T | grep -n -A10 -B3 "location /api"
@@ -382,7 +382,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Error 500 por conexion a BD
+### Error 500 por conexión a BD
 
 Verificar variables del proceso:
 
@@ -457,7 +457,7 @@ npm run dev
 
 ## 12. Notas importantes
 
-- No commitear contrasenas ni URLs con credenciales.
+- No commitear contraseñas ni URLs con credenciales.
 - El backend debe correr en `8090` para coincidir con Nginx.
 - El frontend no habla directo con la BD; siempre usa `/api`.
 - Si se modifican endpoints del backend, desplegar backend antes o junto con frontend.
