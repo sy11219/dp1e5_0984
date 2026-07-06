@@ -7,14 +7,14 @@ import {
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
-import { AirportDetail } from "../../simulation/components/AirportDetail";
-import { AirportsTable } from "../../simulation/components/AirportsTable";
-import { CapacityLegend } from "../../simulation/components/CapacityLegend";
-import { FlightsTable } from "../../simulation/components/FlightsTable";
-import { GlobalIndicators } from "../../simulation/components/GlobalIndicators";
-import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
-import { SimulationResultModal } from "../../simulation/components/SimulationResultModal";
-import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
+import { AirportDetail } from "../../simulation/components/panel/AirportDetail";
+import { AirportsTable } from "../../simulation/components/panel/tables/AirportsTable";
+import { CapacityLegend } from "../../simulation/components/panel/CapacityLegend";
+import { FlightsTable } from "../../simulation/components/panel/tables/FlightsTable";
+import { GlobalIndicators } from "../../simulation/components/panel/GlobalIndicators";
+import { ShipmentsTable } from "../../simulation/components/panel/tables/ShipmentsTable";
+import { SimulationResultModal } from "../../simulation/components/general/SimulationResultModal";
+import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";

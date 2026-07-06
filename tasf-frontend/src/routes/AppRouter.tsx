@@ -11,7 +11,6 @@ import { AirportsPage } from "../features/airports/pages/AirportsPage";
 import { FlightsPage } from "../features/flights/pages/FlightsPage";
 import { ShipmentsPage } from "../features/shipments/pages/ShipmentsPage";
 import { StatsPage } from "../features/stats/pages/StatsPage";
-import { UploadPage } from "@/features/upload/pages/UploadPage";
 import { BatchSimulationCoordinator } from "../features/simulation/components/BatchSimulationCoordinator";
 
 
@@ -30,7 +29,6 @@ export default function AppRouter() {
         <Route path="/flights" element={<FlightsPage />}/>
         <Route path="/shipments" element={<ShipmentsPage />}/>
         <Route path="/stats" element={<StatsPage />}/>
-        <Route path="/upload" element={<UploadPage />}/>
       </Routes>
 
     </BrowserRouter>

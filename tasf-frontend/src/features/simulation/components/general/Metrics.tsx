@@ -1,0 +1,60 @@
+import type { SimulationData } from "../../types";
+import { percent } from "../../utils/formatters";
+
+interface MetricsProps {
+  data: SimulationData;
+}
+
+interface MetricProps {
+  label: string;
+  value: string | number;
+  sub: string | number;
+}
+
+function Metric({ label, value, sub }: MetricProps) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <span>{sub}</span>
+    </div>
+  );
+}
+
+export function Metrics({ data }: MetricsProps) {
+  const metrics = data.metrics;
+  const plannedPct = percent(metrics.plannedShipments, metrics.shipments);
+  const onTimePct = percent(metrics.onTimeShipments, metrics.shipments);
+  const deliveredShipments = metrics.deliveredShipments ?? metrics.onTimeShipments;
+  const deliveredPct = percent(deliveredShipments, metrics.shipments);
+
+  return (
+    <div className="metrics">
+      <Metric
+        label="Envíos planificados"
+        value={`${metrics.plannedShipments}/${metrics.shipments}`}
+        sub={`${plannedPct}%`}
+      />
+      <Metric
+        label="Entregados 120h"
+        value={`${deliveredShipments}/${metrics.shipments}`}
+        sub={`${deliveredPct}%`}
+      />
+      <Metric
+        label="A tiempo"
+        value={`${metrics.onTimeShipments}`}
+        sub={`${onTimePct}%`}
+      />
+      <Metric
+        label="Maletas"
+        value={metrics.plannedBags}
+        sub={`de ${metrics.totalBags}`}
+      />
+      <Metric
+        label="Vuelos usados"
+        value={metrics.usedFlights}
+        sub={`${metrics.iterations} iter.`}
+      />
+    </div>
+  );
+}
