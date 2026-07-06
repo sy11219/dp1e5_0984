@@ -57,7 +57,7 @@ function LiveMetrics({
       <div className="metric">
         <span>En cola</span>
         <strong>{data.metrics.queuedShipments || 0}</strong>
-        <span>pendientes de asignacion</span>
+        <span>pendientes de asignación</span>
       </div>
       <div className="metric">
         <span>Maletas asignadas</span>
@@ -405,7 +405,7 @@ export const OperationsPage = () => {
                 <label>Cancelar vuelo</label>
                 <input
                   type="text"
-                  placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
+                  placeholder="flight_code (ej: SKBO-VIDP-0005)"
                   value={flightToCancel}
                   onChange={(event) => setFlightToCancel(event.target.value)}
                   disabled={!data?.simulationId || cancelling}
@@ -417,7 +417,7 @@ export const OperationsPage = () => {
                 onClick={cancelFlight}
                 disabled={!data?.simulationId || !flightToCancel || cancelling}
               >
-                {cancelling ? "Registrando..." : "Registrar cancelacion"}
+                {cancelling ? "Registrando..." : "Registrar cancelación"}
               </button>
               {error && <div className="error">{error}</div>}
               {notice && <div className="success">{notice}</div>}
@@ -451,8 +451,8 @@ export const OperationsPage = () => {
               {operationDayToggling
                 ? "Actualizando..."
                 : operationsClosed
-                  ? "Abrir operaciones del dia"
-                  : "Finalizar operaciones del dia"}
+                  ? "Abrir operaciones del día"
+                  : "Finalizar operaciones del día"}
             </button>
           </section>
         </aside>
@@ -569,7 +569,7 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
-            <h3>Aeropuertos criticos</h3>
+            <h3>Aeropuertos críticos</h3>
             {data ? (
               <AirportsTable
                 airports={data.airports}

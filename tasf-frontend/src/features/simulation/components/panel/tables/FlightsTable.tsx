@@ -146,7 +146,7 @@ export function FlightsTable({
         </div>
         <div className="table">
           {relatedShipments.length === 0 ? (
-            <div className="empty-state">No se encontraron envios relacionados.</div>
+            <div className="empty-state">No se encontraron envíos relacionados.</div>
           ) : (
             relatedShipments.map((shipment) => (
               <div className="row" key={shipment.id}>
@@ -220,7 +220,7 @@ export function FlightsTable({
         <label className="text-sm">
           Ordenar por:
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}>
-            <option value="utilization">Ocupacion</option>
+            <option value="utilization">Ocupación</option>
             <option value="departureMinute">Hora de salida</option>
             <option value="arrivalMinute">Hora de llegada</option>
             <option value="origin">Origen</option>
@@ -229,7 +229,7 @@ export function FlightsTable({
         </label>
 
         <label className="text-sm">
-          Direccion:
+          Dirección:
           <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}>
             <option value="asc">Ascendente</option>
             <option value="desc">Descendente</option>

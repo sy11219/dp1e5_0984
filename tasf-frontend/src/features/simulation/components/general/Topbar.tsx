@@ -46,7 +46,7 @@ export function Topbar({
   simMinute,
   durationMs,
   title = "TASF.B2B - Simulador de equipaje",
-  subtitle = "Simulacion 5 dias",
+  subtitle = "Simulación 5 días",
   displayGmtOffset,
   displayAirportLabel,
 }: TopbarProps) {
@@ -69,17 +69,17 @@ export function Topbar({
           sub={displayAirportLabel || (data ? "inicio programado" : "--")}
         />
         <StatusItem
-          label="Fecha y Hora en Simulacion"
+          label="Fecha y Hora en Simulación"
           value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
           sub={simulatedDayLabel}
         />
         <StatusItem
-          label="Duracion de la simulacion"
+          label="Duración de la simulación"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecucion real"
+          sub="ejecución real"
         />
         <StatusItem
-          label="Tiempo transcurrido en simulacion"
+          label="Tiempo transcurrido en simulación"
           value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
           sub="avance acumulado"
         />
@@ -110,19 +110,19 @@ export function SimulationStatusCards({
           sub={displayAirportLabel || (data ? "inicio programado" : "--")}
         />
         <StatusItem
-          label="Fecha y Hora en Simulacion"
+          label="Fecha y Hora en Simulación"
           value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
           sub={simulatedDayLabel}
         />
       </div>
       <div className="status-strip map-status-strip map-status-strip-bottom-right">
         <StatusItem
-          label="Duracion de la simulacion"
+          label="Duración de la simulación"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecucion real"
+          sub="ejecución real"
         />
         <StatusItem
-          label="Tiempo transcurrido en simulacion"
+          label="Tiempo transcurrido en simulación"
           value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
           sub="avance acumulado"
         />

@@ -127,14 +127,14 @@ export function ShipmentsTable({
     onSelectShipment?.(shipment);
   };
 
-  if (!shipments.length) return <div className="empty-state">No hay envios registrados.</div>;
+  if (!shipments.length) return <div className="empty-state">No hay envíos registrados.</div>;
 
   return (
     <div className="shipments-table">
       <div className="search-bar" style={{ marginBottom: "0.5rem" }}>
         <input
           type="text"
-          placeholder="Buscar por envio, cliente, origen, destino o vuelo..."
+          placeholder="Buscar..."
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);

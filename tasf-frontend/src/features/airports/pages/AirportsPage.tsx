@@ -204,7 +204,7 @@ export function AirportsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Aeropuertos</h1>
-            <p>Catalogo completo leido desde la base de datos al iniciar la aplicacion.</p>
+            <p>Catalogo completo leído desde la base de datos al iniciar la aplicación.</p>
           </div>
           <button className="primary" onClick={openCreator} disabled={loading}>
             Nuevo
@@ -227,7 +227,7 @@ export function AirportsPage() {
           <div className="panel section metric-panel">
             <span>Inactivos</span>
             <strong>{inactiveCount}</strong>
-            <small>fuera de operacion</small>
+            <small>fuera de operación</small>
           </div>
         </section>
 
@@ -237,7 +237,7 @@ export function AirportsPage() {
               <label>Buscar</label>
               <input
                 type="search"
-                placeholder="Codigo, ciudad, pais o continente"
+                placeholder="Código, ciudad, país o continente"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />

@@ -545,7 +545,7 @@ function createAirportInfo(airport: Airport, load: number): MapInfo {
     title: `${airport.code} - ${airport.city}`,
     subtitle: `${airport.country} / ${airport.continent}`,
     rows: [
-      ["Codigo", airport.code],
+      ["Código", airport.code],
       ["Latitud", `${airport.latitude.toFixed(4)} deg`],
       ["Longitud", `${airport.longitude.toFixed(4)} deg`],
       ["Maletas", `${load}/${airport.maxCapacity}`],
@@ -568,7 +568,7 @@ function createFlightInfo(
     title: `Vuelo ${flight.id}`,
     subtitle: `${origin.code} ${origin.city} -> ${destination.code} ${destination.city}`,
     rows: [
-      ["Codigo", flight.id],
+      ["Código", flight.id],
       ["Origen", `${origin.code} - ${origin.city}`],
       ["Destino", `${destination.code} - ${destination.city}`],
       ["Salida", formatFlightMoment(data, flight.absoluteDepartureMinute, displayGmtOffset)],

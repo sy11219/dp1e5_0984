@@ -210,13 +210,13 @@ export function AirportsTable({
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as "utilization" | "nextFlight")}
               >
-                <option value="utilization">Ocupacion</option>
-                <option value="nextFlight">Proximo vuelo</option>
+                <option value="utilization">Ocupación</option>
+                <option value="nextFlight">Próximo vuelo</option>
               </select>
             </label>
 
             <label className="text-sm">
-              Direccion:
+              Dirección:
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}

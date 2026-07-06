@@ -1296,7 +1296,7 @@ function SimulationControls({
           <label>Cancelar vuelo</label>
           <input
             type="text"
-            placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
+            placeholder="flight_code (ej: SKBO-VIDP-0005)"
             value={flightToCancel}
             onChange={(e) => onFlightToCancelChange(e.target.value)}
             disabled={!hasSimulation || busy}
