@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { CapacityStatus, Flight, Shipment } from "../../../types";
+import { capacityStatus } from "../../../utils/calculations";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { hhmm } from "../../../utils/formatters";
 
@@ -98,7 +99,14 @@ export function FlightsTable({
     }
 
     if (colorFilter !== "Todos") {
-      result = result.filter((f) => f.status === colorFilter);
+      result = result.filter((f) => {
+        const perc = f.utilization;
+        if (colorFilter === "green") return perc > 0 && perc < 0.7;
+        if (colorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
+        if (colorFilter === "red") return perc >= 0.9;
+        if (colorFilter === "gray") return perc <= 0.001;
+        return false;
+      });
     }
 
     result.sort((a, b) => {
