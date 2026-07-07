@@ -68,12 +68,16 @@ export interface Metrics {
   deliveredOnTimeShipments?: number;
   unplannedShipments?: number;
   lateShipments?: number;
+  inTransitShipments?: number;
+  firstWarehouseShipments?: number;
   plannedBags: number;
   onTimeBags?: number;
   deliveredBags?: number;
   deliveredOnTimeBags?: number;
   unplannedBags?: number;
   lateBags?: number;
+  inTransitBags?: number;
+  firstWarehouseBags?: number;
   totalBags: number;
   usedFlights: number;
   pendingCancellations?: number;
@@ -140,10 +144,12 @@ export interface SimulationData {
   shipments: Shipment[];
   airportEvents: AirportEvent[];
   metrics: Metrics;
+  lastPlanningMetrics?: Metrics;
   realStartedAt: string;
   realFinishedAt: string;
   simulationStartDateTime: string;
   simulationEndDateTime: string;
+  simulationStoppedDateTime?: string;
   runtimeMs: number;
 }
 

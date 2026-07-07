@@ -31,22 +31,56 @@ export function SimulationResultModal({
 }: SimulationModalProps) {
   if (!open || !data) return null
 
-  const deliveredShipments = data.metrics.deliveredShipments ?? data.metrics.onTimeShipments
-  const deliveredBags = data.metrics.deliveredBags ?? data.metrics.plannedBags
-  const onTimeBags = data.metrics.onTimeBags ?? data.metrics.plannedBags
-  const plannedShipmentPct = formatPercent(data.metrics.plannedShipments, data.metrics.shipments)
-  const plannedBagPct = formatPercent(data.metrics.plannedBags, data.metrics.totalBags)
-  const deliveredShipmentPct = formatPercent(deliveredShipments, data.metrics.shipments)
-  const deliveredBagPct = formatPercent(deliveredBags, data.metrics.totalBags)
-  const onTimeShipmentPct = formatPercent(data.metrics.onTimeShipments, data.metrics.shipments)
-  const onTimeBagPct = formatPercent(onTimeBags, data.metrics.totalBags)
-  const bagsPerFlight = data.metrics.usedFlights
-    ? (data.metrics.totalBags / data.metrics.usedFlights).toFixed(1)
+  const summaryMetrics = data.lastPlanningMetrics ?? data.metrics
+  const totalShipments = summaryMetrics.shipments
+  const totalBags = summaryMetrics.totalBags
+  const plannedShipments = summaryMetrics.plannedShipments
+  const plannedBags = summaryMetrics.plannedBags
+  const deliveredShipments = summaryMetrics.deliveredShipments ?? summaryMetrics.onTimeShipments
+  const deliveredBags = summaryMetrics.deliveredBags ?? plannedBags
+  const onTimeShipments = summaryMetrics.onTimeShipments
+  const onTimeBags = summaryMetrics.onTimeBags ?? plannedBags
+  const plannedShipmentPct = formatPercent(plannedShipments, totalShipments)
+  const plannedBagPct = formatPercent(plannedBags, totalBags)
+  const firstWarehouseShipments = summaryMetrics.firstWarehouseShipments ?? 0
+  const firstWarehouseBags = summaryMetrics.firstWarehouseBags ?? 0
+  const inTransitShipments = summaryMetrics.inTransitShipments ??
+    Math.max(0, plannedShipments - deliveredShipments - firstWarehouseShipments)
+  const inTransitBags = summaryMetrics.inTransitBags ??
+    Math.max(0, plannedBags - deliveredBags - firstWarehouseBags)
+  const deliveredPlannedPct = formatPercent(deliveredShipments, plannedShipments)
+  const deliveredPlannedBagPct = formatPercent(deliveredBags, plannedBags)
+  const inTransitPct = formatPercent(inTransitShipments, plannedShipments)
+  const inTransitBagPct = formatPercent(inTransitBags, plannedBags)
+  const firstWarehousePct = formatPercent(firstWarehouseShipments, plannedShipments)
+  const firstWarehouseBagPct = formatPercent(firstWarehouseBags, plannedBags)
+  const onTimeShipmentPct = formatPercent(onTimeShipments, totalShipments)
+  const onTimeBagPct = formatPercent(onTimeBags, totalBags)
+  const bagsPerFlight = summaryMetrics.usedFlights
+    ? (plannedBags / summaryMetrics.usedFlights).toFixed(1)
     : "0.0"
-  const simulatedDays = data.days ?? Math.round(((data.maxTick ?? data.tick ?? 0) / 1440))
   const algorithmRuntimeMs = lastPlanningRuntimeMs(data)
-  const finalMinute = data.maxTick ?? data.tick ?? 0
-  const airportLoads = computeAirportLoads(data, finalMinute)
+  const hasPlanningWindow = isFinitePlanningMinute(data.lastBatchStart) && isFinitePlanningMinute(data.lastBatchEnd)
+  const planningStart = hasPlanningWindow
+    ? simulationMinuteToDate(data, data.lastBatchStart)
+    : data.simulationStartDateTime
+  const planningEnd = hasPlanningWindow
+    ? simulationMinuteToDate(data, data.lastBatchEnd)
+    : data.simulationEndDateTime
+  const stoppedMinute = data.status === "COMPLETED"
+    ? data.maxTick ?? data.tick
+    : data.visualEndTick ?? data.tick ?? data.maxTick
+  const simulatedElapsedMinutes = Math.max(
+    0,
+    (stoppedMinute ?? data.startOffsetMinutes ?? 0) - (data.startOffsetMinutes ?? 0)
+  )
+  const simulatedElapsedMs = simulatedElapsedMinutes * 60_000
+  const simulationStoppedAt =
+    data.simulationStoppedDateTime ?? simulationMinuteToDate(data, stoppedMinute)
+  const mapMinute = data.status === "COMPLETED"
+    ? data.maxTick ?? data.tick ?? 0
+    : data.visualEndTick ?? data.tick ?? data.maxTick ?? 0
+  const airportLoads = computeAirportLoads(data, mapMinute)
   const airportBags = data.airports.reduce(
     (sum, airport) => sum + Math.max(0, airportLoads[airport.code] || 0),
     0
@@ -96,15 +130,21 @@ export function SimulationResultModal({
 
         <div className="summary-modal-times">
           <div>
-            <span>Inicio de simulación</span>
+            <span>{hasPlanningWindow ? "Inicio de planificación" : "Inicio de simulación"}</span>
             <strong>
-              {formatDateOnly(data.simulationStartDateTime)} {formatTimeOnly(data.simulationStartDateTime)}
+              {formatDateOnly(planningStart)} {formatTimeOnly(planningStart)}
             </strong>
           </div>
           <div>
-            <span>Fin de simulación</span>
+            <span>{hasPlanningWindow ? "Fin de planificación" : "Fin de simulación"}</span>
             <strong>
-              {formatDateOnly(data.simulationEndDateTime)} {formatTimeOnly(data.simulationEndDateTime)}
+              {formatDateOnly(planningEnd)} {formatTimeOnly(planningEnd)}
+            </strong>
+          </div>
+          <div>
+            <span>Detención de simulación</span>
+            <strong>
+              {formatDateOnly(simulationStoppedAt)} {formatTimeOnly(simulationStoppedAt)}
             </strong>
           </div>
         </div>
@@ -112,27 +152,52 @@ export function SimulationResultModal({
         <div className="summary-modal-grid">
           <SummaryMetric
             label="Planificación"
-            value={`${data.metrics.plannedShipments}/${data.metrics.shipments}`}
+            rows={[
+              metricRow("Envíos", plannedShipments, totalShipments, plannedShipmentPct),
+              metricRow("Maletas", plannedBags, totalBags, plannedBagPct),
+            ]}
+            value={`${summaryMetrics.plannedShipments}/${summaryMetrics.shipments}`}
             sub={`${plannedShipmentPct}% envíos | ${plannedBagPct}% maletas`}
           />
           <SummaryMetric
             label="Entregado"
-            value={`${deliveredShipments}/${data.metrics.shipments}`}
-            sub={`${deliveredShipmentPct}% envíos | ${deliveredBagPct}% maletas`}
+            rows={[
+              metricRow("Envíos", deliveredShipments, plannedShipments, deliveredPlannedPct),
+              metricRow("Maletas", deliveredBags, plannedBags, deliveredPlannedBagPct),
+            ]}
+            value={deliveredShipments}
+            sub={`${deliveredPlannedPct}% planificados | ${deliveredBags} maletas (${deliveredPlannedBagPct}%)`}
+          />
+          <SummaryMetric
+            label="En tránsito"
+            rows={[
+              metricRow("Envíos", inTransitShipments, plannedShipments, inTransitPct),
+              metricRow("Maletas", inTransitBags, plannedBags, inTransitBagPct),
+            ]}
+            value={inTransitShipments}
+            sub={`${inTransitPct}% planificados | ${inTransitBags} maletas (${inTransitBagPct}%)`}
+          />
+          <SummaryMetric
+            label="En primer almacén"
+            rows={[
+              metricRow("Envíos", firstWarehouseShipments, plannedShipments, firstWarehousePct),
+              metricRow("Maletas", firstWarehouseBags, plannedBags, firstWarehouseBagPct),
+            ]}
+            value={firstWarehouseShipments}
+            sub={`${firstWarehousePct}% planificados | ${firstWarehouseBags} maletas (${firstWarehouseBagPct}%)`}
           />
           <SummaryMetric
             label="A tiempo"
-            value={`${data.metrics.onTimeShipments}/${data.metrics.shipments}`}
+            rows={[
+              metricRow("Envíos", onTimeShipments, totalShipments, onTimeShipmentPct),
+              metricRow("Maletas", onTimeBags, totalBags, onTimeBagPct),
+            ]}
+            value={`${summaryMetrics.onTimeShipments}/${summaryMetrics.shipments}`}
             sub={`${onTimeShipmentPct}% envíos | ${onTimeBagPct}% maletas`}
           />
           <SummaryMetric
-            label="Maletas"
-            value={data.metrics.plannedBags}
-            sub={`de ${data.metrics.totalBags}`}
-          />
-          <SummaryMetric
             label="Vuelos usados"
-            value={data.metrics.usedFlights}
+            value={summaryMetrics.usedFlights}
             sub={`${bagsPerFlight} maletas/vuelo`}
           />
           <SummaryMetric
@@ -153,7 +218,10 @@ export function SimulationResultModal({
           <SummaryMetric
             label="Duración de la simulación"
             value={formatDurationHms(realTimeMs)}
-            sub={`${simulatedDays} días simulados`}
+          />
+          <SummaryMetric
+            label="Tiempo simulado"
+            value={formatDurationHms(simulatedElapsedMs)}
           />
         </div>
 
@@ -166,6 +234,19 @@ export function SimulationResultModal({
     </div>,
     document.body
   )
+}
+
+function isFinitePlanningMinute(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+}
+
+function simulationMinuteToDate(data: SimulationData, minute: number | undefined): Date | undefined {
+  if (!isFinitePlanningMinute(minute) || !data.simulationStartDateTime) return undefined
+
+  const simulationStart = Date.parse(data.simulationStartDateTime)
+  if (!Number.isFinite(simulationStart)) return undefined
+
+  return new Date(simulationStart + (minute - (data.startOffsetMinutes ?? 0)) * 60_000)
 }
 
 function formatPercent(part: number, total: number): string {
@@ -206,20 +287,50 @@ function formatDurationHms(
     .padStart(2, "0")}`
 }
 
+type SummaryMetricRow = {
+  label: string
+  value: string
+  percent: string
+}
+
+function metricRow(label: string, part: number, total: number, percent: string): SummaryMetricRow {
+  return {
+    label,
+    value: `${part}/${total}`,
+    percent: `${percent}%`,
+  }
+}
+
 function SummaryMetric({
   label,
   value,
   sub,
+  rows,
 }: {
   label: string
-  value: string | number
-  sub: string | number
+  value?: string | number
+  sub?: string | number
+  rows?: SummaryMetricRow[]
 }) {
   return (
     <div className="summary-metric">
       <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{sub}</small>
+      {rows?.length ? (
+        <div className="summary-metric-rows">
+          {rows.map((row) => (
+            <div className="summary-metric-row" key={row.label}>
+              <small>{row.label}</small>
+              <strong>{row.value}</strong>
+              <em>{row.percent}</em>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <strong>{value}</strong>
+          {sub !== undefined && sub !== "" && <small>{sub}</small>}
+        </>
+      )}
     </div>
   )
 }

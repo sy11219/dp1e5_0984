@@ -109,11 +109,25 @@ function finalVisualFinishedAtMs(data: SimulationData, fallback = Date.now()) {
   return fallback
 }
 
+function simulationMinuteISOString(data: SimulationData, minute: number | undefined) {
+  if (typeof minute !== "number" || !Number.isFinite(minute) || !data.simulationStartDateTime) {
+    return undefined
+  }
+
+  const simulationStart = Date.parse(data.simulationStartDateTime)
+  if (!Number.isFinite(simulationStart)) return undefined
+
+  return new Date(
+    simulationStart + (minute - (data.startOffsetMinutes ?? 0)) * 60_000
+  ).toISOString()
+}
+
 function buildFrozenSummary(data: SimulationData): FrozenSimulationSummary {
   const finishedAt = finalVisualFinishedAtMs(data)
   const startedAt = data.realStartedAt ? Date.parse(data.realStartedAt) : Number.NaN
   const realTimeMs = Math.max(0, finishedAt - (Number.isFinite(startedAt) ? startedAt : finishedAt))
   const maxTick = data.maxTick ?? data.tick
+  const stoppedAt = simulationMinuteISOString(data, maxTick)
 
   return {
     simulationId: simulationIdentity(data),
@@ -123,6 +137,7 @@ function buildFrozenSummary(data: SimulationData): FrozenSimulationSummary {
       tick: maxTick,
       visualEndTick: maxTick,
       realFinishedAt: new Date(finishedAt).toISOString(),
+      simulationStoppedDateTime: stoppedAt ?? data.simulationEndDateTime,
     },
   }
 }
@@ -855,6 +870,20 @@ export function SimulationPage() {
 
     const stoppedSessionId = data.simulationId ?? simulationIdentity(data)
     const elapsed = realTimeMs || elapsedRealTimeMs(data)
+    const stoppedMinute =
+      simMinute ??
+      data.visualEndTick ??
+      data.tick ??
+      data.startOffsetMinutes ??
+      0
+    const stoppedAt = simulationMinuteISOString(data, stoppedMinute)
+    const stoppedData: SimulationData = {
+      ...data,
+      visualEndTick: stoppedMinute,
+      realFinishedAt: new Date().toISOString(),
+      runtimeMs: elapsed,
+      simulationStoppedDateTime: stoppedAt ?? data.simulationStoppedDateTime,
+    }
     stoppedSimulationIdRef.current = stoppedSessionId || null
     markBatchSimulationStopped(data)
     setBatchSimulationPaused(true)
@@ -864,9 +893,9 @@ export function SimulationPage() {
     stopAnimation()
     onBatchCompleteRef.current = null
     animatingRef.current = false
-    setStoppedSummaryData(data)
+    setStoppedSummaryData(stoppedData)
     setStoppedSummaryRealTimeMs(elapsed)
-    setStoppedSummaryMinute(simMinute)
+    setStoppedSummaryMinute(stoppedMinute)
     setStopSummaryOpen(true)
     if (data.simulationId) {
       void stopBatchSimulationRequest(data.simulationId).catch(() => {
