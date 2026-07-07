@@ -47,18 +47,18 @@ Backend:
 ```
 dp1e5_0984/
 │
-├── ALNS_Tasfb2b/        # Código backend del proyecto 
+├── ALNS_Tasfb2b/                                          # Código backend del proyecto 
 │
 ├── outputs/
-│   └── db_schema_tasfb2b.png # Esquema de la base de datos
+│   └── db_schema_tasfb2b.png                              # Esquema de la base de datos
 │
-├── tasf-frontend/       # Código frontend del proyecto
+├── tasf-frontend/                                         # Código frontend del proyecto
 │
 ├── tools/
-│   └── generate_db_schema_image.py # Script para la generación del esquema de la BD
+│   └── generate_db_schema_image.py                        # Script para la generación del esquema de la BD
 |
-├── DEPLOYMENT.md        # Guía de despliegue
+├── DEPLOYMENT.md                                          # Guía de despliegue
 |
-└── README.md            # Archivo README del proyecto
+└── README.md                                              # Archivo README del proyecto
 
 ```
