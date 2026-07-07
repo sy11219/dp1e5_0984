@@ -605,7 +605,7 @@ export const OperationsPage = () => {
         onOpenChange={handleOperationSummaryOpenChange}
         data={operationSummaryData}
         realTimeMs={operationSummaryRealTimeMs}
-        title="Resumen de operaciones del dia"
+        title="Resumen de operaciones del día"
         description=""
         footerLabel="Cerrar"
         closeOnOutside={false}

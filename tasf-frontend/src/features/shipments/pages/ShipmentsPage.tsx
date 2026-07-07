@@ -262,7 +262,7 @@ export function ShipmentsPage() {
         <section className="panel section shipments-panel">
           {createdBatch ? (
             <div className="success">
-              {`Lote registrado: ${createdBatch.inserted} envios insertados de ${createdBatch.parsed} lineas validas.`}
+              {`Lote registrado: ${createdBatch.inserted} envíos insertados de ${createdBatch.parsed} líneas válidas.`}
               {createdBatch.skipped > 0 ? ` Duplicados omitidos: ${createdBatch.skipped}.` : ""}
             </div>
           ) : created ? (
@@ -270,14 +270,14 @@ export function ShipmentsPage() {
               {`Envio registrado: ${created.shipment_code} (${created.baggage_count} maletas).`}
             </div>
           ) : (
-            <div className="empty-state">{`Mostrando envios desde ahora hasta el final del ${listDate}.`}</div>
+            <div className="empty-state">{`Mostrando envíos desde ahora hasta el final del ${listDate}.`}</div>
           )}
         </section>
 
         <section className="panel section shipments-panel">
           {assignedAirportTime && (
             <div className="success" style={{ marginBottom: "1rem" }}>
-              {`Mostrando envios con origen o destino en ${assignedAirportTime.code} - ${
+              {`Mostrando envíos con origen o destino en ${assignedAirportTime.code} - ${
                 assignedAirportTime.city || "aeropuerto asignado"
               }.`}
             </div>
@@ -288,7 +288,7 @@ export function ShipmentsPage() {
               <label>Buscar</label>
               <input
                 type="search"
-                placeholder="Codigo, origen o destino"
+                placeholder="Código, origen o destino"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -323,7 +323,7 @@ export function ShipmentsPage() {
 
             {!visible.length && (
               <div className="empty-state">
-                {loading ? "Cargando envios..." : "No se encontraron envios pendientes para hoy."}
+                {loading ? "Cargando envíos..." : "No se encontraron envíos pendientes para hoy."}
               </div>
             )}
           </div>
