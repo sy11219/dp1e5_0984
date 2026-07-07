@@ -252,7 +252,7 @@ export function SimulationPage() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
   const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos")
-  const [isMaster, setIsMaster] = useState<boolean>(false)
+
   const [airportColorFilter, setAirportColorFilter] = useState<ColorFilter>("Todos")
 
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
@@ -277,35 +277,13 @@ export function SimulationPage() {
     BATCH_MINUTES,
   } = useSimulationPlayer(maxMinute)
 
-  useEffect(() => {
-    if (!data) return;
-    const master = ownsBatchSimulation(data);
-    setIsMaster(master);
-    window.localStorage.setItem("tasf.isMaster", master ? "true" : "false");
-  }, [data]);
 
-  // Sync role on page load (in case of reload)
-  useEffect(() => {
-    const stored = window.localStorage.getItem("tasf.isMaster");
-    setIsMaster(stored === "true");
-  }, []);
 
-  // Sync filter changes from master to workers via localStorage
-  useEffect(() => {
-    if (isMaster) {
-      window.localStorage.setItem("tasf.flightColorFilter", flightColorFilter);
-    }
-  }, [flightColorFilter, isMaster]);
 
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (!isMaster && e.key === "tasf.flightColorFilter" && e.newValue) {
-        setFlightColorFilter(e.newValue as ColorFilter);
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [isMaster]);
+
+
+
+
 
   const isBatchStoppedLocally = useCallback((simulationId?: string | null) => {
     return Boolean(simulationId && stoppedSimulationIdRef.current === simulationId)
@@ -673,9 +651,7 @@ export function SimulationPage() {
       setSelectedShipment(null)
       setMapFocusTarget(null)
       setPlaying(true)
-      const master = ownsBatchSimulation(initial);
-      setIsMaster(master);
-      window.localStorage.setItem("tasf.isMaster", master ? "true" : "false");
+
 
       // 2. Pedir el primer lote sin mantener bloqueado el estado "Iniciando".
       void fetchNextBatch(initial.simulationId!, initial.tick ?? initial.startOffsetMinutes ?? 0)
