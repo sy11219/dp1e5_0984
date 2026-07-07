@@ -49,8 +49,7 @@ dp1e5_0984/
 │
 ├── ALNS_Tasfb2b/                                      # Código backend del proyecto 
 │
-├── outputs/
-│   └── db_schema_tasfb2b.png                          # Esquema de la base de datos
+├── diagrams/                                          # Diagramas de interacción entre navegadores y de consumo de datos, y esquema de la BD
 │
 ├── tasf-frontend/                                     # Código frontend del proyecto
 │
@@ -62,3 +61,14 @@ dp1e5_0984/
 └── README.md                                          # Archivo README del proyecto
 
 ```
+
+## Instrucciones de uso
+
+### Simulación de 5 días
+Para acceder el escenario, ingresar a la página correspondiente (Tiempo real). Adentro, se visualizarán todos los vuelos en proceso, los cuales inicialmente estarán vacíos. En la pantalla de Vuelos, se pueden agregar vuelos ya sea manualmente o a través de archivos .txt con el formato **000000001-20260102-00-47-SUAA-002-0032535** (ID_Envío-Fecha-HH-MM-ID_Destino-Num_Maletas-ID_Cliente) por cada línea de texto. El sistema está diseñado para detectar la zona horaria del dispositivo y seleccionar automáticamente el aeropuerto respectivo.
+
+### Operaciones día a día
+Para acceder el escenario, ingresar a la página correspondiente (Simulación). Adentro, completar los datos de fecha y hora de inicio de la simulación, y presionar "Ejecutar simulación". El algoritmo planificador calculará las asignaciones del primer batch de datos y a continuación se procederán a cargas los envíos en su panel respectivo. El usuario creador de la simulación puede pausarla, reiniciarla o cancelarla. El sistema está diseñado para que esta misma simulación se transmita a otros usuarios que accedan al sistema, hasta que esta termine o sea cancelada.
+
+### Agregar datos
+Los usuarios pueden agregar datos y modificar datos de Aeropuertos, Planes de Vuelo y Envíos en las páginas correspondientes. Solo se pueden agregar envíos con origen en el aeropuerto asignado según la zona horaria.
