@@ -14,6 +14,7 @@ interface FlightsTableProps {
   displayGmtOffset?: number;
   colorFilter?: ColorFilter;
   onColorFilterChange?: (filter: ColorFilter) => void;
+  hideColorFilter?: boolean;
 }
 
 type ColorFilter = "Todos" | CapacityStatus;
@@ -28,6 +29,7 @@ export function FlightsTable({
   displayGmtOffset,
   colorFilter: colorFilterProp,
   onColorFilterChange,
+  hideColorFilter,
 }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
@@ -244,16 +246,18 @@ export function FlightsTable({
           </select>
         </label>
 
-        <label className="text-sm">
-          Color:
-          <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
-            <option value="Todos">Todos</option>
-            <option value="green">Verde</option>
-            <option value="yellow">Amarillo</option>
-            <option value="red">Rojo</option>
-            <option value="gray">Gris</option>
-          </select>
-        </label>
+        {!hideColorFilter && (
+          <label className="text-sm">
+            Color:
+            <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
+              <option value="Todos">Todos</option>
+              <option value="green">Verde</option>
+              <option value="yellow">Amarillo</option>
+              <option value="red">Rojo</option>
+              <option value="gray">Gris</option>
+            </select>
+          </label>
+        )}
       </div>
 
       <div className="table">

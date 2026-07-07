@@ -18,11 +18,17 @@ import MapStage, { type MapFocusTarget } from "../../../shared/components/map/Ma
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
+import { capacityStatus } from "../../simulation/utils/calculations";
+import type { CapacityStatus } from "../../simulation/types";
 import {
   formatClock,
   formatDateOnly,
   percent,
 } from "../../simulation/utils/formatters";
+
+// Color filter type
+type ColorFilter = "Todos" | CapacityStatus;
+
 import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
 const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
@@ -105,6 +111,7 @@ export const OperationsPage = () => {
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [operationDayToggling, setOperationDayToggling] = useState(false);
   const [operationSummaryOpen, setOperationSummaryOpen] = useState(false);
+  const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos");
   const [operationSummaryData, setOperationSummaryData] = useState<SimulationData | null>(null);
   const [operationSummaryRealTimeMs, setOperationSummaryRealTimeMs] = useState(0);
   const [now, setNow] = useState(new Date());
@@ -483,6 +490,7 @@ export const OperationsPage = () => {
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
             onClearSelection={clearMapSelection}
+            flightColorFilter={flightColorFilter}
           />
         </section>
 
@@ -528,14 +536,33 @@ export const OperationsPage = () => {
 
           <section className="panel section">
             <h3>Vuelos</h3>
+            {/* Color filter selector */}
+            <label className="text-sm" style={{ marginRight: "0.5rem" }}>
+              Filtro color:
+              <select
+                value={flightColorFilter}
+                onChange={(e) => setFlightColorFilter(e.target.value as ColorFilter)}
+                style={{ marginLeft: "0.5rem" }}
+              >
+                <option value="Todos">Todos</option>
+                <option value="green">Verde</option>
+                <option value="yellow">Amarillo</option>
+                <option value="red">Rojo</option>
+                <option value="gray">Gris</option>
+              </select>
+            </label>
+            {/* Apply filter to flights */}
             <FlightsTable
-              flights={data?.flights || []}
+              flights={flightColorFilter === "Todos" ? data?.flights || [] : (data?.flights || []).filter((f) => capacityStatus(f.utilization) === flightColorFilter)}
               activeFlightIds={activeFlightIds}
               shipments={visibleShipments}
               simMinute={operationalMinute}
               selectedFlightId={selectedFlightId}
               onSelectFlight={focusFlight}
               displayGmtOffset={displayGmtOffset}
+              colorFilter={flightColorFilter}
+              onColorFilterChange={setFlightColorFilter}
+              hideColorFilter={true}
             />
           </section>
 

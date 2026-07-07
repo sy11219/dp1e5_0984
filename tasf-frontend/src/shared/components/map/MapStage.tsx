@@ -18,6 +18,7 @@ type MapStageProps = {
   activeFlights: ActiveFlight[];
   airportLoads: AirportLoads;
   airportColorFilter?: "Todos" | CapacityStatus;
+  flightColorFilter?: "Todos" | CapacityStatus;
   selectedAirport: string | null;
   selectedFlightId?: string | null;
   selectedShipment?: Shipment | null;
@@ -49,6 +50,7 @@ export default function MapStage({
   activeFlights,
   airportLoads,
   airportColorFilter = "Todos",
+  flightColorFilter = "Todos",
   selectedAirport,
   selectedFlightId,
   selectedShipment,
@@ -217,6 +219,18 @@ export default function MapStage({
   }, [airportLoads, selectedAirport, visibleAirports]);
 
   // Función para dibujar en canvas
+  // Filter flights according to color filter
+  const filteredActiveFlights = useMemo(() => {
+    if (flightColorFilter === "Todos") return activeFlights;
+    return activeFlights.filter((flight) => {
+      const perc = flight.utilization;
+      if (flightColorFilter === "green") return perc > 0 && perc < 0.7;
+      if (flightColorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
+      if (flightColorFilter === "red") return perc >= 0.9;
+      if (flightColorFilter === "gray") return perc <= 0.001;
+      return false;
+    });
+  }, [activeFlights, flightColorFilter]);
   const drawFlights = useCallback((force = false) => {
     if (!canvasRef.current || !mapRef.current) return;
 
@@ -251,31 +265,31 @@ export default function MapStage({
       drawStaticFlightRoute(ctx, mapRef.current, selectedFlight, airportByCode);
     }
 
-    for (const flight of activeFlights) {
-      const origin = airportByCode[flight.origin];
-      const destination = airportByCode[flight.destination];
-      if (!origin || !destination) continue;
+  for (const flight of filteredActiveFlights) {
+    const origin = airportByCode[flight.origin];
+    const destination = airportByCode[flight.destination];
+    if (!origin || !destination) continue;
 
-      const { destPixel, planePixel, angle } =
-        getRouteGeometry(mapRef.current, origin, destination, flight.progress);
-      const isSelected = flight.id === selectedFlightId;
-      const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[flight.status];
+    const { destPixel, planePixel, angle } =
+      getRouteGeometry(mapRef.current, origin, destination, flight.progress);
+    const isSelected = flight.id === selectedFlightId;
+    const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[flight.status];
 
-      ctx.strokeStyle = flightColor;
-      ctx.lineWidth = isSelected ? SELECTED_FLIGHT_ROUTE_LINE_WIDTH : FLIGHT_ROUTE_LINE_WIDTH;
-      ctx.globalAlpha = isSelected ? 0.95 : 0.62;
-      ctx.shadowColor = isSelected ? "rgba(15, 23, 42, 0.36)" : "transparent";
-      ctx.shadowBlur = isSelected ? 10 : 0;
-      ctx.beginPath();
-      ctx.moveTo(planePixel.x, planePixel.y);
-      ctx.lineTo(destPixel.x, destPixel.y);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = "transparent";
+    ctx.strokeStyle = flightColor;
+    ctx.lineWidth = isSelected ? SELECTED_FLIGHT_ROUTE_LINE_WIDTH : FLIGHT_ROUTE_LINE_WIDTH;
+    ctx.globalAlpha = isSelected ? 0.95 : 0.62;
+    ctx.shadowColor = isSelected ? "rgba(15, 23, 42, 0.36)" : "transparent";
+    ctx.shadowBlur = isSelected ? 10 : 0;
+    ctx.beginPath();
+    ctx.moveTo(planePixel.x, planePixel.y);
+    ctx.lineTo(destPixel.x, destPixel.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
 
-      drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, flightColor, isSelected);
-    }
+    drawPlaneIcon(ctx, planePixel.x, planePixel.y, angle, flightColor, isSelected);
+  }
   }, [
     activeFlights,
     airportByCode,
@@ -283,6 +297,8 @@ export default function MapStage({
     selectedFlightId,
     selectedShipment?.id,
     selectedShipmentRoute,
+    flightColorFilter,
+    filteredActiveFlights
   ]);
 
   // Redibujar cuando cambian vuelos o mapa se mueve
@@ -390,7 +406,16 @@ export default function MapStage({
       if (target?.closest(".airport-marker, .leaflet-control")) return;
 
       // Buscar avión cerca del click (hitarea de 15px)
-      for (const flight of activeFlights) {
+      const filteredActiveFlights = activeFlights.filter((flight) => {
+        const perc = flight.utilization;
+        if (flightColorFilter === "green") return perc > 0 && perc < 0.7;
+        if (flightColorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
+        if (flightColorFilter === "red") return perc >= 0.9;
+        if (flightColorFilter === "gray") return perc <= 0.001;
+        return true;
+      });
+
+      for (const flight of filteredActiveFlights) {
         const origin = airportByCode[flight.origin];
         const destination = airportByCode[flight.destination];
         if (!origin || !destination) continue;
