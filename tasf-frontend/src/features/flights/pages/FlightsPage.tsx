@@ -156,10 +156,14 @@ export function FlightsPage() {
   };
 
   const openCreator = () => {
-    const defaultAirportCode = airportOptions[0]?.code || "";
+    const defaultAirportCode = assignedAirportTime?.code || "";
+    const defaultDestinationCode = airportOptions[0]?.code || "";
     setSelectedFlight(null);
     setEditorMode("create");
-    setForm(emptyFlightForm(defaultAirportCode));
+    setForm({
+      ...emptyFlightForm(defaultAirportCode),
+      destinationAirportCode: defaultDestinationCode,
+    });
     setModalError("");
   };
 
@@ -187,20 +191,21 @@ export function FlightsPage() {
 
     try {
       if (editorMode === "create") {
+        const originAirportCode = assignedAirportTime?.code || form.originAirportCode;
         const created = await createFlightPlanRequest({
-          originAirportCode: form.originAirportCode,
+          originAirportCode,
           destinationAirportCode: form.destinationAirportCode,
           departureTimeLocal: form.departureTimeLocal,
           arrivalTimeLocal: form.arrivalTimeLocal,
-          departureTimeUtc: form.departureTimeUtc,
-          arrivalTimeUtc: form.arrivalTimeUtc,
           capacity: form.capacity,
         });
         setFlights((current) => [...current, created]);
       } else if (selectedFlight) {
         const updated = await updateFlightPlanRequest(selectedFlight.flight_code, form);
         setFlights((current) =>
-          current.map((flight) => (flight.flight_code === updated.flight_code ? updated : flight))
+          current.map((flight) =>
+            flight.flight_code === selectedFlight.flight_code ? updated : flight
+          )
         );
       }
       setSelectedFlight(null);
@@ -223,7 +228,12 @@ export function FlightsPage() {
             <h1>Vuelos</h1>
             <p>Listado completo de planes de vuelo leidos desde la base de datos.</p>
           </div>
-          <button className="primary" onClick={openCreator} disabled={loading || !airportOptions.length}>
+          <button
+            className="primary"
+            onClick={openCreator}
+            disabled={loading || !airportOptions.length || !assignedAirportTime}
+            title={!assignedAirportTime ? "Asigna un aeropuerto por defecto para crear vuelos." : undefined}
+          >
             Nuevo
           </button>
         </section>
@@ -382,7 +392,7 @@ export function FlightsPage() {
                 </h2>
                 <span>
                   {editorMode === "create"
-                    ? "Se guardara como SCHEDULED"
+                    ? `Se guardara como SCHEDULED desde ${assignedAirportTime?.code || "aeropuerto asignado"}`
                     : `${selectedFlight?.origin} -> ${selectedFlight?.destination}`}
                 </span>
               </div>
@@ -392,23 +402,6 @@ export function FlightsPage() {
             </div>
 
             <form className="airport-form" onSubmit={saveFlight}>
-              <div className="field">
-                <label>AEROPUERTO_ORIGEN</label>
-                <select
-                  value={form.originAirportCode}
-                  onChange={(event) => updateForm("originAirportCode", event.target.value)}
-                  required
-                >
-                  {!airportOptions.some((airport) => airport.code === form.originAirportCode) && (
-                    <option value={form.originAirportCode}>{form.originAirportCode}</option>
-                  )}
-                  {airportOptions.map((airport) => (
-                    <option key={airport.code} value={airport.code}>
-                      {airport.code}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="field">
                 <label>AEROPUERTO_DESTINO</label>
                 <select
@@ -443,26 +436,6 @@ export function FlightsPage() {
                   step="1"
                   value={form.arrivalTimeLocal}
                   onChange={(event) => updateForm("arrivalTimeLocal", event.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label>SALIDA_UTC</label>
-                <input
-                  type="datetime-local"
-                  step="1"
-                  value={form.departureTimeUtc}
-                  onChange={(event) => updateForm("departureTimeUtc", event.target.value)}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label>LLEGADA_UTC</label>
-                <input
-                  type="datetime-local"
-                  step="1"
-                  value={form.arrivalTimeUtc}
-                  onChange={(event) => updateForm("arrivalTimeUtc", event.target.value)}
                   required
                 />
               </div>

@@ -118,9 +118,9 @@ public class ShipmentService {
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO shipments (
                       id, shipment_code, origin_airport_id, destination_airport_id,
-                      baggage_count, registered_at, max_delivery_at, status
+                      baggage_count, registered_at, max_delivery_at, status, client_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'REGISTERED')
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'REGISTERED', ?)
                     ON CONFLICT (shipment_code) DO NOTHING
                     """)) {
                 for (int index = 0; index < lines.length; index++) {
@@ -142,6 +142,7 @@ public class ShipmentService {
                     if (baggageCount <= 0) {
                         throw new IllegalArgumentException("Linea " + (index + 1) + ": la cantidad de maletas debe ser mayor a cero.");
                     }
+                    String clientId = normalizeClientId(matcher.group(7));
 
                     AirportRef destination = airportCache.get(destinationCode);
                     if (destination == null) {
@@ -161,6 +162,7 @@ public class ShipmentService {
                     statement.setInt(5, baggageCount);
                     statement.setObject(6, registeredAtUtc);
                     statement.setObject(7, registeredAtUtc.plusDays(deadlineDays(origin, destination)));
+                    statement.setString(8, clientId);
 
                     int affected = statement.executeUpdate();
                     parsed++;

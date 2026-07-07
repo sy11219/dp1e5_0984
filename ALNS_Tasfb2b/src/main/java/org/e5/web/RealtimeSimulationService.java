@@ -10,8 +10,10 @@ import org.e5.parser.ShipmentParser;
 import org.e5.planner.ALNS;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -430,7 +432,7 @@ public class RealtimeSimulationService {
                 catalogService.loadRuntimeCatalog(startDate, days + 2);
         List<Airport> airports = catalog.airports();
         Map<String, Airport> airportMap = catalog.airportMap();
-        List<Flight> flights = catalog.flights();
+        List<Flight> flights = alignFlightsToSessionZone(catalog.flights(), startDate, sessionZone);
         flights.sort(Comparator
                 .comparingInt(Flight::absoluteDepartureMinute)
                 .thenComparing(Flight::getFlightId));
@@ -454,6 +456,45 @@ public class RealtimeSimulationService {
             session.syncRegisteredShipmentsFromDatabase();
         }
         return session.snapshotJson();
+    }
+
+    private List<Flight> alignFlightsToSessionZone(
+            List<Flight> flights,
+            String startDate,
+            ZoneId sessionZone
+    ) {
+        LocalDate date = LocalDate.parse(startDate, RAW_DATE);
+        ZonedDateTime localStart = date.atStartOfDay(sessionZone);
+        ZonedDateTime utcStart = date.atStartOfDay(ZoneOffset.UTC);
+        List<Flight> aligned = new ArrayList<>(flights.size());
+
+        for (Flight flight : flights) {
+            ZonedDateTime departureUtc = utcStart.plusMinutes(flight.absoluteDepartureMinute());
+            ZonedDateTime arrivalUtc = utcStart.plusMinutes(flight.absoluteArrivalMinute());
+            int localDeparture = Math.toIntExact(Duration.between(
+                    localStart.toInstant(),
+                    departureUtc.toInstant()
+            ).toMinutes());
+            int localArrival = Math.toIntExact(Duration.between(
+                    localStart.toInstant(),
+                    arrivalUtc.toInstant()
+            ).toMinutes());
+            int dayOffset = Math.floorDiv(localDeparture, 1440);
+            int departureMinute = Math.floorMod(localDeparture, 1440);
+            int arrivalMinute = localArrival - dayOffset * 1440;
+
+            aligned.add(new Flight(
+                    flight.getFlightId(),
+                    flight.getOriginCode(),
+                    flight.getDestCode(),
+                    departureMinute,
+                    arrivalMinute,
+                    flight.getMaxCapacity(),
+                    dayOffset
+            ));
+        }
+
+        return aligned;
     }
 
     private ZoneId resolveZone(String timeZone) {

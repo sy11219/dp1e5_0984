@@ -7,6 +7,10 @@ import {
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
+import {
+  assignManualAirportTime,
+  useAssignedAirportTime,
+} from "../../simulation/utils/assignedAirportTime";
 
 const PAGE_SIZE = 12;
 
@@ -59,6 +63,7 @@ function emptyAirportForm(): AirportForm {
 }
 
 export function AirportsPage() {
+  const assignedAirportTime = useAssignedAirportTime();
   const [airports, setAirports] = useState<Airport[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,6 +77,7 @@ export function AirportsPage() {
   const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [newCode, setNewCode] = useState("");
   const [form, setForm] = useState<AirportForm | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
 
   const loadAirports = async () => {
     setLoading(true);
@@ -131,6 +137,22 @@ export function AirportsPage() {
   const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const activeCount = airports.filter(isActive).length;
   const inactiveCount = airports.length - activeCount;
+
+  const airportOptions = useMemo(
+    () => [...airports].sort((a, b) => a.code.localeCompare(b.code)),
+    [airports]
+  );
+
+  const assignAirport = (code: string) => {
+    const airport = airportOptions.find((item) => item.code === code);
+    if (!airport) return;
+    assignManualAirportTime({
+      code: airport.code,
+      city: airport.city || "",
+      gmtOffset: airport.gmtOffset ?? 0,
+    });
+  };
+
   const openEditor = (airport: Airport) => {
     setSelectedAirport(airport);
     setEditorMode("edit");
@@ -206,12 +228,55 @@ export function AirportsPage() {
             <h1>Aeropuertos</h1>
             <p>Catalogo completo leido desde la base de datos al iniciar la aplicacion.</p>
           </div>
-          <button className="primary" onClick={openCreator} disabled={loading}>
-            Nuevo
-          </button>
+          <div className="toolbar-actions">
+            <button
+              className="ghost"
+              onClick={() => setAssignOpen((open) => !open)}
+              disabled={loading || !airportOptions.length}
+            >
+              Asignar
+            </button>
+            <button className="primary" onClick={openCreator} disabled={loading}>
+              Nuevo
+            </button>
+          </div>
         </section>
 
         {error && <div className="error">{error}</div>}
+
+        {assignOpen && (
+          <section className="panel section airports-panel">
+            <div className="airports-toolbar">
+              <div className="field">
+                <label>Aeropuerto por defecto</label>
+                <select
+                  value={assignedAirportTime?.code || ""}
+                  onChange={(event) => assignAirport(event.target.value)}
+                >
+                  <option value="" disabled>
+                    Selecciona un aeropuerto
+                  </option>
+                  {airportOptions.map((airport) => (
+                    <option key={airport.code} value={airport.code}>
+                      {`${airport.code} - ${airport.city}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="metric-panel">
+                <span>Actual</span>
+                <strong>{assignedAirportTime?.code || "Sin asignar"}</strong>
+                <small>
+                  {assignedAirportTime
+                    ? `${assignedAirportTime.city} - UTC${
+                        (assignedAirportTime.gmtOffset ?? 0) >= 0 ? "+" : ""
+                      }${assignedAirportTime.gmtOffset ?? 0}`
+                    : "se usara la deteccion automatica si encuentra coincidencia"}
+                </small>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="dashboard-grid">
           <div className="panel section metric-panel">

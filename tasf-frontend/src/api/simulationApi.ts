@@ -328,7 +328,10 @@ export type FlightPlanUpdatePayload = {
   status: "SCHEDULED" | "CANCELED";
 };
 
-export type FlightPlanCreatePayload = Omit<FlightPlanUpdatePayload, "status">;
+export type FlightPlanCreatePayload = Pick<
+  FlightPlanUpdatePayload,
+  "originAirportCode" | "destinationAirportCode" | "departureTimeLocal" | "arrivalTimeLocal" | "capacity"
+>;
 
 export async function getFlightPlansRequest(): Promise<FlightPlanRecord[]> {
   const response = await api.get<FlightPlanRecord[]>("/flights");

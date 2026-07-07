@@ -33,10 +33,10 @@ function formatShipmentDate(value: string) {
   return value.replace("T", " ").replace("Z", " UTC");
 }
 
-function emptyForm(defaultAirportCode = ""): ShipmentCreatePayload {
+function emptyForm(originAirportCode = "", destinationAirportCode = ""): ShipmentCreatePayload {
   return {
-    originAirportCode: defaultAirportCode,
-    destinationAirportCode: defaultAirportCode,
+    originAirportCode,
+    destinationAirportCode,
     departureDate: currentDateTimeLocalValue(),
     baggageCount: 1,
     clientId: "",
@@ -132,17 +132,22 @@ export function ShipmentsPage() {
   const totalBags = shipments.reduce((sum, shipment) => sum + shipment.baggage_count, 0);
 
   const openCreator = () => {
+    if (!assignedAirportTime?.code) return;
+    const defaultDestination =
+      airportOptions.find((airport) => airport.code !== assignedAirportTime.code)?.code ||
+      assignedAirportTime.code;
     setCreated(null);
     setCreatedBatch(null);
     setModalError("");
-    setForm(emptyForm(airportOptions[0]?.code || ""));
+    setForm(emptyForm(assignedAirportTime.code, defaultDestination));
   };
 
   const openBatchCreator = () => {
+    if (!assignedAirportTime?.code) return;
     setCreated(null);
     setCreatedBatch(null);
     setModalError("");
-    setBatchForm({ originAirportCode: airportOptions[0]?.code || "", file: null });
+    setBatchForm({ originAirportCode: assignedAirportTime.code, file: null });
   };
 
   const closeCreator = () => {
@@ -169,8 +174,9 @@ export function ShipmentsPage() {
     try {
       const createdShipment = await createShipmentRequest({
         ...form,
-        originAirportCode: form.originAirportCode.toUpperCase(),
+        originAirportCode: (assignedAirportTime?.code || form.originAirportCode).toUpperCase(),
         destinationAirportCode: form.destinationAirportCode.toUpperCase(),
+        departureDate: currentDateTimeLocalValue(),
         clientId: form.clientId,
       });
       setCreated(createdShipment);
@@ -197,7 +203,7 @@ export function ShipmentsPage() {
     try {
       const fileContent = await batchForm.file.text();
       const result = await createShipmentBatchRequest({
-        originAirportCode: batchForm.originAirportCode.toUpperCase(),
+        originAirportCode: (assignedAirportTime?.code || batchForm.originAirportCode).toUpperCase(),
         fileContent,
       });
       setCreatedBatch(result);
@@ -221,10 +227,18 @@ export function ShipmentsPage() {
             <p>Registro manual de envios en la base de datos.</p>
           </div>
           <div className="toolbar-actions">
-            <button className="ghost" onClick={openBatchCreator} disabled={loading || !airportOptions.length}>
+            <button
+              className="ghost"
+              onClick={openBatchCreator}
+              disabled={loading || !airportOptions.length || !assignedAirportTime?.code}
+            >
               Nuevo lote
             </button>
-            <button className="primary" onClick={openCreator} disabled={loading || !airportOptions.length}>
+            <button
+              className="primary"
+              onClick={openCreator}
+              disabled={loading || !airportOptions.length || !assignedAirportTime?.code}
+            >
               Nuevo
             </button>
           </div>
@@ -364,19 +378,10 @@ export function ShipmentsPage() {
             </div>
 
             <form className="airport-form" onSubmit={saveShipment}>
-              <div className="field">
-                <label>Aeropuerto origen</label>
-                <select
-                  value={form.originAirportCode}
-                  onChange={(event) => updateForm("originAirportCode", event.target.value)}
-                  required
-                >
-                  {airportOptions.map((airport) => (
-                    <option key={airport.code} value={airport.code}>
-                      {airport.code}
-                    </option>
-                  ))}
-                </select>
+              <div className="empty-state">
+                {`Origen: ${assignedAirportTime?.code || form.originAirportCode} - ${
+                  assignedAirportTime?.city || "aeropuerto asignado"
+                }`}
               </div>
               <div className="field">
                 <label>Aeropuerto destino</label>
@@ -391,16 +396,6 @@ export function ShipmentsPage() {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="field">
-                <label>Fecha de salida (hora local del origen)</label>
-                <input
-                  type="datetime-local"
-                  step="1"
-                  value={form.departureDate}
-                  onChange={(event) => updateForm("departureDate", event.target.value)}
-                  required
-                />
               </div>
               <div className="field">
                 <label>Cantidad de maletas</label>
@@ -463,23 +458,10 @@ export function ShipmentsPage() {
             </div>
 
             <form className="airport-form" onSubmit={saveShipmentBatch}>
-              <div className="field">
-                <label>Aeropuerto origen</label>
-                <select
-                  value={batchForm.originAirportCode}
-                  onChange={(event) =>
-                    setBatchForm((current) =>
-                      current ? { ...current, originAirportCode: event.target.value } : current
-                    )
-                  }
-                  required
-                >
-                  {airportOptions.map((airport) => (
-                    <option key={airport.code} value={airport.code}>
-                      {airport.code}
-                    </option>
-                  ))}
-                </select>
+              <div className="empty-state">
+                {`Origen: ${assignedAirportTime?.code || batchForm.originAirportCode} - ${
+                  assignedAirportTime?.city || "aeropuerto asignado"
+                }`}
               </div>
               <div className="field">
                 <label>Archivo de texto</label>

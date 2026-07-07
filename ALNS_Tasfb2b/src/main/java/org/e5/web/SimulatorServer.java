@@ -327,8 +327,8 @@ public class SimulatorServer {
                             readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
                             readRequiredString(DEPARTURE_TIME_LOCAL, body, "departureTimeLocal"),
                             readRequiredString(ARRIVAL_TIME_LOCAL, body, "arrivalTimeLocal"),
-                            readRequiredString(DEPARTURE_TIME_UTC, body, "departureTimeUtc"),
-                            readRequiredString(ARRIVAL_TIME_UTC, body, "arrivalTimeUtc"),
+                            readString(DEPARTURE_TIME_UTC, body, ""),
+                            readString(ARRIVAL_TIME_UTC, body, ""),
                             readRequiredInt(CAPACITY, body, "capacity"),
                             "SCHEDULED"
                     );
@@ -360,8 +360,8 @@ public class SimulatorServer {
                         readRequiredString(DESTINATION_AIRPORT_CODE, body, "destinationAirportCode"),
                         readRequiredString(DEPARTURE_TIME_LOCAL, body, "departureTimeLocal"),
                         readRequiredString(ARRIVAL_TIME_LOCAL, body, "arrivalTimeLocal"),
-                        readRequiredString(DEPARTURE_TIME_UTC, body, "departureTimeUtc"),
-                        readRequiredString(ARRIVAL_TIME_UTC, body, "arrivalTimeUtc"),
+                        readString(DEPARTURE_TIME_UTC, body, ""),
+                        readString(ARRIVAL_TIME_UTC, body, ""),
                         readRequiredInt(CAPACITY, body, "capacity"),
                         readRequiredString(FLIGHT_STATUS_FIELD, body, "status")
                 );

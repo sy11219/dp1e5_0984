@@ -14,10 +14,20 @@ const TIME_ZONE_AIRPORT_CODES: Record<string, string[]> = {
 
 type StoredAssignedAirportTime = AssignedAirportTime & {
   timeZone?: string;
-  source?: "auto";
+  source?: "auto" | "manual";
 };
 
 export function readAssignedAirportTime(): AssignedAirportTime | null {
+  const parsed = readStoredAssignedAirportTime();
+  if (!parsed) return null;
+  return {
+    code: parsed.code,
+    city: parsed.city || "",
+    gmtOffset: parsed.gmtOffset,
+  };
+}
+
+function readStoredAssignedAirportTime(): StoredAssignedAirportTime | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -27,6 +37,8 @@ export function readAssignedAirportTime(): AssignedAirportTime | null {
       code: parsed.code,
       city: parsed.city || "",
       gmtOffset: parsed.gmtOffset,
+      timeZone: parsed.timeZone,
+      source: parsed.source,
     };
   } catch {
     return null;
@@ -47,6 +59,9 @@ export function writeAssignedAirportTime(airport: AssignedAirportTime | StoredAs
 }
 
 export function assignAirportTimeFromSystemTimeZone(airports: Airport[]): AssignedAirportTime | null {
+  const current = readStoredAssignedAirportTime();
+  if (current?.source === "manual") return current;
+
   const timeZone = getSystemTimeZone();
   if (!timeZone || !airports.length) return null;
 
@@ -62,6 +77,17 @@ export function assignAirportTimeFromSystemTimeZone(airports: Airport[]): Assign
     gmtOffset: match.gmtOffset ?? offset,
     timeZone,
     source: "auto",
+  };
+  writeAssignedAirportTime(assigned);
+  return assigned;
+}
+
+export function assignManualAirportTime(airport: AssignedAirportTime): AssignedAirportTime {
+  const assigned: StoredAssignedAirportTime = {
+    code: airport.code,
+    city: airport.city || "",
+    gmtOffset: airport.gmtOffset ?? 0,
+    source: "manual",
   };
   writeAssignedAirportTime(assigned);
   return assigned;
