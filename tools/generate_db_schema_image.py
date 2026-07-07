@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 import math
 
 
-OUT = Path("outputs/db_schema_tasfb2b.png")
+OUT = Path("diagrams/db_schema_tasfb2b.png")
 W, H = 6200, 4300
 
 
