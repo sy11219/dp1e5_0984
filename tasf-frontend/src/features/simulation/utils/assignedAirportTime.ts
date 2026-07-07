@@ -7,10 +7,19 @@ const CHANGE_EVENT = "tasf.assignedAirportTime.change";
 export type AssignedAirportTime = Pick<Airport, "code" | "city" | "gmtOffset">;
 
 const TIME_ZONE_AIRPORT_CODES: Record<string, string[]> = {
-  "America/Lima": ["SPJC", "SPIM"],
+  "America/Lima": ["SPIM", "SPJC"],
   "America/Bogota": ["SKBO"],
   "America/Santiago": ["SCEL"],
+  "America/Sao_Paulo": ["SABE"],
+  "America/Argentina/Buenos_Aires": ["SABE"],
 };
+
+const OFFSET_AIRPORT_CODES: Array<{ offset: number; codes: string[] }> = [
+  { offset: -5, codes: ["SPIM", "SPJC"] },
+  { offset: -3, codes: ["SABE"] },
+  { offset: 2, codes: ["EKCH"] },
+  { offset: 5.5, codes: ["VIDP"] },
+];
 
 type StoredAssignedAirportTime = AssignedAirportTime & {
   timeZone?: string;
@@ -66,7 +75,7 @@ export function assignAirportTimeFromSystemTimeZone(airports: Airport[]): Assign
   if (!timeZone || !airports.length) return null;
 
   const offset = getCurrentOffsetHours(timeZone);
-  if (offset === null || !Number.isInteger(offset)) return null;
+  if (offset === null) return null;
 
   const match = findBestAirportForTimeZone(airports, timeZone, offset);
   if (!match) return null;
@@ -157,6 +166,9 @@ function findBestAirportForTimeZone(
   timeZone: string,
   offset: number
 ): Airport | null {
+  const offsetMatch = findExplicitOffsetAirport(airports, offset);
+  if (offsetMatch) return offsetMatch;
+
   const explicitMatch = findExplicitTimeZoneAirport(airports, timeZone);
   if (explicitMatch) return explicitMatch;
 
@@ -178,6 +190,18 @@ function findExplicitTimeZoneAirport(airports: Airport[], timeZone: string): Air
   if (!codes?.length) return null;
 
   for (const code of codes) {
+    const airport = airports.find((item) => item.code === code);
+    if (airport) return airport;
+  }
+
+  return null;
+}
+
+function findExplicitOffsetAirport(airports: Airport[], offset: number): Airport | null {
+  const entry = OFFSET_AIRPORT_CODES.find((item) => Math.abs(item.offset - offset) < 0.01);
+  if (!entry) return null;
+
+  for (const code of entry.codes) {
     const airport = airports.find((item) => item.code === code);
     if (airport) return airport;
   }
