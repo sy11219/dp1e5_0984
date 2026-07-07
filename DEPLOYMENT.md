@@ -1,4 +1,4 @@
-# TASF B2B - Guia de despliegue
+# TASF B2B - Guía de despliegue
 
 Este repositorio contiene dos aplicaciones principales:
 
