@@ -255,7 +255,7 @@ export function ShipmentsPage() {
           <div className="panel section metric-panel">
             <span>Maletas</span>
             <strong>{totalBags.toLocaleString("es-PE")}</strong>
-            <small>desde ahora hasta fin del dia</small>
+            <small>desde ahora hasta fin del día</small>
           </div>
         </section>
 

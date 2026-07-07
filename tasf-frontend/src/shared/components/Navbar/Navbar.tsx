@@ -10,7 +10,6 @@ export function Navbar() {
     { name: "Aeropuertos", path: "/airports" },
     { name: "Vuelos", path: "/flights" },
     { name: "Envíos", path: "/shipments" },
-    { name: "Carga de archivos", path: "/upload" },
   ];
 
   return (

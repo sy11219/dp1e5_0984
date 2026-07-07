@@ -226,7 +226,7 @@ export function FlightsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Vuelos</h1>
-            <p>Listado completo de planes de vuelo leidos desde la base de datos.</p>
+            <p>Listado completo de planes de vuelo leídos desde la base de datos.</p>
           </div>
           <button
             className="primary"
@@ -254,7 +254,7 @@ export function FlightsPage() {
           <div className="panel section metric-panel">
             <span>Cancelados</span>
             <strong>{canceledCount}</strong>
-            <small>fuera de operacion</small>
+            <small>fuera de operación</small>
           </div>
         </section>
 
@@ -272,7 +272,7 @@ export function FlightsPage() {
               <label>Buscar</label>
               <input
                 type="search"
-                placeholder="Codigo, UUID, fecha o estado"
+                placeholder="Código, UUID, fecha o estado"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />

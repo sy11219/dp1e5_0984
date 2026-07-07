@@ -7,14 +7,14 @@ import {
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
-import { AirportDetail } from "../../simulation/components/AirportDetail";
-import { AirportsTable } from "../../simulation/components/AirportsTable";
-import { CapacityLegend } from "../../simulation/components/CapacityLegend";
-import { FlightsTable } from "../../simulation/components/FlightsTable";
-import { GlobalIndicators } from "../../simulation/components/GlobalIndicators";
-import { ShipmentsTable } from "../../simulation/components/ShipmentsTable";
-import { SimulationResultModal } from "../../simulation/components/SimulationResultModal";
-import MapStage, { type MapFocusTarget } from "../../simulation/components/simulation/map/MapStage";
+import { AirportDetail } from "../../simulation/components/panel/AirportDetail";
+import { AirportsTable } from "../../simulation/components/panel/tables/AirportsTable";
+import { CapacityLegend } from "../../simulation/components/panel/CapacityLegend";
+import { FlightsTable } from "../../simulation/components/panel/tables/FlightsTable";
+import { GlobalIndicators } from "../../simulation/components/panel/GlobalIndicators";
+import { ShipmentsTable } from "../../simulation/components/panel/tables/ShipmentsTable";
+import { SimulationResultModal } from "../../simulation/components/general/SimulationResultModal";
+import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
@@ -57,7 +57,7 @@ function LiveMetrics({
       <div className="metric">
         <span>En cola</span>
         <strong>{data.metrics.queuedShipments || 0}</strong>
-        <span>pendientes de asignacion</span>
+        <span>pendientes de asignación</span>
       </div>
       <div className="metric">
         <span>Maletas asignadas</span>
@@ -405,7 +405,7 @@ export const OperationsPage = () => {
                 <label>Cancelar vuelo</label>
                 <input
                   type="text"
-                  placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
+                  placeholder="flight_code (ej: SKBO-VIDP-0005)"
                   value={flightToCancel}
                   onChange={(event) => setFlightToCancel(event.target.value)}
                   disabled={!data?.simulationId || cancelling}
@@ -417,7 +417,7 @@ export const OperationsPage = () => {
                 onClick={cancelFlight}
                 disabled={!data?.simulationId || !flightToCancel || cancelling}
               >
-                {cancelling ? "Registrando..." : "Registrar cancelacion"}
+                {cancelling ? "Registrando..." : "Registrar cancelación"}
               </button>
               {error && <div className="error">{error}</div>}
               {notice && <div className="success">{notice}</div>}
@@ -451,8 +451,8 @@ export const OperationsPage = () => {
               {operationDayToggling
                 ? "Actualizando..."
                 : operationsClosed
-                  ? "Abrir operaciones del dia"
-                  : "Finalizar operaciones del dia"}
+                  ? "Abrir operaciones del día"
+                  : "Finalizar operaciones del día"}
             </button>
           </section>
         </aside>
@@ -569,7 +569,7 @@ export const OperationsPage = () => {
           </section>
 
           <section className="panel section">
-            <h3>Aeropuertos criticos</h3>
+            <h3>Aeropuertos críticos</h3>
             {data ? (
               <AirportsTable
                 airports={data.airports}

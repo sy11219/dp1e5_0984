@@ -12,21 +12,21 @@ import {
   ownsBatchSimulation,
 } from "../../../api/simulationApi"
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
-import { AirportDetail } from "../components/AirportDetail"
-import { AirportsTable } from "../components/AirportsTable"
-import { CapacityLegend } from "../components/CapacityLegend"
-import { FlightsTable } from "../components/FlightsTable"
-import { GlobalIndicators } from "../components/GlobalIndicators"
-import { ShipmentsTable } from "../components/ShipmentsTable"
-import { Metrics } from "../components/Metrics"
-import MapStage, { type MapFocusTarget } from "../components/simulation/map/MapStage"
-import { Timeline } from "../components/Timeline"
-import { SimulationStatusCards } from "../components/Topbar"
+import { AirportDetail } from "../components/panel/AirportDetail"
+import { AirportsTable } from "../components/panel/tables/AirportsTable"
+import { CapacityLegend } from "../components/panel/CapacityLegend"
+import { FlightsTable } from "../components/panel/tables/FlightsTable"
+import { GlobalIndicators } from "../components/panel/GlobalIndicators"
+import { ShipmentsTable } from "../components/panel/tables/ShipmentsTable"
+import { Metrics } from "../components/general/Metrics"
+import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage"
+import { Timeline } from "../components/general/Timeline"
+import { SimulationStatusCards } from "../components/general/Topbar"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../types"
 import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../utils/constants"
 import { capacityStatus, computeActiveFlights, computeAirportLoads } from "../utils/calculations"
-import { SimulationResultModal } from "../components/SimulationResultModal"
+import { SimulationResultModal } from "../components/general/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
 import { useAssignedAirportTime } from "../utils/assignedAirportTime"
 
@@ -109,11 +109,25 @@ function finalVisualFinishedAtMs(data: SimulationData, fallback = Date.now()) {
   return fallback
 }
 
+function simulationMinuteISOString(data: SimulationData, minute: number | undefined) {
+  if (typeof minute !== "number" || !Number.isFinite(minute) || !data.simulationStartDateTime) {
+    return undefined
+  }
+
+  const simulationStart = Date.parse(data.simulationStartDateTime)
+  if (!Number.isFinite(simulationStart)) return undefined
+
+  return new Date(
+    simulationStart + (minute - (data.startOffsetMinutes ?? 0)) * 60_000
+  ).toISOString()
+}
+
 function buildFrozenSummary(data: SimulationData): FrozenSimulationSummary {
   const finishedAt = finalVisualFinishedAtMs(data)
   const startedAt = data.realStartedAt ? Date.parse(data.realStartedAt) : Number.NaN
   const realTimeMs = Math.max(0, finishedAt - (Number.isFinite(startedAt) ? startedAt : finishedAt))
   const maxTick = data.maxTick ?? data.tick
+  const stoppedAt = simulationMinuteISOString(data, maxTick)
 
   return {
     simulationId: simulationIdentity(data),
@@ -123,6 +137,7 @@ function buildFrozenSummary(data: SimulationData): FrozenSimulationSummary {
       tick: maxTick,
       visualEndTick: maxTick,
       realFinishedAt: new Date(finishedAt).toISOString(),
+      simulationStoppedDateTime: stoppedAt ?? data.simulationEndDateTime,
     },
   }
 }
@@ -855,6 +870,20 @@ export function SimulationPage() {
 
     const stoppedSessionId = data.simulationId ?? simulationIdentity(data)
     const elapsed = realTimeMs || elapsedRealTimeMs(data)
+    const stoppedMinute =
+      simMinute ??
+      data.visualEndTick ??
+      data.tick ??
+      data.startOffsetMinutes ??
+      0
+    const stoppedAt = simulationMinuteISOString(data, stoppedMinute)
+    const stoppedData: SimulationData = {
+      ...data,
+      visualEndTick: stoppedMinute,
+      realFinishedAt: new Date().toISOString(),
+      runtimeMs: elapsed,
+      simulationStoppedDateTime: stoppedAt ?? data.simulationStoppedDateTime,
+    }
     stoppedSimulationIdRef.current = stoppedSessionId || null
     markBatchSimulationStopped(data)
     setBatchSimulationPaused(true)
@@ -864,9 +893,9 @@ export function SimulationPage() {
     stopAnimation()
     onBatchCompleteRef.current = null
     animatingRef.current = false
-    setStoppedSummaryData(data)
+    setStoppedSummaryData(stoppedData)
     setStoppedSummaryRealTimeMs(elapsed)
-    setStoppedSummaryMinute(simMinute)
+    setStoppedSummaryMinute(stoppedMinute)
     setStopSummaryOpen(true)
     if (data.simulationId) {
       void stopBatchSimulationRequest(data.simulationId).catch(() => {
@@ -1296,7 +1325,7 @@ function SimulationControls({
           <label>Cancelar vuelo</label>
           <input
             type="text"
-            placeholder="flight_code (ej: SKBO-SEQM-20260101-0334-0001)"
+            placeholder="flight_code (ej: SKBO-VIDP-0005)"
             value={flightToCancel}
             onChange={(e) => onFlightToCancelChange(e.target.value)}
             disabled={!hasSimulation || busy}

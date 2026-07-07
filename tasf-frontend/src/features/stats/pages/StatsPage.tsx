@@ -65,10 +65,10 @@ function buildInsights(data: SimulationData) {
   return [
     {
       title: mostUsedAirport
-        ? `${mostUsedAirport.code} esta cerca del límite.`
+        ? `${mostUsedAirport.code} está cerca del límite.`
         : "Sin aeropuertos cargados.",
       detail: mostUsedAirport
-        ? `La utilizacion llega a ${Math.round(
+        ? `La utilización llega a ${Math.round(
             mostUsedAirport.utilization * 100
           )}% durante la simulación.`
         : "Ejecuta la simulación para poblar los indicadores.",
@@ -79,12 +79,12 @@ function buildInsights(data: SimulationData) {
         : "Sin throughput calculado.",
       detail: busiestBucket
         ? `El backend reporta ${busiestBucket.actual} maletas planificadas en ese bloque.`
-        : "No hay envios disponibles en el resultado recibido.",
+        : "No hay envíos disponibles en el resultado recibido.",
     },
     {
       title: `${delayedBags.toLocaleString("es-PE")} maletas requieren seguimiento.`,
       detail:
-        "La cifra agrupa envios fuera de SLA o no planificados en la simulación.",
+        "La cifra agrupa envíos fuera de SLA o no planificados en la simulación.",
     },
   ];
 }

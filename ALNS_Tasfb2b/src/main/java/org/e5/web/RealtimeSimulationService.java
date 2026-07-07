@@ -585,6 +585,8 @@ public class RealtimeSimulationService {
         int lastBatchEnd = -1;
         int batchCount = 0;
         long lastBatchRuntimeMs = 0;
+        PlanningMetrics lastPlanningMetrics = new PlanningMetrics();
+        int lastPlanningUsedFlights = 0;
         long realFinishedAtMs = 0;
         boolean paused = false;
         long lastRealtimeAdvanceMs = 0;
@@ -902,6 +904,7 @@ public class RealtimeSimulationService {
                 System.out.printf("[Lote] Rutas: %d / %d | backlog entrante: %d | backlog saliente: %d%n",
                         resultado.size(), n, backlogEntrante, batchPlanningBacklog.size());
             }
+            captureLastPlanningSummary(loteShipments, batchEnd);
 
             batchCount++;
             tick = batchEnd;
@@ -1242,9 +1245,11 @@ public class RealtimeSimulationService {
                     9.0, 3.0, 0.0, 0.8, plannerFastMode());
             Map<String, Route> result = alns.ejecutarIncremental(
                     queue, availableFlightsFrom(tick), airportMap, processed);
+            List<Shipment> planningScope = new ArrayList<>(queue);
             events.add(new RealtimeEvent(tick, "SYSTEM", result.size(), "replan"));
             processed.addAll(queue);
             for (Shipment s : queue) queuedShipmentIds.remove(s.getShipmentId());
+            captureLastPlanningSummary(planningScope, Math.min(maxTick, Math.max(tick, lastBatchEnd)));
             queue.clear();
         }
 
@@ -1862,6 +1867,8 @@ public class RealtimeSimulationService {
             json.prop("deliveredOnTimeShipments", planMetrics.deliveredOnTimeShipments).comma();
             json.prop("unplannedShipments", planMetrics.unplannedShipments).comma();
             json.prop("lateShipments", planMetrics.lateShipments).comma();
+            json.prop("inTransitShipments", planMetrics.inTransitShipments).comma();
+            json.prop("firstWarehouseShipments", planMetrics.firstWarehouseShipments).comma();
             json.prop("totalBags", planMetrics.totalBags).comma();
             json.prop("plannedBags", planMetrics.plannedBags).comma();
             json.prop("onTimeBags", planMetrics.onTimeBags).comma();
@@ -1869,6 +1876,8 @@ public class RealtimeSimulationService {
             json.prop("deliveredOnTimeBags", planMetrics.deliveredOnTimeBags).comma();
             json.prop("unplannedBags", planMetrics.unplannedBags).comma();
             json.prop("lateBags", planMetrics.lateBags).comma();
+            json.prop("inTransitBags", planMetrics.inTransitBags).comma();
+            json.prop("firstWarehouseBags", planMetrics.firstWarehouseBags).comma();
             json.prop("planningComplete", planMetrics.planningComplete).comma();
             json.prop("deliveryCompleteWithinSimulation", planMetrics.deliveryCompleteWithinSimulation).comma();
             json.prop("usedFlights", usedFlights).comma();
@@ -1879,6 +1888,15 @@ public class RealtimeSimulationService {
             json.prop("iterations", 0).comma();
             json.prop("globalImprovements", 0).comma();
             json.prop("acceptedBySa", 0);
+            json.objEnd().comma();
+
+            json.name("lastPlanningMetrics").objStart();
+            writeMetricsFields(
+                    json,
+                    lastPlanningMetrics,
+                    lastPlanningUsedFlights,
+                    lastPlanningMetrics.totalShipments,
+                    Math.max(0, lastPlanningMetrics.unplannedShipments));
             json.objEnd().comma();
 
             // airports
@@ -1965,13 +1983,17 @@ public class RealtimeSimulationService {
         }
 
         private PlanningMetrics calculatePlanningMetrics(List<Shipment> source) {
+            return calculatePlanningMetrics(source, maxTick);
+        }
+
+        private PlanningMetrics calculatePlanningMetrics(List<Shipment> source, int deliveredByMinute) {
             Map<String, ShipmentRollup> rollups = new LinkedHashMap<>();
             for (Shipment shipment : source) {
                 String rootId = shipment.isSplitPart()
                         ? shipment.getParentShipmentId()
                         : shipment.getShipmentId();
                 rollups.computeIfAbsent(rootId, ignored -> new ShipmentRollup(shipment))
-                        .include(shipment, maxTick);
+                        .include(shipment, deliveredByMinute);
             }
 
             PlanningMetrics metrics = new PlanningMetrics();
@@ -1982,21 +2004,29 @@ public class RealtimeSimulationService {
                 int onTime = Math.min(total, rollup.onTimeBags);
                 int delivered = Math.min(total, rollup.deliveredBags);
                 int deliveredOnTime = Math.min(total, rollup.deliveredOnTimeBags);
+                int firstWarehouse = Math.min(total, rollup.firstWarehouseBags);
+                int inTransit = Math.min(total, rollup.inTransitBags);
 
                 metrics.totalBags += total;
                 metrics.plannedBags += planned;
                 metrics.onTimeBags += onTime;
                 metrics.deliveredBags += delivered;
                 metrics.deliveredOnTimeBags += deliveredOnTime;
+                metrics.firstWarehouseBags += firstWarehouse;
+                metrics.inTransitBags += inTransit;
 
                 if (total > 0 && planned >= total) {
                     metrics.plannedShipments++;
+                    if (delivered >= total) {
+                        metrics.deliveredShipments++;
+                    } else if (firstWarehouse >= total) {
+                        metrics.firstWarehouseShipments++;
+                    } else {
+                        metrics.inTransitShipments++;
+                    }
                 }
                 if (total > 0 && onTime >= total) {
                     metrics.onTimeShipments++;
-                }
-                if (total > 0 && delivered >= total) {
-                    metrics.deliveredShipments++;
                 }
                 if (total > 0 && deliveredOnTime >= total) {
                     metrics.deliveredOnTimeShipments++;
@@ -2022,6 +2052,8 @@ public class RealtimeSimulationService {
             int onTimeBags;
             int deliveredBags;
             int deliveredOnTimeBags;
+            int firstWarehouseBags;
+            int inTransitBags;
 
             ShipmentRollup(Shipment seed) {
                 totalBags = Math.max(0, seed.getOriginalSuitcaseCount());
@@ -2036,12 +2068,29 @@ public class RealtimeSimulationService {
                 if (shipment.isOnTime()) {
                     onTimeBags += bags;
                 }
-                if (shipment.getEstimatedArrival() <= 0) return;
+                if (shipment.getEstimatedArrival() <= 0) {
+                    firstWarehouseBags += bags;
+                    return;
+                }
                 if (shipment.getEstimatedArrival() <= simulationEndMinute) {
                     deliveredBags += bags;
                     if (shipment.isOnTime()) {
                         deliveredOnTimeBags += bags;
                     }
+                    return;
+                }
+
+                Route route = shipment.getAssignedRoute();
+                if (route == null || !route.isValid() || route.getFlights().isEmpty()) {
+                    firstWarehouseBags += bags;
+                    return;
+                }
+
+                int firstDeparture = route.getFlights().get(0).absoluteDepartureMinute();
+                if (firstDeparture > simulationEndMinute) {
+                    firstWarehouseBags += bags;
+                } else {
+                    inTransitBags += bags;
                 }
             }
         }
@@ -2054,6 +2103,8 @@ public class RealtimeSimulationService {
             int deliveredOnTimeShipments;
             int unplannedShipments;
             int lateShipments;
+            int firstWarehouseShipments;
+            int inTransitShipments;
             int totalBags;
             int plannedBags;
             int onTimeBags;
@@ -2061,6 +2112,8 @@ public class RealtimeSimulationService {
             int deliveredOnTimeBags;
             int unplannedBags;
             int lateBags;
+            int firstWarehouseBags;
+            int inTransitBags;
             boolean planningComplete;
             boolean deliveryCompleteWithinSimulation;
         }
@@ -2100,6 +2153,64 @@ public class RealtimeSimulationService {
 
         private String scenarioLabel() {
             return "SIMULACION_LOTES".equals(scenario) ? "Simulación 5 días" : "Tiempo real";
+        }
+
+        private void captureLastPlanningSummary(List<Shipment> plannedScope, int deliveredByMinute) {
+            List<Shipment> scope = plannedScope == null
+                    ? Collections.emptyList()
+                    : new ArrayList<>(plannedScope);
+            lastPlanningMetrics = calculatePlanningMetrics(scope, deliveredByMinute);
+            lastPlanningUsedFlights = countUsedFlights(scope);
+        }
+
+        private int countUsedFlights(List<Shipment> source) {
+            Set<String> usedFlightIds = new HashSet<>();
+            for (Shipment shipment : source) {
+                Route route = shipment.getAssignedRoute();
+                if (route == null || !route.isValid()) continue;
+                for (Flight flight : route.getFlights()) {
+                    usedFlightIds.add(flight.getFlightId());
+                }
+            }
+            return usedFlightIds.size();
+        }
+
+        private void writeMetricsFields(
+                Json json,
+                PlanningMetrics metrics,
+                int usedFlights,
+                int payloadShipments,
+                int queuedShipments) {
+            json.prop("shipments", metrics.totalShipments).comma();
+            json.prop("processedShipments", metrics.totalShipments).comma();
+            json.prop("queuedShipments", queuedShipments).comma();
+            json.prop("plannedShipments", metrics.plannedShipments).comma();
+            json.prop("onTimeShipments", metrics.onTimeShipments).comma();
+            json.prop("deliveredShipments", metrics.deliveredShipments).comma();
+            json.prop("deliveredOnTimeShipments", metrics.deliveredOnTimeShipments).comma();
+            json.prop("unplannedShipments", metrics.unplannedShipments).comma();
+            json.prop("lateShipments", metrics.lateShipments).comma();
+            json.prop("inTransitShipments", metrics.inTransitShipments).comma();
+            json.prop("firstWarehouseShipments", metrics.firstWarehouseShipments).comma();
+            json.prop("totalBags", metrics.totalBags).comma();
+            json.prop("plannedBags", metrics.plannedBags).comma();
+            json.prop("onTimeBags", metrics.onTimeBags).comma();
+            json.prop("deliveredBags", metrics.deliveredBags).comma();
+            json.prop("deliveredOnTimeBags", metrics.deliveredOnTimeBags).comma();
+            json.prop("unplannedBags", metrics.unplannedBags).comma();
+            json.prop("lateBags", metrics.lateBags).comma();
+            json.prop("inTransitBags", metrics.inTransitBags).comma();
+            json.prop("firstWarehouseBags", metrics.firstWarehouseBags).comma();
+            json.prop("planningComplete", metrics.planningComplete).comma();
+            json.prop("deliveryCompleteWithinSimulation", metrics.deliveryCompleteWithinSimulation).comma();
+            json.prop("usedFlights", usedFlights).comma();
+            json.prop("payloadShipments", payloadShipments).comma();
+            json.prop("pendingCancellations", 0).comma();
+            json.prop("fitnessInitial", 0).comma();
+            json.prop("fitnessFinal", 0).comma();
+            json.prop("iterations", 0).comma();
+            json.prop("globalImprovements", 0).comma();
+            json.prop("acceptedBySa", 0);
         }
 
         private double ratio(int value, int total) {
