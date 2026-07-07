@@ -1,7 +1,8 @@
 import type { ActiveFlight, AirportLoads, SimulationData } from "../types";
 
 export function capacityStatus(utilization: number): "green" | "yellow" | "red" | "gray" {
-  if (utilization == 0) return "gray";
+  const EPS = 0.001; // treat utilization below 0.1% as effectively zero
+  if (utilization <= EPS) return "gray";
   if (utilization < 0.7) return "green";
   if (utilization < 0.9) return "yellow";
   return "red";
@@ -19,7 +20,7 @@ export function computeActiveFlights(
   const active: ActiveFlight[] = [];
 
   for (const flight of data.flights) {
-    if (flight.assignedLoad <= 0) continue;
+    //if (flight.assignedLoad <= 0) continue;
     if (flight.scheduleStatus?.toUpperCase().startsWith("CANCEL")) continue;
     if (minute < flight.absoluteDepartureMinute) continue;
     if (minute > flight.absoluteArrivalMinute) continue;
@@ -28,7 +29,7 @@ export function computeActiveFlights(
       ...flight,
       progress: clamp(
         (minute - flight.absoluteDepartureMinute) /
-          Math.max(1, flight.absoluteArrivalMinute - flight.absoluteDepartureMinute),
+        Math.max(1, flight.absoluteArrivalMinute - flight.absoluteDepartureMinute),
         0,
         1
       ),

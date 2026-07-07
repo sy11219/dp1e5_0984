@@ -252,6 +252,7 @@ export function SimulationPage() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true)
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
   const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos")
+
   const [airportColorFilter, setAirportColorFilter] = useState<ColorFilter>("Todos")
 
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
@@ -275,6 +276,14 @@ export function SimulationPage() {
     onBatchCompleteRef,
     BATCH_MINUTES,
   } = useSimulationPlayer(maxMinute)
+
+
+
+
+
+
+
+
 
   const isBatchStoppedLocally = useCallback((simulationId?: string | null) => {
     return Boolean(simulationId && stoppedSimulationIdRef.current === simulationId)
@@ -643,6 +652,7 @@ export function SimulationPage() {
       setMapFocusTarget(null)
       setPlaying(true)
 
+
       // 2. Pedir el primer lote sin mantener bloqueado el estado "Iniciando".
       void fetchNextBatch(initial.simulationId!, initial.tick ?? initial.startOffsetMinutes ?? 0)
     } catch (err) {
@@ -702,7 +712,7 @@ export function SimulationPage() {
     () =>
       flightColorFilter === "Todos"
         ? activeFlights
-        : activeFlights.filter((flight) => flight.status === flightColorFilter),
+        : activeFlights.filter((flight) => capacityStatus(flight.utilization) === flightColorFilter),
     [activeFlights, flightColorFilter]
   )
   const activeFlightIds = useMemo(
@@ -713,7 +723,7 @@ export function SimulationPage() {
     if (!selectedFlightId) return null
     if (flightColorFilter === "Todos") return selectedFlightId
     const selectedFlight = displayData.flights.find((flight) => flight.id === selectedFlightId)
-    return selectedFlight?.status === flightColorFilter ? selectedFlightId : null
+    return selectedFlight && capacityStatus(selectedFlight.utilization) === flightColorFilter ? selectedFlightId : null
   }, [displayData.flights, flightColorFilter, selectedFlightId])
   const mapSelectedAirport = useMemo(() => {
     if (!selectedAirport) return null
