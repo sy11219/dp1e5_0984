@@ -175,9 +175,7 @@ export function FlightsTable({
     );
   }
 
-  if (!flights.length) {
-    return <div className="empty-state">No hay vuelos registrados.</div>;
-  }
+
 
   return (
     <div className="flights-table">
@@ -238,26 +236,28 @@ export function FlightsTable({
           </select>
         </label>
 
-        <label className="text-sm">
-          Dirección:
-          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}>
-            <option value="asc">Ascendente</option>
-            <option value="desc">Descendente</option>
-          </select>
-        </label>
-
-        {!hideColorFilter && (
+        <div className="flex items-center gap-2">
           <label className="text-sm">
-            Color:
-            <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
-              <option value="Todos">Todos</option>
-              <option value="green">Verde</option>
-              <option value="yellow">Amarillo</option>
-              <option value="red">Rojo</option>
-              <option value="gray">Gris</option>
+            Dirección:
+            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+              >
+              <option value="asc">Ascendente</option>
+              <option value="desc">Descendente</option>
             </select>
           </label>
-        )}
+          {!hideColorFilter && (
+            <label className="text-sm">
+              Color:
+              <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
+                <option value="Todos">Todos</option>
+                <option value="green">Verde</option>
+                <option value="yellow">Amarillo</option>
+                <option value="red">Rojo</option>
+                <option value="gray">Gris</option>
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="table">

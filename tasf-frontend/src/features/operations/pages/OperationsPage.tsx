@@ -536,21 +536,7 @@ export const OperationsPage = () => {
 
           <section className="panel section">
             <h3>Vuelos</h3>
-            {/* Color filter selector */}
-            <label className="text-sm" style={{ marginRight: "0.5rem" }}>
-              Filtro color:
-              <select
-                value={flightColorFilter}
-                onChange={(e) => setFlightColorFilter(e.target.value as ColorFilter)}
-                style={{ marginLeft: "0.5rem" }}
-              >
-                <option value="Todos">Todos</option>
-                <option value="green">Verde</option>
-                <option value="yellow">Amarillo</option>
-                <option value="red">Rojo</option>
-                <option value="gray">Gris</option>
-              </select>
-            </label>
+
             {/* Apply filter to flights */}
             <FlightsTable
               flights={flightColorFilter === "Todos" ? data?.flights || [] : (data?.flights || []).filter((f) => capacityStatus(f.utilization) === flightColorFilter)}
@@ -562,13 +548,13 @@ export const OperationsPage = () => {
               displayGmtOffset={displayGmtOffset}
               colorFilter={flightColorFilter}
               onColorFilterChange={setFlightColorFilter}
-              hideColorFilter={true}
+              hideColorFilter={false}
             />
           </section>
 
           <section className="panel section">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-              <h3>Envios</h3>
+              <h3>Envíos</h3>
               <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
                 Mostrar finalizados hace
                 <input
