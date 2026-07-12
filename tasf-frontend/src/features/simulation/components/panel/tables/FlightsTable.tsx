@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
-import type { CapacityStatus, Flight, Shipment } from "../../../types";
-import { capacityStatus } from "../../../utils/calculations";
+import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
-import { hhmm } from "../../../utils/formatters";
+import { formatFlightMoment } from "../../../utils/formatters";
 
 interface FlightsTableProps {
   flights: Flight[];
   activeFlightIds: Set<string>;
   shipments: Shipment[];
+  data?: SimulationData | null;
   simMinute: number;
   selectedFlightId?: string | null;
   onSelectFlight?: (id: string) => void;
@@ -23,6 +23,7 @@ export function FlightsTable({
   flights,
   activeFlightIds,
   shipments,
+  data,
   simMinute,
   selectedFlightId,
   onSelectFlight,
@@ -139,7 +140,7 @@ export function FlightsTable({
     const selected = filteredAndSortedFlights.find((flight) => flight.id === selectedFlightId);
     return selected ? [selected, ...base.slice(0, 9)] : base;
   }, [filteredAndSortedFlights, selectedFlightId]);
-  const gmtOffset = displayGmtOffset ?? 0;
+  const flightMomentData = data ?? null;
 
   if (viewMode === "flight-shipments" && selectedFlightShipments) {
     return (
@@ -283,9 +284,16 @@ export function FlightsTable({
                 }}
               >
                 <span className={`dot ${flight.status}`}></span>
-                <div className="row-main">
-                  <strong>{`${flight.origin} -> ${flight.destination}`}</strong>
-                  <span>{`Dia ${flight.dayOffset} - ${hhmm(flight.departureMinute, gmtOffset)}-${hhmm(flight.arrivalMinute, gmtOffset)}`}</span>
+                <div className="row-main flight-route-main">
+                  <div className="flight-route-point">
+                    <strong>{flight.origin}</strong>
+                    <span>{formatFlightMoment(flightMomentData, flight.absoluteDepartureMinute, displayGmtOffset)}</span>
+                  </div>
+                  <span className="flight-route-arrow">-&gt;</span>
+                  <div className="flight-route-point">
+                    <strong>{flight.destination}</strong>
+                    <span>{formatFlightMoment(flightMomentData, flight.absoluteArrivalMinute, displayGmtOffset)}</span>
+                  </div>
                 </div>
                 <span
                   className="capacity-pill"

@@ -20,8 +20,8 @@ import { GlobalIndicators } from "../components/panel/GlobalIndicators"
 import { ShipmentsTable } from "../components/panel/tables/ShipmentsTable"
 import { Metrics } from "../components/general/Metrics"
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage"
-import { Timeline } from "../components/general/Timeline"
 import { SimulationStatusCards } from "../components/general/Topbar"
+import { DraggableMapOverlay } from "../components/general/DraggableMapOverlay"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../types"
 import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../utils/constants"
@@ -36,6 +36,7 @@ const SIMULATION_MAP_FOCUS_KEY = "tasf.simulation5d.mapFocus"
 const FINAL_SUMMARY_KEY = "tasf.simulation5d.finalSummary"
 const DEFAULT_BATCH_INTERVAL_MS = 120_000
 type ColorFilter = "Todos" | CapacityStatus
+type RightPanelSection = "flights" | "shipments" | "airports"
 
 type FrozenSimulationSummary = {
   simulationId?: string
@@ -249,8 +250,9 @@ export function SimulationPage() {
   )
   const [realTimeMs, setRealTimeMs]   = useState(0)
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1)
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true)
-  const [rightPanelOpen, setRightPanelOpen] = useState(true)
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false)
+  const [rightPanelOpen, setRightPanelOpen] = useState(false)
+  const [openRightPanelSection, setOpenRightPanelSection] = useState<RightPanelSection | null>(null)
   const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos")
 
   const [airportColorFilter, setAirportColorFilter] = useState<ColorFilter>("Todos")
@@ -965,10 +967,12 @@ export function SimulationPage() {
     setReportDismissed(true)
   }
 
-  return (
-    <div className="app-shell">
-      <Navbar />
+  const toggleRightPanelSection = (section: RightPanelSection) => {
+    setOpenRightPanelSection((current) => current === section ? null : section)
+  }
 
+  return (
+    <div className="app-shell simulation-shell">
       <main
         className={[
           "workspace",
@@ -987,6 +991,9 @@ export function SimulationPage() {
           >
             <PanelLeftClose size={18} />
           </button>
+          <section className="panel section simulation-side-nav">
+            <Navbar />
+          </section>
           <SimulationControls
             error={error}
             notice={notice}
@@ -1032,11 +1039,6 @@ export function SimulationPage() {
             onRunSimulation={runSimulation}
             onStartDateChange={setStartDate}
             onStartTimeChange={setStartTime}
-          />
-          <GlobalIndicators
-            data={data}
-            currentMinute={simMinute}
-            samplingIntervalMinutes={data?.planningIntervalMinutes}
           />
           <CapacityLegend />
           <section className="panel section">
@@ -1113,15 +1115,14 @@ export function SimulationPage() {
               displayGmtOffset={displayGmtOffset}
               displayAirportLabel={displayAirportLabel}
             />
+            <DraggableMapOverlay initialX={18} initialY={168} className="map-global-indicators-overlay">
+              <GlobalIndicators
+                data={data}
+                currentMinute={simMinute}
+                samplingIntervalMinutes={data?.planningIntervalMinutes}
+              />
+            </DraggableMapOverlay>
           </MapStage>
-          <Timeline
-            simMinute={simMinute}
-            maxMinute={maxMinute}
-            setSimMinute={setSimMinute}
-            data={data}
-            startDate={startDate}
-            displayGmtOffset={displayGmtOffset}
-          />
         </section>
 
         {rightPanelOpen ? (
@@ -1162,25 +1163,49 @@ export function SimulationPage() {
               />
             )}
           </section>
-          <section className="panel section">
-            <h3>Vuelos</h3>
-            {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
-            <FlightsTable
-              flights={displayData.flights}
-              activeFlightIds={activeFlightIds}
-              shipments={visibleShipments}
-              simMinute={simMinute}
-              selectedFlightId={selectedFlightId}
-              onSelectFlight={focusFlight}
-              displayGmtOffset={displayGmtOffset}
-              colorFilter={flightColorFilter}
-              onColorFilterChange={setFlightColorFilter}
-            />
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("flights")}
+              aria-expanded={openRightPanelSection === "flights"}
+            >
+              <span>Vuelos</span>
+              <strong>{openRightPanelSection === "flights" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "flights" && (
+              <div className="collapsible-content">
+                {loadingFlights && <div className="empty-state">Cargando vuelos...</div>}
+                <FlightsTable
+                  flights={displayData.flights}
+                  activeFlightIds={activeFlightIds}
+                  shipments={visibleShipments}
+                  data={displayData}
+                  simMinute={simMinute}
+                  selectedFlightId={selectedFlightId}
+                  onSelectFlight={focusFlight}
+                  displayGmtOffset={displayGmtOffset}
+                  colorFilter={flightColorFilter}
+                  onColorFilterChange={setFlightColorFilter}
+                />
+              </div>
+            )}
           </section>
-          <section className="panel section">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("shipments")}
+              aria-expanded={openRightPanelSection === "shipments"}
+            >
+              <span>Envios</span>
+              <strong>{openRightPanelSection === "shipments" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "shipments" && (
+              <div className="collapsible-content">
+                <div className="list-toolbar">
               <h3>Envíos</h3>
-              <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+              <label className="text-sm">
                 Mostrar finalizados hace
                 <input
                   type="number"
@@ -1189,12 +1214,10 @@ export function SimulationPage() {
                   step={1}
                   value={shipmentHistoryHours}
                   onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
-                  style={{ width: "4.5rem" }}
                 />
                 h
               </label>
             </div>
-            <br></br>
             {loadingFlights && <div className="empty-state">Cargando envíos...</div>}
             <ShipmentsTable
               shipments={visibleShipments}
@@ -1206,8 +1229,21 @@ export function SimulationPage() {
               onSelectShipment={focusShipment}
               onSelectFlight={focusFlight}
             />
+              </div>
+            )}
           </section>
-          <section className="panel section">
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("airports")}
+              aria-expanded={openRightPanelSection === "airports"}
+            >
+              <span>Aeropuertos criticos</span>
+              <strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "airports" && (
+              <div className="collapsible-content">
             <h3>Aeropuertos críticos</h3>
             {displayData.airports.length ? (
               <AirportsTable
@@ -1224,6 +1260,8 @@ export function SimulationPage() {
               />
             ) : (
               <div className="empty-state">Sin datos.</div>
+            )}
+              </div>
             )}
           </section>
         </aside>

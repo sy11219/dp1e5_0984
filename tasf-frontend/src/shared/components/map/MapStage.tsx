@@ -42,8 +42,8 @@ export type MapFocusTarget = {
 };
 
 const FOCUS_ZOOM = 5;
-const FLIGHT_ROUTE_LINE_WIDTH = 1.2;
-const SELECTED_FLIGHT_ROUTE_LINE_WIDTH = 3.2;
+const FLIGHT_ROUTE_LINE_WIDTH = 0.75;
+const SELECTED_FLIGHT_ROUTE_LINE_WIDTH = 2.2;
 
 export default function MapStage({
   data,
@@ -188,7 +188,7 @@ export default function MapStage({
         pane: "airports",
         interactive: true,
         keyboard: false,
-        zIndexOffset: 900,
+        zIndexOffset: 1600,
       })
         .on("click", (event) => {
           L.DomEvent.stopPropagation(event);
@@ -277,7 +277,7 @@ export default function MapStage({
 
     ctx.strokeStyle = flightColor;
     ctx.lineWidth = isSelected ? SELECTED_FLIGHT_ROUTE_LINE_WIDTH : FLIGHT_ROUTE_LINE_WIDTH;
-    ctx.globalAlpha = isSelected ? 0.95 : 0.62;
+    ctx.globalAlpha = isSelected ? 0.92 : 0.5;
     ctx.shadowColor = isSelected ? "rgba(15, 23, 42, 0.36)" : "transparent";
     ctx.shadowBlur = isSelected ? 10 : 0;
     ctx.beginPath();
@@ -423,7 +423,7 @@ export default function MapStage({
         const { planePixel } = getRouteGeometry(map, origin, destination, flight.progress);
 
         const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
-        if (dist < 15) {
+        if (dist < 12) {
           onSelectFlight?.(flight.id);
           setMapInfo(createFlightInfo(data, flight, origin, destination, displayGmtOffset));
           return;
@@ -750,7 +750,7 @@ function drawPlaneIcon(
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate((angle * Math.PI) / 180);
-  ctx.scale(selected ? 0.68 : 0.54, selected ? 0.68 : 0.54);
+  ctx.scale(selected ? 0.5 : 0.38, selected ? 0.5 : 0.38);
 
   if (selected) {
     ctx.shadowColor = "rgba(15, 23, 42, 0.46)";
@@ -760,7 +760,7 @@ function drawPlaneIcon(
 
   drawPlanePath(ctx);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  ctx.lineWidth = selected ? 7 : 5.5;
+  ctx.lineWidth = selected ? 5.2 : 4.2;
   ctx.lineJoin = "round";
   ctx.stroke();
 
@@ -769,7 +769,7 @@ function drawPlaneIcon(
   drawPlanePath(ctx);
   ctx.fillStyle = color;
   ctx.strokeStyle = selected ? "#111827" : "rgba(255, 255, 255, 0.9)";
-  ctx.lineWidth = selected ? 2.4 : 1.8;
+  ctx.lineWidth = selected ? 1.8 : 1.25;
   ctx.lineJoin = "round";
   ctx.fill();
   ctx.stroke();

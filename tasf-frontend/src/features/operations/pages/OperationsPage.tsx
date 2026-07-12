@@ -15,6 +15,7 @@ import { GlobalIndicators } from "../../simulation/components/panel/GlobalIndica
 import { ShipmentsTable } from "../../simulation/components/panel/tables/ShipmentsTable";
 import { SimulationResultModal } from "../../simulation/components/general/SimulationResultModal";
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
+import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
 import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
@@ -28,6 +29,7 @@ import {
 
 // Color filter type
 type ColorFilter = "Todos" | CapacityStatus;
+type RightPanelSection = "flights" | "shipments" | "airports";
 
 import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
@@ -106,8 +108,9 @@ export const OperationsPage = () => {
   );
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [openRightPanelSection, setOpenRightPanelSection] = useState<RightPanelSection | null>(null);
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [operationDayToggling, setOperationDayToggling] = useState(false);
   const [operationSummaryOpen, setOperationSummaryOpen] = useState(false);
@@ -356,6 +359,10 @@ export const OperationsPage = () => {
     }
   };
 
+  const toggleRightPanelSection = (section: RightPanelSection) => {
+    setOpenRightPanelSection((current) => current === section ? null : section);
+  };
+
   const cancelFlight = async () => {
     if (!data?.simulationId || !flightToCancel.trim()) return;
     setCancelling(true);
@@ -374,9 +381,7 @@ export const OperationsPage = () => {
   };
 
   return (
-    <div className="app-shell">
-      <Navbar />
-
+    <div className="app-shell simulation-shell">
       <main
         className={[
           "workspace",
@@ -395,6 +400,9 @@ export const OperationsPage = () => {
           >
             <PanelLeftClose size={18} />
           </button>
+          <section className="panel section simulation-side-nav">
+            <Navbar />
+          </section>
           <section className="panel section">
             <h2>Panel de control</h2>
             <div className="metrics current-time-metrics">
@@ -430,12 +438,6 @@ export const OperationsPage = () => {
               {notice && <div className="success">{notice}</div>}
             </div>
           </section>
-
-          <GlobalIndicators
-            data={data}
-            currentMinute={operationalMinute}
-            samplingIntervalMinutes={data?.planningIntervalMinutes}
-          />
 
           <CapacityLegend />
 
@@ -491,7 +493,15 @@ export const OperationsPage = () => {
             onSelectFlight={focusFlight}
             onClearSelection={clearMapSelection}
             flightColorFilter={flightColorFilter}
-          />
+          >
+            <DraggableMapOverlay initialX={18} initialY={18} className="map-global-indicators-overlay">
+              <GlobalIndicators
+                data={data}
+                currentMinute={operationalMinute}
+                samplingIntervalMinutes={data?.planningIntervalMinutes}
+              />
+            </DraggableMapOverlay>
+          </MapStage>
         </section>
 
         {rightPanelOpen ? (
@@ -534,28 +544,50 @@ export const OperationsPage = () => {
             )}
           </section>
 
-          <section className="panel section">
-            <h3>Vuelos</h3>
-
-            {/* Apply filter to flights */}
-            <FlightsTable
-              flights={flightColorFilter === "Todos" ? data?.flights || [] : (data?.flights || []).filter((f) => capacityStatus(f.utilization) === flightColorFilter)}
-              activeFlightIds={activeFlightIds}
-              shipments={visibleShipments}
-              simMinute={operationalMinute}
-              selectedFlightId={selectedFlightId}
-              onSelectFlight={focusFlight}
-              displayGmtOffset={displayGmtOffset}
-              colorFilter={flightColorFilter}
-              onColorFilterChange={setFlightColorFilter}
-              hideColorFilter={false}
-            />
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("flights")}
+              aria-expanded={openRightPanelSection === "flights"}
+            >
+              <span>Vuelos</span>
+              <strong>{openRightPanelSection === "flights" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "flights" && (
+              <div className="collapsible-content">
+                <FlightsTable
+                  flights={flightColorFilter === "Todos" ? data?.flights || [] : (data?.flights || []).filter((f) => capacityStatus(f.utilization) === flightColorFilter)}
+                  activeFlightIds={activeFlightIds}
+                  shipments={visibleShipments}
+                  data={data}
+                  simMinute={operationalMinute}
+                  selectedFlightId={selectedFlightId}
+                  onSelectFlight={focusFlight}
+                  displayGmtOffset={displayGmtOffset}
+                  colorFilter={flightColorFilter}
+                  onColorFilterChange={setFlightColorFilter}
+                  hideColorFilter={false}
+                />
+              </div>
+            )}
           </section>
 
-          <section className="panel section">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("shipments")}
+              aria-expanded={openRightPanelSection === "shipments"}
+            >
+              <span>Envios</span>
+              <strong>{openRightPanelSection === "shipments" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "shipments" && (
+              <div className="collapsible-content">
+                <div className="list-toolbar">
               <h3>Envíos</h3>
-              <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+              <label className="text-sm">
                 Mostrar finalizados hace
                 <input
                   type="number"
@@ -564,7 +596,6 @@ export const OperationsPage = () => {
                   step={1}
                   value={shipmentHistoryHours}
                   onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
-                  style={{ width: "4.5rem" }}
                 />
                 h
               </label>
@@ -579,9 +610,22 @@ export const OperationsPage = () => {
               onSelectShipment={focusShipment}
               onSelectFlight={focusFlight}
             />
+              </div>
+            )}
           </section>
 
-          <section className="panel section">
+          <section className="panel section collapsible-section">
+            <button
+              type="button"
+              className="collapsible-trigger"
+              onClick={() => toggleRightPanelSection("airports")}
+              aria-expanded={openRightPanelSection === "airports"}
+            >
+              <span>Aeropuertos criticos</span>
+              <strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong>
+            </button>
+            {openRightPanelSection === "airports" && (
+              <div className="collapsible-content">
             <h3>Aeropuertos críticos</h3>
             {data ? (
               <AirportsTable
@@ -596,6 +640,8 @@ export const OperationsPage = () => {
               />
             ) : (
               <div className="empty-state">Sin datos.</div>
+            )}
+              </div>
             )}
           </section>
         </aside>

@@ -1,6 +1,7 @@
 import type { SimulationData } from "../../types";
 import { formatDateOnly, formatFlightMoment, formatTimeOnly } from "../../utils/formatters";
 import { formatRealTime } from "../../utils/timeUtils";
+import { DraggableMapOverlay } from "./DraggableMapOverlay";
 
 interface TopbarProps {
   data: SimulationData | null;
@@ -18,12 +19,32 @@ interface StatusItemProps {
   sub?: string;
 }
 
+interface StackedStatusCardProps {
+  items: Array<{
+    label: string;
+    value: string;
+  }>;
+}
+
 export function StatusItem({ label, value, sub }: StatusItemProps) {
   return (
     <div className="status-item">
       <span>{label}</span>
       <strong>{value}</strong>
       {sub && <small>{sub}</small>}
+    </div>
+  );
+}
+
+function StackedStatusCard({ items }: StackedStatusCardProps) {
+  return (
+    <div className="map-stacked-status-card">
+      {items.map((item) => (
+        <div className="map-stacked-status-row" key={item.label}>
+          <span>{item.label}</span>
+          <strong>{item.value}</strong>
+        </div>
+      ))}
     </div>
   );
 }
@@ -46,7 +67,7 @@ export function Topbar({
   simMinute,
   durationMs,
   title = "TASF.B2B - Simulador de equipaje",
-  subtitle = "Simulación 5 días",
+  subtitle = "Simulacion 5 dias",
   displayGmtOffset,
   displayAirportLabel,
 }: TopbarProps) {
@@ -64,22 +85,22 @@ export function Topbar({
       </div>
       <div className="status-strip">
         <StatusItem
-          label="Fecha y Hora de Inicio"
+          label="Fecha y hora de inicio"
           value={formatDateTime(data?.simulationStartDateTime, displayGmtOffset)}
           sub={displayAirportLabel || (data ? "inicio programado" : "--")}
         />
         <StatusItem
-          label="Fecha y Hora en Simulación"
+          label="Fecha y hora en simulacion"
           value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
           sub={simulatedDayLabel}
         />
         <StatusItem
-          label="Duración de la simulación"
+          label="Duracion de la simulacion"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecución real"
+          sub="ejecucion real"
         />
         <StatusItem
-          label="Tiempo transcurrido en simulación"
+          label="Tiempo transcurrido en simulacion"
           value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
           sub="avance acumulado"
         />
@@ -93,40 +114,40 @@ export function SimulationStatusCards({
   simMinute,
   durationMs,
   displayGmtOffset,
-  displayAirportLabel,
 }: Pick<TopbarProps, "data" | "simMinute" | "durationMs" | "displayGmtOffset" | "displayAirportLabel">) {
   const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
   const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
-  const simulatedDayLabel = data
-    ? `Dia ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
-    : "--";
 
   return (
     <>
-      <div className="status-strip map-status-strip map-status-strip-top-left">
-        <StatusItem
-          label="Fecha y Hora de Inicio"
-          value={formatDateTime(data?.simulationStartDateTime, displayGmtOffset)}
-          sub={displayAirportLabel || (data ? "inicio programado" : "--")}
+      <DraggableMapOverlay initialX={18} initialY={18} className="map-status-overlay">
+        <StackedStatusCard
+          items={[
+            {
+              label: "Fecha y hora de inicio",
+              value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
+            },
+            {
+              label: "Fecha y hora en simulacion",
+              value: data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--",
+            },
+          ]}
         />
-        <StatusItem
-          label="Fecha y Hora en Simulación"
-          value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
-          sub={simulatedDayLabel}
+      </DraggableMapOverlay>
+      <DraggableMapOverlay initialX={18} initialY={92} className="map-status-overlay">
+        <StackedStatusCard
+          items={[
+            {
+              label: "Duracion de la simulacion",
+              value: data ? formatRealTime(simulationDurationMs) : "--",
+            },
+            {
+              label: "Tiempo transcurrido en simulacion",
+              value: data ? formatElapsedSimulation(minutesFromStart) : "--",
+            },
+          ]}
         />
-      </div>
-      <div className="status-strip map-status-strip map-status-strip-bottom-right">
-        <StatusItem
-          label="Duración de la simulación"
-          value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecución real"
-        />
-        <StatusItem
-          label="Tiempo transcurrido en simulación"
-          value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
-          sub="avance acumulado"
-        />
-      </div>
+      </DraggableMapOverlay>
     </>
   );
 }

@@ -240,6 +240,15 @@ select {
   grid-row: 2;
 }
 
+.simulation-shell,
+.simulation-shell:has(> main.workspace) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.simulation-shell > main.workspace {
+  grid-row: 1;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -304,6 +313,53 @@ select {
 .map-status-strip-bottom-right {
   right: 18px;
   bottom: 18px;
+}
+
+.map-draggable-overlay {
+  position: absolute;
+  z-index: 1300;
+  top: 0;
+  left: 0;
+  max-width: min(280px, calc(100% - 16px));
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.map-draggable-overlay.is-dragging {
+  cursor: grabbing;
+}
+
+.map-stacked-status-card {
+  display: grid;
+  width: min(250px, calc(100vw - 88px));
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+}
+
+.map-stacked-status-row {
+  display: grid;
+  gap: 2px;
+}
+
+.map-stacked-status-row span {
+  color: rgba(241, 245, 249, 0.72);
+  font-size: 8.5px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.map-stacked-status-row strong {
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .status-item {
@@ -416,6 +472,125 @@ select {
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+.right-panel {
+  font-size: 11px;
+}
+
+.right-panel h3 {
+  font-size: 12px;
+}
+
+.right-panel .section {
+  padding: 11px;
+}
+
+.right-panel .row-main strong,
+.right-panel .capacity-pill {
+  font-size: 11px;
+}
+
+.right-panel .row-main span,
+.right-panel .text-sm,
+.right-panel label,
+.right-panel select,
+.right-panel input {
+  font-size: 10px;
+}
+
+.flight-route-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.flight-route-point {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.flight-route-point strong,
+.flight-route-point span {
+  display: block;
+}
+
+.flight-route-point span {
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.flight-route-arrow {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.collapsible-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.right-panel .collapsible-section {
+  padding: 0;
+}
+
+.collapsible-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 0;
+  background: transparent;
+  color: #18212f;
+  cursor: pointer;
+  font-weight: 800;
+  text-align: left;
+}
+
+.collapsible-trigger span {
+  min-width: 0;
+}
+
+.collapsible-trigger strong {
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.collapsible-content {
+  padding: 0 11px 11px;
+}
+
+.collapsible-content > h3,
+.list-toolbar h3 {
+  display: none;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.list-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.list-toolbar input {
+  width: 4rem;
 }
 
 .panel-rail {
@@ -790,7 +965,7 @@ select {
 .map-panel {
   position: relative;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -836,6 +1011,68 @@ select {
 .leaflet-container {
   font: inherit;
   background: #cfe3ee;
+}
+
+.map-global-indicators-overlay {
+  width: min(250px, calc(100vw - 88px));
+}
+
+.map-global-indicators-overlay .panel {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  padding: 8px;
+}
+
+.map-global-indicators-overlay h3 {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.map-global-indicators-overlay .global-indicators {
+  gap: 6px;
+}
+
+.map-global-indicators-overlay .traffic-metric {
+  padding: 6px 7px;
+  border-left-width: 4px;
+}
+
+.map-global-indicators-overlay .traffic-metric span {
+  font-size: 9px;
+}
+
+.map-global-indicators-overlay .traffic-metric strong {
+  font-size: 16px;
+}
+
+.map-global-indicators-overlay .traffic-metric small {
+  font-size: 9px;
+}
+
+.simulation-side-nav {
+  padding: 10px;
+}
+
+.simulation-side-nav .navbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+}
+
+.simulation-side-nav .nav-link {
+  color: #18212f;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+
+.simulation-side-nav .nav-link.active {
+  color: #fff;
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
 .leaflet-control-attribution {
@@ -991,7 +1228,7 @@ select {
 
 .map-info-card {
   position: absolute;
-  z-index: 1200;
+  z-index: 1700;
   top: 58px;
   right: 16px;
   width: min(340px, calc(100% - 32px));
