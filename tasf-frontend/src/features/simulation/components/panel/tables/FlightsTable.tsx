@@ -146,7 +146,7 @@ export function FlightsTable({
     return (
       <div className="flights-table">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h3 style={{ margin: 0 }}>Envios del vuelo {selectedFlightShipments.id}</h3>
+          <h3 style={{ margin: 0 }}>Envíos del vuelo {selectedFlightShipments.id}</h3>
           <button
             type="button"
             onClick={() => setViewMode("flights")}
@@ -314,7 +314,7 @@ export function FlightsTable({
                   {relatedCount > 0 && (
                     <button
                       type="button"
-                      aria-label={`Ver envios del vuelo ${flight.id}`}
+                      aria-label={`Ver envíos del vuelo ${flight.id}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedFlightShipments(flight);

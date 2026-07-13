@@ -25,6 +25,6 @@ export const MAP_CONFIG = {
 
 export const PANE_Z_INDEX = {
   routes: "430",
-  activeFlights: "560",
-  airports: "760",
+  activeFlights: "540",
+  airports: "920",
 } as const;

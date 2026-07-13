@@ -59,30 +59,31 @@ export function GlobalIndicators({
   samplingIntervalMinutes,
 }: GlobalIndicatorsProps) {
   const minute = sampledMinute(currentMinute, samplingIntervalMinutes);
-  const {
-    airportBags,
-    airportCapacity,
-    assignedBags,
-    fleetCapacity,
-  } = useMemo(() => {
+  const airportBags = useMemo(() => {
+    if (!data) return 0;
+
+    const airportLoads = computeAirportLoads(data, minute);
+    return data.airports.reduce((sum, airport) => {
+      const load = Math.max(0, airportLoads[airport.code] || 0);
+      return sum + load;
+    }, 0);
+  }, [data, minute]);
+
+  const airportCapacity = useMemo(() => {
+    if (!data) return 0;
+    return data.airports.reduce(
+      (sum, airport) => sum + Math.max(0, airport.maxCapacity || 0),
+      0
+    );
+  }, [data]);
+
+  const { assignedBags, fleetCapacity } = useMemo(() => {
     if (!data) {
       return {
-        airportBags: 0,
-        airportCapacity: 0,
         assignedBags: 0,
         fleetCapacity: 0,
       };
     }
-
-    const airportLoads = computeAirportLoads(data, minute);
-    const airportBags = data.airports.reduce((sum, airport) => {
-      const load = Math.max(0, airportLoads[airport.code] || 0);
-      return sum + load;
-    }, 0);
-    const airportCapacity = data.airports.reduce(
-      (sum, airport) => sum + Math.max(0, airport.maxCapacity || 0),
-      0
-    );
 
     const assignedBags = data.flights.reduce((sum, flight) => {
       const load = Math.max(0, flight.assignedLoad || 0);
@@ -94,12 +95,10 @@ export function GlobalIndicators({
     );
 
     return {
-      airportBags,
-      airportCapacity,
       assignedBags,
       fleetCapacity,
     };
-  }, [data, minute]);
+  }, [data]);
 
   if (!data) {
     return (

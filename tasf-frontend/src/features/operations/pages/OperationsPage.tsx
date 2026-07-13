@@ -17,7 +17,7 @@ import { SimulationResultModal } from "../../simulation/components/general/Simul
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
-import { computeActiveFlights, computeAirportLoads } from "../../simulation/utils/calculations";
+import { computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import { capacityStatus } from "../../simulation/utils/calculations";
 import type { CapacityStatus } from "../../simulation/types";
@@ -193,7 +193,7 @@ export const OperationsPage = () => {
       })
       .catch((err) => {
         if (!ignore) {
-          setError(err instanceof Error ? err.message : "No se pudo conectar la operacion.");
+          setError(err instanceof Error ? err.message : "No se pudo conectar la operación.");
         }
       })
       .finally(() => {
@@ -231,7 +231,7 @@ export const OperationsPage = () => {
         })
         .catch((err) => {
           if (!cancelled) {
-            setError(err instanceof Error ? err.message : "No se pudo sincronizar la operacion.");
+            setError(err instanceof Error ? err.message : "No se pudo sincronizar la operación.");
           }
         })
         .finally(() => {
@@ -249,6 +249,9 @@ export const OperationsPage = () => {
 
   const airportLoads = useMemo<AirportLoads>(() => {
     return computeAirportLoads(data, operationalMinute);
+  }, [data, operationalMinute]);
+  const airportPeakLoads = useMemo<AirportLoads>(() => {
+    return computeAirportPeakLoads(data, operationalMinute);
   }, [data, operationalMinute]);
   const activeFlights = useMemo(
     () => computeActiveFlights(data, operationalMinute),
@@ -341,8 +344,8 @@ export const OperationsPage = () => {
       }
       setNotice(
         operationsClosed
-          ? "Operaciones del dia abiertas. La planificacion vuelve a ejecutarse."
-          : "Operaciones del dia finalizadas. La planificacion queda detenida."
+          ? "Operaciones del día abiertas. La planificación vuelve a ejecutarse."
+          : "Operaciones del día finalizadas. La planificación queda detenida."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar el estado de operaciones.");
@@ -484,6 +487,7 @@ export const OperationsPage = () => {
             data={data}
             activeFlights={activeFlights}
             airportLoads={airportLoads}
+            airportPeakLoads={airportPeakLoads}
             selectedAirport={selectedAirport}
             selectedFlightId={selectedFlightId}
             selectedShipment={selectedShipment}
@@ -537,7 +541,9 @@ export const OperationsPage = () => {
               <AirportDetail
                 airport={selected}
                 load={airportLoads[selected.code] || 0}
+                peakLoad={data?.airportEvents.length ? airportPeakLoads[selected.code] : undefined}
                 peakLabel="Carga registrada"
+                showMetrics={false}
               />
             ) : (
               <div className="empty-state">Selecciona un aeropuerto.</div>
@@ -580,7 +586,7 @@ export const OperationsPage = () => {
               onClick={() => toggleRightPanelSection("shipments")}
               aria-expanded={openRightPanelSection === "shipments"}
             >
-              <span>Envios</span>
+              <span>Envíos</span>
               <strong>{openRightPanelSection === "shipments" ? "-" : "+"}</strong>
             </button>
             {openRightPanelSection === "shipments" && (
@@ -591,11 +597,11 @@ export const OperationsPage = () => {
                 Mostrar finalizados hace
                 <input
                   type="number"
-                  min={0}
+                  min={1}
                   max={24}
                   step={1}
                   value={shipmentHistoryHours}
-                  onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
+                  onChange={(e) => setShipmentHistoryHours(Math.max(1, Number(e.target.value) || 1))}
                 />
                 h
               </label>
@@ -621,12 +627,12 @@ export const OperationsPage = () => {
               onClick={() => toggleRightPanelSection("airports")}
               aria-expanded={openRightPanelSection === "airports"}
             >
-              <span>Aeropuertos criticos</span>
+              <span>Aeropuertos</span>
               <strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong>
             </button>
             {openRightPanelSection === "airports" && (
               <div className="collapsible-content">
-            <h3>Aeropuertos críticos</h3>
+            <h3>Aeropuertos</h3>
             {data ? (
               <AirportsTable
                 airports={data.airports}

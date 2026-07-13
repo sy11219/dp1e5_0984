@@ -1,4 +1,4 @@
-import type { ActiveFlight, AirportLoads, SimulationData } from "../types";
+import type { ActiveFlight, AirportEvent, AirportLoads, SimulationData } from "../types";
 
 export function capacityStatus(utilization: number): "green" | "yellow" | "red" | "gray" {
   const EPS = 0.001; // treat utilization below 0.1% as effectively zero
@@ -44,14 +44,84 @@ export function computeAirportLoads(
   minute: number
 ): AirportLoads {
   if (!data) return {};
-  const loads = Object.fromEntries(
-    data.airports.map((airport) => [airport.code, 0])
-  );
-  for (const event of data.airportEvents) {
+
+  const loads: AirportLoads = {};
+  for (const airport of data.airports) {
+    loads[airport.code] = 0;
+  }
+
+  for (const event of getOrderedAirportEvents(data.airportEvents)) {
     if (event.minute > minute) break;
     loads[event.airport] = Math.max(0, (loads[event.airport] || 0) + event.delta);
   }
   return loads;
+}
+
+function airportEventPriority(event: AirportEvent): number {
+  switch (event.type) {
+    case "snapshot_baseline":
+      return 0;
+    case "flight_departure":
+    case "connection_departure":
+    case "final_pickup":
+      return 1;
+    case "shipment_created":
+    case "connection_arrival":
+    case "final_arrival":
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function compareAirportEvents(a: AirportEvent, b: AirportEvent): number {
+  if (a.minute !== b.minute) return a.minute - b.minute;
+  if (a.airport !== b.airport) return a.airport.localeCompare(b.airport);
+  return airportEventPriority(a) - airportEventPriority(b);
+}
+
+const orderedAirportEventsCache = new WeakMap<AirportEvent[], AirportEvent[]>();
+
+function getOrderedAirportEvents(events: AirportEvent[]): AirportEvent[] {
+  const cached = orderedAirportEventsCache.get(events);
+  if (cached) return cached;
+
+  let ordered = true;
+  for (let i = 1; i < events.length; i += 1) {
+    if (compareAirportEvents(events[i - 1], events[i]) > 0) {
+      ordered = false;
+      break;
+    }
+  }
+
+  const result = ordered ? events : [...events].sort(compareAirportEvents);
+  orderedAirportEventsCache.set(events, result);
+  return result;
+}
+
+export function computeAirportPeakLoads(
+  data: SimulationData | null,
+  minute: number
+): AirportLoads {
+  if (!data) return {};
+
+  const loads: AirportLoads = {};
+  const peaks: AirportLoads = {};
+  for (const airport of data.airports) {
+    loads[airport.code] = 0;
+    peaks[airport.code] = 0;
+  }
+
+  for (const event of getOrderedAirportEvents(data.airportEvents)) {
+    if (event.minute > minute) break;
+    if (!(event.airport in loads)) continue;
+
+    const next = Math.max(0, (loads[event.airport] || 0) + event.delta);
+    loads[event.airport] = next;
+    peaks[event.airport] = Math.max(peaks[event.airport] || 0, next);
+  }
+
+  return peaks;
 }
 
 export function bearingDegrees(

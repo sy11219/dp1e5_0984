@@ -152,7 +152,7 @@ export function AirportsTable({
         <div style={{ padding: "0.5rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>
-              {expandedAirportCode} - {expandedView === "incoming" ? "Vuelos Entrantes" : expandedView === "outgoing" ? "Vuelos Salientes" : "Envios"}
+              {expandedAirportCode} - {expandedView === "incoming" ? "Vuelos entrantes" : expandedView === "outgoing" ? "Vuelos salientes" : "Envíos"}
             </h3>
             <button
               onClick={() => {
@@ -387,7 +387,7 @@ export function AirportsTable({
                               e.currentTarget.style.background = "transparent";
                             }}
                           >
-                            Envios
+                            Envíos
                           </button>
                         </div>
                       )}

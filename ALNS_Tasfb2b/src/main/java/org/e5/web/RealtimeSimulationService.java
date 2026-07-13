@@ -297,11 +297,19 @@ public class RealtimeSimulationService {
     }
 
     public synchronized String stopBatchSimulation(String id, String clientId, String controlToken) {
-        RealtimeSession session = require(id);
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            if (id != null && id.equals(sharedSimulationSessionId)) {
+                sharedSimulationSessionId = null;
+            }
+            return "{}";
+        }
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
         }
-        requireBatchControl(session, clientId, controlToken);
+        if (!session.completed) {
+            requireBatchControl(session, clientId, controlToken);
+        }
 
         sessions.remove(id);
         if (id.equals(sharedSimulationSessionId)) {

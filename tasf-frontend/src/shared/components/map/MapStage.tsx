@@ -17,6 +17,7 @@ type MapStageProps = {
   data: SimulationData | null;
   activeFlights: ActiveFlight[];
   airportLoads: AirportLoads;
+  airportPeakLoads?: AirportLoads;
   airportColorFilter?: "Todos" | CapacityStatus;
   flightColorFilter?: "Todos" | CapacityStatus;
   selectedAirport: string | null;
@@ -44,11 +45,16 @@ export type MapFocusTarget = {
 const FOCUS_ZOOM = 5;
 const FLIGHT_ROUTE_LINE_WIDTH = 0.75;
 const SELECTED_FLIGHT_ROUTE_LINE_WIDTH = 2.2;
+const MAP_MIN_ZOOM = 2;
+const MAP_MAX_ZOOM = 8;
+const MAP_ZOOM_STEP = 0.01;
+const MAP_BUTTON_ZOOM_STEP = 0.25;
 
 export default function MapStage({
   data,
   activeFlights,
   airportLoads,
+  airportPeakLoads = {},
   airportColorFilter = "Todos",
   flightColorFilter = "Todos",
   selectedAirport,
@@ -62,18 +68,32 @@ export default function MapStage({
   children,
 }: MapStageProps) {
   const [mapInfo, setMapInfo] = useState<MapInfo | null>(null);
+  const [zoom, setZoom] = useState<number>(MAP_CONFIG.zoom);
   const mapElement = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasOriginRef = useRef<L.Point>(L.point(0, 0));
   const airportLayerRef = useRef<L.LayerGroup | null>(null);
   const airportLoadsRef = useRef<AirportLoads>({});
+  const airportPeakLoadsRef = useRef<AirportLoads>({});
   const airportMarkersRef = useRef(new Map<string, AirportMarkerItem>());
+  const onSelectAirportRef = useRef(onSelectAirport);
   const didFitBoundsRef = useRef(false);
   const lastDrawKeyRef = useRef("");
   const autoCloseTimerRef = useRef<number | null>(null);
   const autoCloseFlightIdRef = useRef<string | null>(null);
 
   const airports = useMemo(() => data?.airports || [], [data]);
+  const airportLoadFilterKey = useMemo(() => {
+    if (airportColorFilter === "Todos") return "";
+
+    return airports
+      .map((airport) => {
+        const load = airportLoads[airport.code] || 0;
+        return `${airport.code}:${capacityStatus(load / airport.maxCapacity)}`;
+      })
+      .join("|");
+  }, [airportColorFilter, airportLoads, airports]);
   const visibleAirports = useMemo(
     () =>
       airports.filter((airport) => {
@@ -81,7 +101,7 @@ export default function MapStage({
         const load = airportLoads[airport.code] || 0;
         return capacityStatus(load / airport.maxCapacity) === airportColorFilter;
       }),
-    [airportColorFilter, airportLoads, airports]
+    [airportColorFilter, airportLoadFilterKey, airports]
   );
   const activeAirports = useMemo(
     () => visibleAirports.filter(isAirportActive),
@@ -104,8 +124,42 @@ export default function MapStage({
   );
 
   useEffect(() => {
+    onSelectAirportRef.current = onSelectAirport;
+  }, [onSelectAirport]);
+
+  useEffect(() => {
     airportLoadsRef.current = airportLoads;
   }, [airportLoads]);
+
+  useEffect(() => {
+    airportPeakLoadsRef.current = airportPeakLoads;
+  }, [airportPeakLoads]);
+
+  const fitDefaultAirportBounds = useCallback((animate = false) => {
+    const map = mapRef.current;
+    const airportsForBounds = activeAirports.length ? activeAirports : visibleAirports;
+    if (!map || !airportsForBounds.length) return;
+
+    const bounds = L.latLngBounds(
+      airportsForBounds.map((airport) => [airport.latitude, airport.longitude])
+    );
+
+    map.invalidateSize();
+    map.fitBounds(bounds.pad(0.01), {
+      animate,
+      padding: [4, 4],
+    });
+    setZoom(Number(map.getZoom().toFixed(2)));
+  }, [activeAirports, visibleAirports]);
+
+  const handleCloseMapInfo = useCallback(() => {
+    setMapInfo((current) => {
+      if (current?.type === "flight" && selectedFlightId === current.id) {
+        onClearSelection?.();
+      }
+      return null;
+    });
+  }, [onClearSelection, selectedFlightId]);
 
   // Inicializar mapa
   useEffect(() => {
@@ -113,8 +167,13 @@ export default function MapStage({
 
     const map = L.map(mapElement.current, {
       worldCopyJump: MAP_CONFIG.worldCopyJump,
-      zoomControl: MAP_CONFIG.zoomControl,
+      zoomControl: false,
       preferCanvas: MAP_CONFIG.preferCanvas,
+      minZoom: MAP_MIN_ZOOM,
+      maxZoom: MAP_MAX_ZOOM,
+      zoomSnap: 0,
+      zoomDelta: MAP_BUTTON_ZOOM_STEP,
+      wheelPxPerZoomLevel: 72,
       maxBounds: MAP_BOUNDS,
       maxBoundsViscosity: MAP_CONFIG.maxBoundsViscosity,
     }).setView(MAP_CENTER, MAP_CONFIG.zoom);
@@ -146,19 +205,15 @@ export default function MapStage({
     canvas.style.pointerEvents = "none";
     canvas.className = "flight-canvas";
     
-    canvas.style.zIndex = PANE_Z_INDEX.activeFlights;
-    map.getContainer().appendChild(canvas);
+    (map.getPane("activeFlights") ?? map.getContainer()).appendChild(canvas);
     canvasRef.current = canvas;
 
     // Función para redimensionar y redibujar canvas
-    const updateCanvasSize = () => {
-      const size = map.getSize();
-      canvas.width = size.x;
-      canvas.height = size.y;
-    };
+    const updateCanvasSize = () => updateFlightCanvasViewport(map, canvas, canvasOriginRef);
 
     updateCanvasSize();
     map.on("resize", updateCanvasSize);
+    map.on("zoom zoomend", () => setZoom(Number(map.getZoom().toFixed(2))));
 
     const timers = [0, 100, 350].map((delay) =>
       window.setTimeout(() => {
@@ -178,13 +233,26 @@ export default function MapStage({
   useEffect(() => {
     if (!mapRef.current || !airportLayerRef.current) return;
 
-    airportLayerRef.current.clearLayers();
-    airportMarkersRef.current.clear();
+    const visibleCodes = new Set(visibleAirports.map((airport) => airport.code));
+
+    for (const [code, item] of airportMarkersRef.current) {
+      if (!visibleCodes.has(code)) {
+        airportLayerRef.current.removeLayer(item.marker);
+        airportMarkersRef.current.delete(code);
+      }
+    }
 
     for (const airport of visibleAirports) {
+      const existing = airportMarkersRef.current.get(airport.code);
+      if (existing) {
+        existing.airport = airport;
+        existing.marker.setLatLng([airport.latitude, airport.longitude]);
+        continue;
+      }
+
       const load = airportLoadsRef.current[airport.code] || 0;
       const marker = L.marker([airport.latitude, airport.longitude], {
-        icon: createAirportIcon(airport, load, airport.code === selectedAirport),
+        icon: createAirportIcon(airport, load, false),
         pane: "airports",
         interactive: true,
         keyboard: false,
@@ -192,15 +260,20 @@ export default function MapStage({
       })
         .on("click", (event) => {
           L.DomEvent.stopPropagation(event);
-          const currentLoad = airportLoadsRef.current[airport.code] || 0;
-          onSelectAirport(airport.code);
-          setMapInfo(createAirportInfo(airport, currentLoad));
+          const currentAirport = airportMarkersRef.current.get(airport.code)?.airport ?? airport;
+          const currentLoad = airportLoadsRef.current[currentAirport.code] || 0;
+          const currentPeak = Math.max(
+            currentLoad,
+            airportPeakLoadsRef.current[currentAirport.code] ?? currentAirport.peakLoad ?? 0
+          );
+          onSelectAirportRef.current(currentAirport.code);
+          setMapInfo(createAirportInfo(currentAirport, currentLoad, currentPeak));
         })
         .addTo(airportLayerRef.current);
 
       airportMarkersRef.current.set(airport.code, { airport, marker });
     }
-  }, [onSelectAirport, selectedAirport, visibleAirports]);
+  }, [visibleAirports]);
 
   // Actualizar estado de aeropuertos (colores)
   useEffect(() => {
@@ -234,6 +307,8 @@ export default function MapStage({
   const drawFlights = useCallback((force = false) => {
     if (!canvasRef.current || !mapRef.current) return;
 
+    updateFlightCanvasViewport(mapRef.current, canvasRef.current, canvasOriginRef);
+    const canvasOrigin = canvasOriginRef.current;
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
@@ -260,9 +335,9 @@ export default function MapStage({
     ctx.lineJoin = "round";
 
     if (selectedShipmentRoute.length > 0) {
-      drawShipmentRoute(ctx, mapRef.current, selectedShipmentRoute, airportByCode);
+      drawShipmentRoute(ctx, mapRef.current, selectedShipmentRoute, airportByCode, canvasOrigin);
     } else if (selectedFlight && !activeFlights.some((flight) => flight.id === selectedFlight.id)) {
-      drawStaticFlightRoute(ctx, mapRef.current, selectedFlight, airportByCode);
+      drawStaticFlightRoute(ctx, mapRef.current, selectedFlight, airportByCode, canvasOrigin);
     }
 
   for (const flight of filteredActiveFlights) {
@@ -271,7 +346,7 @@ export default function MapStage({
     if (!origin || !destination) continue;
 
     const { destPixel, planePixel, angle } =
-      getRouteGeometry(mapRef.current, origin, destination, flight.progress);
+      getRouteGeometry(mapRef.current, origin, destination, flight.progress, canvasOrigin);
     const isSelected = flight.id === selectedFlightId;
     const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[flight.status];
 
@@ -314,10 +389,13 @@ export default function MapStage({
       const airport = airportByCode[focusTarget.id];
       if (!airport) return;
 
+      const currentLoad = airportLoadsRef.current[airport.code] || 0;
+      const currentPeak = Math.max(currentLoad, airportPeakLoadsRef.current[airport.code] ?? airport.peakLoad ?? 0);
       map.flyTo([airport.latitude, airport.longitude], Math.max(map.getZoom(), FOCUS_ZOOM), {
         animate: true,
         duration: 0.75,
       });
+      setMapInfo(createAirportInfo(airport, currentLoad, currentPeak));
       return;
     }
 
@@ -355,16 +433,14 @@ export default function MapStage({
       duration: 0.75,
     });
     setMapInfo(createFlightInfo(data, flight, origin, destination, displayGmtOffset));
-  }, [airportByCode, data, focusTarget, selectedFlight, selectedShipment, selectedShipmentRoute]);
+  }, [airportByCode, data, displayGmtOffset, focusTarget, selectedFlight, selectedShipment, selectedShipmentRoute]);
 
   useEffect(() => {
     const resizeAndRedraw = () => {
       window.requestAnimationFrame(() => {
         if (!mapRef.current || !canvasRef.current) return;
         mapRef.current.invalidateSize({ pan: false });
-        const size = mapRef.current.getSize();
-        canvasRef.current.width = size.x;
-        canvasRef.current.height = size.y;
+        updateFlightCanvasViewport(mapRef.current, canvasRef.current, canvasOriginRef);
         drawFlights(true);
       });
     };
@@ -403,7 +479,7 @@ export default function MapStage({
       const y = e.clientY - rect.top;
       const target = e.target as HTMLElement | null;
 
-      if (target?.closest(".airport-marker, .leaflet-control")) return;
+      if (target?.closest(".airport-marker, .leaflet-control, .map-info-card, .map-zoom-control")) return;
 
       // Buscar avión cerca del click (hitarea de 15px)
       const filteredActiveFlights = activeFlights.filter((flight) => {
@@ -420,7 +496,13 @@ export default function MapStage({
         const destination = airportByCode[flight.destination];
         if (!origin || !destination) continue;
 
-        const { planePixel } = getRouteGeometry(map, origin, destination, flight.progress);
+        const { planePixel } = getRouteGeometry(
+          map,
+          origin,
+          destination,
+          flight.progress,
+          canvasOriginRef.current
+        );
 
         const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
         if (dist < 12) {
@@ -493,21 +575,20 @@ export default function MapStage({
   useEffect(() => {
     if (!data || !mapRef.current || !visibleAirports.length || didFitBoundsRef.current) return;
 
-    const airportsForBounds = activeAirports.length ? activeAirports : visibleAirports;
-    const bounds = L.latLngBounds(
-      airportsForBounds.map((airport) => [airport.latitude, airport.longitude])
-    );
-
     window.setTimeout(() => {
-      mapRef.current?.invalidateSize();
-      mapRef.current?.fitBounds(bounds.pad(0.05), {
-        maxZoom: 3,
-        animate: false,
-        padding: [16, 16],
-      });
+      fitDefaultAirportBounds(false);
       didFitBoundsRef.current = true;
     }, 0);
-  }, [data, visibleAirports, activeAirports]);
+  }, [data, visibleAirports, fitDefaultAirportBounds]);
+
+  const setMapZoom = useCallback((nextZoom: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const clamped = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, nextZoom));
+    map.setZoom(clamped, { animate: false });
+    setZoom(Number(clamped.toFixed(2)));
+  }, []);
 
   return (
     <div className="map-stage">
@@ -515,13 +596,14 @@ export default function MapStage({
         <span className="badge">{data ? `${visibleAirports.length}/${data.airports.length} aeropuertos` : "Mapa operativo"}</span>
         <span className="badge">{data ? `${activeFlights.length} vuelos en aire` : "Simulación"}</span>
       </div>
-      {mapInfo && <MapInfoCard info={mapInfo} onClose={() => setMapInfo(null)} />}
+      {mapInfo && <MapInfoCard info={mapInfo} onClose={handleCloseMapInfo} />}
       <div
         ref={mapElement}
         className="leaflet-map"
         role="img"
         aria-label="Mapa mundial con aeropuertos y vuelos activos"
       />
+      <MapZoomControl zoom={zoom} onZoomChange={setMapZoom} onReset={() => fitDefaultAirportBounds(true)} />
       {children}
     </div>
   );
@@ -535,7 +617,14 @@ function isAirportActive(airport: Airport) {
 function MapInfoCard({ info, onClose }: { info: MapInfo; onClose: () => void }) {
   return (
     <aside className={`map-info-card ${info.type}`}>
-      <button className="map-info-close" onClick={onClose} aria-label="Cerrar informacion">
+      <button
+        className="map-info-close"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+        aria-label="Cerrar información"
+      >
         x
       </button>
       <strong>{info.title}</strong>
@@ -552,6 +641,56 @@ function MapInfoCard({ info, onClose }: { info: MapInfo; onClose: () => void }) 
   );
 }
 
+function MapZoomControl({
+  zoom,
+  onZoomChange,
+  onReset,
+}: {
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="map-zoom-control" aria-label="Control de zoom del mapa">
+      <button
+        type="button"
+        className="map-zoom-button"
+        onClick={() => onZoomChange(zoom - MAP_BUTTON_ZOOM_STEP)}
+        aria-label="Alejar mapa"
+      >
+        -
+      </button>
+      <input
+        className="map-zoom-slider"
+        type="range"
+        min={MAP_MIN_ZOOM}
+        max={MAP_MAX_ZOOM}
+        step={MAP_ZOOM_STEP}
+        value={zoom}
+        onChange={(event) => onZoomChange(Number(event.target.value))}
+        aria-label="Ajustar zoom del mapa"
+      />
+      <button
+        type="button"
+        className="map-zoom-button"
+        onClick={() => onZoomChange(zoom + MAP_BUTTON_ZOOM_STEP)}
+        aria-label="Acercar mapa"
+      >
+        +
+      </button>
+      <button
+        type="button"
+        className="map-zoom-button map-zoom-reset"
+        onClick={onReset}
+        aria-label="Restaurar vista de aeropuertos"
+        title="Restaurar vista de aeropuertos"
+      >
+        ↻
+      </button>
+    </div>
+  );
+}
+
 function createAirportIcon(airport: Airport, load: number, isSelected: boolean) {
   const status = capacityStatus(load / airport.maxCapacity);
 
@@ -563,7 +702,15 @@ function createAirportIcon(airport: Airport, load: number, isSelected: boolean) 
   });
 }
 
-function createAirportInfo(airport: Airport, load: number): MapInfo {
+function formatMapPercent(value: number): string {
+  return `${(value * 100).toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function createAirportInfo(airport: Airport, load: number, peakLoad?: number): MapInfo {
+  const effectivePeakLoad = Math.max(load, peakLoad ?? airport.peakLoad ?? 0);
   return {
     type: "airport",
     id: airport.code,
@@ -574,7 +721,13 @@ function createAirportInfo(airport: Airport, load: number): MapInfo {
       ["Latitud", `${airport.latitude.toFixed(4)} deg`],
       ["Longitud", `${airport.longitude.toFixed(4)} deg`],
       ["Maletas", `${load}/${airport.maxCapacity}`],
-      ["Uso", `${Math.round((load / airport.maxCapacity) * 100)}%`],
+      ["Uso", formatMapPercent(airport.maxCapacity ? load / airport.maxCapacity : 0)],
+      [
+        "Pico registrado",
+        `${effectivePeakLoad}/${airport.maxCapacity} (${formatMapPercent(
+          airport.maxCapacity ? effectivePeakLoad / airport.maxCapacity : 0
+        )})`,
+      ],
     ],
   };
 }
@@ -620,7 +773,7 @@ function createShipmentInfo(
   return {
     type: "shipment",
     id: shipment.id,
-    title: `Envio ${shipment.id}`,
+    title: `Envío ${shipment.id}`,
     subtitle: `${shipment.origin} -> ${shipment.destination}`,
     rows: [
       ["Maletas", shipment.suitcases],
@@ -638,22 +791,23 @@ function drawShipmentRoute(
   ctx: CanvasRenderingContext2D,
   map: L.Map,
   route: ShipmentRouteLeg[],
-  airportByCode: Record<string, Airport>
+  airportByCode: Record<string, Airport>,
+  canvasOrigin: L.Point
 ) {
   route.forEach((leg, index) => {
     const origin = airportByCode[leg.origin];
     const destination = airportByCode[leg.destination];
     if (!origin || !destination) return;
 
-    drawRouteSegment(ctx, map, origin, destination, {
+    drawRouteSegment(ctx, map, origin, destination, canvasOrigin, {
       color: "#f59e0b",
       width: 4.2,
       alpha: 0.86,
       dash: index % 2 === 0 ? [10, 6] : [4, 5],
       shadow: true,
     });
-    drawRouteNode(ctx, map, origin, index === 0 ? "#22c55e" : "#f59e0b");
-    drawRouteNode(ctx, map, destination, index === route.length - 1 ? "#ef4444" : "#f59e0b");
+    drawRouteNode(ctx, map, origin, canvasOrigin, index === 0 ? "#22c55e" : "#f59e0b");
+    drawRouteNode(ctx, map, destination, canvasOrigin, index === route.length - 1 ? "#ef4444" : "#f59e0b");
   });
 }
 
@@ -661,21 +815,22 @@ function drawStaticFlightRoute(
   ctx: CanvasRenderingContext2D,
   map: L.Map,
   flight: Flight,
-  airportByCode: Record<string, Airport>
+  airportByCode: Record<string, Airport>,
+  canvasOrigin: L.Point
 ) {
   const origin = airportByCode[flight.origin];
   const destination = airportByCode[flight.destination];
   if (!origin || !destination) return;
 
-  drawRouteSegment(ctx, map, origin, destination, {
+  drawRouteSegment(ctx, map, origin, destination, canvasOrigin, {
     color: STATUS_COLOR[flight.status] ?? "#111827",
     width: 3.2,
     alpha: 0.82,
     dash: [8, 6],
     shadow: true,
   });
-  drawRouteNode(ctx, map, origin, "#111827");
-  drawRouteNode(ctx, map, destination, "#111827");
+  drawRouteNode(ctx, map, origin, canvasOrigin, "#111827");
+  drawRouteNode(ctx, map, destination, canvasOrigin, "#111827");
 }
 
 function drawRouteSegment(
@@ -683,9 +838,10 @@ function drawRouteSegment(
   map: L.Map,
   origin: Airport,
   destination: Airport,
+  canvasOrigin: L.Point,
   options: { color: string; width: number; alpha: number; dash?: number[]; shadow?: boolean }
 ) {
-  const { originPixel, destPixel } = getRouteGeometry(map, origin, destination, 0);
+  const { originPixel, destPixel } = getRouteGeometry(map, origin, destination, 0, canvasOrigin);
   ctx.save();
   ctx.strokeStyle = options.color;
   ctx.lineWidth = options.width;
@@ -706,9 +862,10 @@ function drawRouteNode(
   ctx: CanvasRenderingContext2D,
   map: L.Map,
   airport: Airport,
+  canvasOrigin: L.Point,
   color: string
 ) {
-  const point = map.latLngToContainerPoint([airport.latitude, airport.longitude]);
+  const point = map.latLngToLayerPoint([airport.latitude, airport.longitude]).subtract(canvasOrigin);
   ctx.save();
   ctx.fillStyle = color;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
@@ -725,9 +882,28 @@ function setPaneZIndex(map: L.Map, paneName: string, zIndex: string) {
   if (pane) pane.style.zIndex = zIndex;
 }
 
-function getRouteGeometry(map: L.Map, origin: Airport, destination: Airport, progress: number) {
-  const originPixel = map.latLngToContainerPoint([origin.latitude, origin.longitude]);
-  const destPixel = map.latLngToContainerPoint([destination.latitude, destination.longitude]);
+function updateFlightCanvasViewport(
+  map: L.Map,
+  canvas: HTMLCanvasElement,
+  canvasOriginRef: { current: L.Point }
+) {
+  const size = map.getSize();
+  const origin = map.containerPointToLayerPoint([0, 0]);
+  if (canvas.width !== size.x) canvas.width = size.x;
+  if (canvas.height !== size.y) canvas.height = size.y;
+  canvasOriginRef.current = origin;
+  L.DomUtil.setPosition(canvas, origin);
+}
+
+function getRouteGeometry(
+  map: L.Map,
+  origin: Airport,
+  destination: Airport,
+  progress: number,
+  canvasOrigin: L.Point
+) {
+  const originPixel = map.latLngToLayerPoint([origin.latitude, origin.longitude]).subtract(canvasOrigin);
+  const destPixel = map.latLngToLayerPoint([destination.latitude, destination.longitude]).subtract(canvasOrigin);
   const dx = destPixel.x - originPixel.x;
   const dy = destPixel.y - originPixel.y;
 

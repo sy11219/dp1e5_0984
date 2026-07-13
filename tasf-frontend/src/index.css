@@ -320,7 +320,7 @@ select {
   z-index: 1300;
   top: 0;
   left: 0;
-  max-width: min(280px, calc(100% - 16px));
+  max-width: min(195px, calc(100% - 16px));
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
@@ -333,7 +333,7 @@ select {
 
 .map-stacked-status-card {
   display: grid;
-  width: min(250px, calc(100vw - 88px));
+  width: min(190px, calc(100vw - 88px));
   gap: 5px;
   padding: 7px 9px;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -353,6 +353,7 @@ select {
   font-size: 8.5px;
   font-weight: 800;
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .map-stacked-status-row strong {
@@ -1013,11 +1014,58 @@ select {
   background: #cfe3ee;
 }
 
+.map-zoom-control {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.map-zoom-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  border-radius: 999px;
+  color: #111827;
+  background: #f8fafc;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-zoom-button:hover {
+  background: #e2e8f0;
+}
+
+.map-zoom-reset {
+  font-size: 15px;
+}
+
+.map-zoom-slider {
+  width: 132px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
 .map-global-indicators-overlay {
-  width: min(250px, calc(100vw - 88px));
+  width: min(190px, calc(100vw - 88px));
 }
 
 .map-global-indicators-overlay .panel {
+  width: 100%;
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
@@ -1040,11 +1088,13 @@ select {
 }
 
 .map-global-indicators-overlay .traffic-metric span {
-  font-size: 9px;
+  font-size: 8.5px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .map-global-indicators-overlay .traffic-metric strong {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .map-global-indicators-overlay .traffic-metric small {
@@ -1086,8 +1136,14 @@ select {
   pointer-events: auto;
 }
 
+.airport-map-icon {
+  z-index: 920 !important;
+}
+
 .airport-marker {
   --airport-color: var(--gray);
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 5px;

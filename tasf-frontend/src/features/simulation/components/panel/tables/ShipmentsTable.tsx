@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
 import type { Flight, Shipment, SimulationData } from "../../../types";
 import { formatSimMinute } from "../../../utils/formatters";
 import { FlightListModal } from "../FlightListModal";
@@ -67,16 +68,28 @@ export function ShipmentsTable({
   const [statusFilter, setStatusFilter] = useState(ANY);
   const [page, setPage] = useState(1);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [remoteShipments, setRemoteShipments] = useState<Shipment[]>([]);
+  const [remoteTotal, setRemoteTotal] = useState(0);
+  const [remoteTotalPages, setRemoteTotalPages] = useState(1);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteError, setRemoteError] = useState("");
   const gmtOffset = displayGmtOffset ?? 0;
+  const simulationId = data?.simulationId;
+  const useRemoteShipments = Boolean(simulationId);
 
   const airportOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const shipment of shipments) {
+    const source = useRemoteShipments ? remoteShipments : shipments;
+    for (const shipment of source) {
       set.add(shipment.origin);
       set.add(shipment.destination);
     }
+    for (const flight of flights) {
+      set.add(flight.origin);
+      set.add(flight.destination);
+    }
     return [...set].sort();
-  }, [shipments]);
+  }, [flights, remoteShipments, shipments, useRemoteShipments]);
 
   const filtered = useMemo(() => {
     let result = [...shipments].sort((a, b) => a.requestMinute - b.requestMinute);
@@ -116,18 +129,79 @@ export function ShipmentsTable({
     return result;
   }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    if (!simulationId) {
+      setRemoteShipments([]);
+      setRemoteTotal(0);
+      setRemoteTotalPages(1);
+      setRemoteError("");
+      setRemoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRemoteLoading(true);
+    setRemoteError("");
+
+    void getBatchShipmentsPageRequest(simulationId, {
+      page,
+      pageSize: PAGE_SIZE,
+      search,
+      origin: originAirport !== ANY ? originAirport : undefined,
+      destination: destinationAirport !== ANY ? destinationAirport : undefined,
+      status: statusFilter !== ANY ? statusFilter : undefined,
+    })
+      .then((response) => {
+        if (cancelled) return;
+        setRemoteShipments(response.items);
+        setRemoteTotal(response.total);
+        setRemoteTotalPages(Math.max(1, response.totalPages));
+        if (response.page !== page) setPage(response.page);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setRemoteShipments([]);
+        setRemoteTotal(0);
+        setRemoteTotalPages(1);
+        setRemoteError(error instanceof Error ? error.message : "No se pudieron cargar los envíos.");
+      })
+      .finally(() => {
+        if (!cancelled) setRemoteLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [destinationAirport, originAirport, page, search, simulationId, statusFilter]);
+
+  const totalPages = useRemoteShipments
+    ? remoteTotalPages
+    : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const paginatedItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginatedItems = useRemoteShipments
+    ? remoteShipments
+    : filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalItems = useRemoteShipments ? remoteTotal : filtered.length;
   const canGoBack = currentPage > 1;
   const canGoForward = currentPage < totalPages;
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    originAirport !== ANY ||
+    destinationAirport !== ANY ||
+    statusFilter !== ANY;
 
   const handleSelectShipment = (shipment: Shipment) => {
     setSelectedShipment(shipment);
     onSelectShipment?.(shipment);
   };
 
-  if (!shipments.length) return <div className="empty-state">No hay envíos registrados.</div>;
+  const clearFilters = () => {
+    setSearch("");
+    setOriginAirport(ANY);
+    setDestinationAirport(ANY);
+    setStatusFilter(ANY);
+    setPage(1);
+  };
 
   return (
     <div className="shipments-table">
@@ -147,7 +221,13 @@ export function ShipmentsTable({
       <div className="filters" style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" }}>
         <label className="text-sm">
           Origen:
-          <select value={originAirport} onChange={(event) => setOriginAirport(event.target.value)}>
+          <select
+            value={originAirport}
+            onChange={(event) => {
+              setOriginAirport(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value={ANY}>{ANY}</option>
             {airportOptions.map((option) => (
               <option key={option} value={option}>{option}</option>
@@ -156,7 +236,13 @@ export function ShipmentsTable({
         </label>
         <label className="text-sm">
           Destino:
-          <select value={destinationAirport} onChange={(event) => setDestinationAirport(event.target.value)}>
+          <select
+            value={destinationAirport}
+            onChange={(event) => {
+              setDestinationAirport(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value={ANY}>{ANY}</option>
             {airportOptions.map((option) => (
               <option key={option} value={option}>{option}</option>
@@ -165,7 +251,13 @@ export function ShipmentsTable({
         </label>
         <label className="text-sm">
           Estado:
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value={ANY}>{ANY}</option>
             <option value="in-progress">En curso</option>
             <option value="delivered">Entregado</option>
@@ -173,11 +265,24 @@ export function ShipmentsTable({
             <option value="unplanned">Sin ruta</option>
           </select>
         </label>
+        {hasActiveFilters && (
+          <button type="button" onClick={clearFilters}>
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       <div className="table">
-        {paginatedItems.length === 0 ? (
-          <div className="empty-state">No se encontraron resultados.</div>
+        {remoteLoading ? (
+          <div className="empty-state">Cargando envíos...</div>
+        ) : remoteError ? (
+          <div className="empty-state">{remoteError}</div>
+        ) : paginatedItems.length === 0 ? (
+          <div className="empty-state">
+            {hasActiveFilters
+              ? "No se encontraron resultados con los filtros actuales."
+              : "No hay envíos procesados por la planificación todavía."}
+          </div>
         ) : (
           paginatedItems.map((shipment) => {
             const status = !shipment.planned ? "red" : shipment.onTime ? "green" : "yellow";
@@ -225,13 +330,13 @@ export function ShipmentsTable({
         )}
       </div>
 
-      {filtered.length > 0 && (
+      {totalItems > 0 && (
         <div className="segmented" style={{ marginTop: "0.75rem", justifyContent: "space-between" }}>
           <button type="button" disabled={!canGoBack} onClick={() => setPage((value) => Math.max(1, value - 1))}>
             Anterior
           </button>
           <span className="text-sm">
-            {currentPage}/{totalPages} - {filtered.length} envios
+            {currentPage}/{totalPages} - {totalItems} envíos
           </span>
           <button type="button" disabled={!canGoForward} onClick={() => setPage((value) => value + 1)}>
             Siguiente

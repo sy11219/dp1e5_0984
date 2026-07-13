@@ -67,14 +67,14 @@ export function Topbar({
   simMinute,
   durationMs,
   title = "TASF.B2B - Simulador de equipaje",
-  subtitle = "Simulacion 5 dias",
+  subtitle = "Simulación 5 días",
   displayGmtOffset,
   displayAirportLabel,
 }: TopbarProps) {
   const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
   const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
   const simulatedDayLabel = data
-    ? `Dia ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
+    ? `Día ${Math.floor(Math.max(0, minutesFromStart) / 1440) + 1}`
     : "--";
 
   return (
@@ -90,17 +90,17 @@ export function Topbar({
           sub={displayAirportLabel || (data ? "inicio programado" : "--")}
         />
         <StatusItem
-          label="Fecha y hora en simulacion"
+          label="Fecha y hora en simulación"
           value={data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--"}
           sub={simulatedDayLabel}
         />
         <StatusItem
-          label="Duracion de la simulacion"
+          label="Duración de la simulación"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecucion real"
+          sub="ejecución real"
         />
         <StatusItem
-          label="Tiempo transcurrido en simulacion"
+          label="Tiempo transcurrido en simulación"
           value={data ? formatElapsedSimulation(minutesFromStart) : "--"}
           sub="avance acumulado"
         />
@@ -128,7 +128,7 @@ export function SimulationStatusCards({
               value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
             },
             {
-              label: "Fecha y hora en simulacion",
+              label: "Fecha y hora en simulación",
               value: data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--",
             },
           ]}
@@ -138,11 +138,11 @@ export function SimulationStatusCards({
         <StackedStatusCard
           items={[
             {
-              label: "Duracion de la simulacion",
+              label: "Duración de la simulación",
               value: data ? formatRealTime(simulationDurationMs) : "--",
             },
             {
-              label: "Tiempo transcurrido en simulacion",
+              label: "Tiempo transcurrido en simulación",
               value: data ? formatElapsedSimulation(minutesFromStart) : "--",
             },
           ]}

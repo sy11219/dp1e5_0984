@@ -335,7 +335,7 @@ export function AirportsPage() {
             <table className="data-table airports-data-table">
               <thead>
                 <tr>
-                  <th>Codigo</th>
+                  <th>Código</th>
                   <th>Ciudad</th>
                   <th>Pais</th>
                   <th>Continente</th>
@@ -449,7 +449,7 @@ export function AirportsPage() {
             <form className="airport-form" onSubmit={saveAirport}>
               {editorMode === "create" && (
                 <div className="field">
-                  <label>Codigo</label>
+                  <label>Código</label>
                   <input
                     value={newCode}
                     onChange={(event) => setNewCode(event.target.value.toUpperCase())}

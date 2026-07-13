@@ -77,7 +77,7 @@ export function ShipmentsPage() {
       setShipments(shipmentPayload);
       setPage(1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar los envios.");
+      setError(err instanceof Error ? err.message : "No se pudieron cargar los envíos.");
     } finally {
       setLoading(false);
     }
@@ -224,7 +224,7 @@ export function ShipmentsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Envíos</h1>
-            <p>Registro manual de envios en la base de datos.</p>
+            <p>Registro manual de envíos en la base de datos.</p>
           </div>
           <div className="toolbar-actions">
             <button
@@ -250,7 +250,7 @@ export function ShipmentsPage() {
           <div className="panel section metric-panel">
             <span>Total</span>
             <strong>{shipments.length}</strong>
-            <small>envios restantes de hoy</small>
+            <small>envíos restantes de hoy</small>
           </div>
           <div className="panel section metric-panel">
             <span>Maletas</span>
@@ -267,7 +267,7 @@ export function ShipmentsPage() {
             </div>
           ) : created ? (
             <div className="success">
-              {`Envio registrado: ${created.shipment_code} (${created.baggage_count} maletas).`}
+              {`Envío registrado: ${created.shipment_code} (${created.baggage_count} maletas).`}
             </div>
           ) : (
             <div className="empty-state">{`Mostrando envíos desde ahora hasta el final del ${listDate}.`}</div>

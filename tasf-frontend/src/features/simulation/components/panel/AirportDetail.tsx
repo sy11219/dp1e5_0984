@@ -22,17 +22,45 @@ function Metric({ label, value, sub }: MetricProps) {
 interface AirportDetailProps {
   airport: Airport;
   load: number;
+  peakLoad?: number;
   peakLabel?: string;
+  showMetrics?: boolean;
   onStatusUpdated?: (code: string, active: boolean, status: string) => void;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function statusLabel(status: ReturnType<typeof capacityStatus>): string {
+  switch (status) {
+    case "gray":
+      return "Vacío";
+    case "green":
+      return "Normal";
+    case "yellow":
+      return "Atención";
+    case "red":
+      return "Crítico";
+    default:
+      return "Sin datos";
+  }
 }
 
 export function AirportDetail({
   airport,
   load,
+  peakLoad,
   peakLabel = "Pico registrado",
+  showMetrics = true,
   onStatusUpdated,
 }: AirportDetailProps) {
   const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
+  const effectivePeakLoad = Math.max(load, peakLoad ?? airport.peakLoad ?? 0);
+  const peakUtilization = airport.maxCapacity ? effectivePeakLoad / airport.maxCapacity : 0;
   const status = capacityStatus(utilization);
   const [active, setActive] = useState(airport.active ?? true);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -84,12 +112,14 @@ export function AirportDetail({
 
       {statusError && <div className="inline-error text-xs text-destructive">{statusError}</div>}
 
-      <div className="metrics grid grid-cols-2 gap-2 mt-2 text-sm">
-        <Metric label="Carga actual" value={load} sub={`cap. ${airport.maxCapacity}`} />
-        <Metric label="Uso actual" value={`${Math.round(utilization * 100)}%`} sub={status.toUpperCase()} />
-        <Metric label={peakLabel} value={airport.peakLoad} sub={`${Math.round(airport.utilization * 100)}%`} />
-        <Metric label="Ubicación" value={airport.country} sub={airport.continent} />
-      </div>
+      {showMetrics && (
+        <div className="metrics grid grid-cols-2 gap-2 mt-2 text-sm">
+          <Metric label="Carga actual" value={load} sub={`cap. ${airport.maxCapacity}`} />
+          <Metric label="Uso actual" value={formatPercent(utilization)} sub={statusLabel(status)} />
+          <Metric label={peakLabel} value={effectivePeakLoad} sub={formatPercent(peakUtilization)} />
+          <Metric label="Ubicación" value={airport.country} sub={airport.continent} />
+        </div>
+      )}
     </>
   );
 }
