@@ -71,9 +71,9 @@ public class SimulationService {
             throw new IllegalArgumentException("La fecha inicial debe tener formato aaaammdd.");
         }
         LocalDate.parse(startDate, RAW_DATE);
-        if (days != 5) {
-            throw new IllegalArgumentException("Solo se permite simular 5 dias.");
-        }
+        //if (days != 5) {
+        //    throw new IllegalArgumentException("Solo se permite simular 5 dias.");
+        //}
     }
 
     private String toJson(String startDate, int days,

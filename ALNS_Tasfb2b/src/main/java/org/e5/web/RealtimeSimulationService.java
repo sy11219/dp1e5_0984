@@ -535,13 +535,13 @@ public class RealtimeSimulationService {
         if (startDate == null || !startDate.matches("\\d{8}"))
             throw new IllegalArgumentException("La fecha inicial debe tener formato aaaammdd.");
         LocalDate.parse(startDate, RAW_DATE);
-        if (batch) {
-            if (days != 5)
-                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
-        } else {
-            if (days < 1 || days > 7)
-                throw new IllegalArgumentException("Tiempo real permite operar entre 1 y 7 dias.");
-        }
+//        if (batch) {
+//            if (days != 5)
+//                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
+//        } else {
+//            if (days < 1 || days > 7)
+//                throw new IllegalArgumentException("Tiempo real permite operar entre 1 y 7 dias.");
+//        }
     }
 
     // ════════════════════════════════════════════════════════════════════════

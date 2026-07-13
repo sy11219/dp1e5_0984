@@ -5,6 +5,7 @@ export function Navbar() {
   const pages = [
     { name: "Tiempo real", path: "/operations" },
     { name: "Simulación", path: "/" },
+    { name: "Colapso", path: "/collapse" },
     { name: "Gestión de Maletas", path: "/baggage" },
     { name: "Estadísticas", path: "/stats" },
     { name: "Aeropuertos", path: "/airports" },
