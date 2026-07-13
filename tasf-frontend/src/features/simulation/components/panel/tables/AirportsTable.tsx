@@ -239,6 +239,7 @@ export function AirportsTable({
                 const load = loads[airport.code] || 0;
                 const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
                 const status = capacityStatus(utilization);
+                const accentColor = STATUS_COLOR[status];
                 const currentSelectedAirport = isSelectionControlled ? selectedAirportProp : localSelectedAirport;
                 const isSelected = currentSelectedAirport === airport.code;
 
@@ -247,7 +248,17 @@ export function AirportsTable({
                     <div
                       className={`row ${isSelected ? "selected" : ""}`}
                       onClick={() => selectAirport(airport.code, isSelected)}
-                      style={{ cursor: "pointer", position: "relative" }}
+                      style={{
+                        cursor: "pointer",
+                        position: "relative",
+                        borderColor: isSelected ? "#2563eb" : accentColor,
+                        background: isSelected
+                          ? `linear-gradient(90deg, ${accentColor}22 0%, #eff6ff 100%)`
+                          : `${accentColor}16`,
+                        boxShadow: isSelected
+                          ? "inset 0 0 0 1px rgba(37, 99, 235, 0.2)"
+                          : `inset 0 0 0 1px ${accentColor}30`,
+                      }}
                     >
                       <span className={`dot ${status}`}></span>
                       <div className="row-main">

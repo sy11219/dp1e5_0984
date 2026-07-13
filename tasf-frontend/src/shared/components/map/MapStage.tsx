@@ -298,14 +298,7 @@ export default function MapStage({
   // Filter flights according to color filter
   const filteredActiveFlights = useMemo(() => {
     if (flightColorFilter === "Todos") return activeFlights;
-    return activeFlights.filter((flight) => {
-      const perc = flight.utilization;
-      if (flightColorFilter === "green") return perc > 0 && perc < 0.7;
-      if (flightColorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
-      if (flightColorFilter === "red") return perc >= 0.9;
-      if (flightColorFilter === "gray") return perc <= 0.001;
-      return false;
-    });
+    return activeFlights.filter((flight) => capacityStatus(flight.utilization) === flightColorFilter);
   }, [activeFlights, flightColorFilter]);
   const drawFlights = useCallback((force = false) => {
     if (!canvasRef.current || !mapRef.current) return;
@@ -351,7 +344,8 @@ export default function MapStage({
     const { destPixel, planePixel, angle } =
       getRouteGeometry(mapRef.current, origin, destination, flight.progress, canvasOrigin);
     const isSelected = flight.id === selectedFlightId;
-    const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[flight.status];
+    const status = capacityStatus(flight.utilization);
+    const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[status];
 
     ctx.strokeStyle = flightColor;
     ctx.lineWidth = isSelected ? SELECTED_FLIGHT_ROUTE_LINE_WIDTH : FLIGHT_ROUTE_LINE_WIDTH;
@@ -487,9 +481,9 @@ export default function MapStage({
       // Buscar avión cerca del click (hitarea de 15px)
       const filteredActiveFlights = activeFlights.filter((flight) => {
         const perc = flight.utilization;
-        if (flightColorFilter === "green") return perc > 0 && perc < 0.7;
-        if (flightColorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
-        if (flightColorFilter === "red") return perc >= 0.9;
+        if (flightColorFilter === "green") return perc > 0 && perc < 0.5;
+        if (flightColorFilter === "yellow") return perc >= 0.5 && perc < 0.8;
+        if (flightColorFilter === "red") return perc >= 0.8;
         if (flightColorFilter === "gray") return perc <= 0.001;
         return true;
       });

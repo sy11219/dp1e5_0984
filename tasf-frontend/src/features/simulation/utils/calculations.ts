@@ -1,10 +1,15 @@
 import type { ActiveFlight, AirportEvent, AirportLoads, SimulationData } from "../types";
+import { getCapacityThresholds } from "./capacityThresholds";
 
 export function capacityStatus(utilization: number): "green" | "yellow" | "red" | "gray" {
+  const thresholds = getCapacityThresholds();
+  const greenLimit = thresholds.green / 100;
+  const yellowLimit = thresholds.yellow / 100;
+  const grayLimit = thresholds.gray / 100;
   const EPS = 0.001; // treat utilization below 0.1% as effectively zero
-  if (utilization <= EPS) return "gray";
-  if (utilization < 0.7) return "green";
-  if (utilization < 0.9) return "yellow";
+  if (utilization <= Math.max(EPS, grayLimit)) return "gray";
+  if (utilization < greenLimit) return "green";
+  if (utilization < yellowLimit) return "yellow";
   return "red";
 }
 

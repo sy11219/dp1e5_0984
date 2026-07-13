@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
+import { capacityStatus } from "../../../utils/calculations";
 import { formatFlightMoment } from "../../../utils/formatters";
 
 interface FlightsTableProps {
@@ -102,14 +103,7 @@ export function FlightsTable({
     }
 
     if (colorFilter !== "Todos") {
-      result = result.filter((flight) => {
-        const utilization = flight.utilization;
-        if (colorFilter === "green") return utilization > 0 && utilization < 0.7;
-        if (colorFilter === "yellow") return utilization >= 0.7 && utilization < 0.9;
-        if (colorFilter === "red") return utilization >= 0.9;
-        if (colorFilter === "gray") return utilization <= 0.001;
-        return false;
-      });
+      result = result.filter((flight) => capacityStatus(flight.utilization) === colorFilter);
     }
 
     result.sort((a, b) => {
@@ -266,6 +260,8 @@ export function FlightsTable({
             const active = activeFlightIds.has(flight.id);
             const relatedCount = relatedShipmentCounts.get(flight.id) ?? 0;
             const isSelected = selectedFlightId === flight.id;
+            const status = capacityStatus(flight.utilization);
+            const accentColor = STATUS_COLOR[status];
 
             return (
               <Fragment key={flight.id}>
@@ -279,9 +275,16 @@ export function FlightsTable({
                   style={{
                     opacity: active ? 1 : 0.6,
                     cursor: onSelectFlight ? "pointer" : undefined,
+                    borderColor: isSelected ? "#2563eb" : accentColor,
+                    background: isSelected
+                      ? `linear-gradient(90deg, ${accentColor}22 0%, #eff6ff 100%)`
+                      : `${accentColor}16`,
+                    boxShadow: isSelected
+                      ? "inset 0 0 0 1px rgba(37, 99, 235, 0.2)"
+                      : `inset 0 0 0 1px ${accentColor}30`,
                   }}
                 >
-                  <span className={`dot ${flight.status}`}></span>
+                  <span className={`dot ${status}`}></span>
                   <div className="row-main flight-route-main">
                     <div className="flight-route-point">
                       <strong>{flight.origin}</strong>
@@ -296,7 +299,7 @@ export function FlightsTable({
                   <span
                     className="capacity-pill"
                     style={{
-                      background: STATUS_COLOR[flight.status],
+                      background: accentColor,
                       display: "inline-flex",
                       alignItems: "center",
                       padding: "0.2rem 0.5rem",

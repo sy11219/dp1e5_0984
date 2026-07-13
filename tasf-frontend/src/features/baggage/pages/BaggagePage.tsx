@@ -22,8 +22,9 @@ type Incident = {
 };
 
 function statusFromUtilization(utilization: number): CapacityStatus {
-  if (utilization < 0.7) return "green";
-  if (utilization < 0.9) return "yellow";
+  if (utilization <= 0.001) return "gray";
+  if (utilization < 0.5) return "green";
+  if (utilization < 0.8) return "yellow";
   return "red";
 }
 
