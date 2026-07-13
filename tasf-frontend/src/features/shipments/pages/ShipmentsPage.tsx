@@ -183,7 +183,7 @@ export function ShipmentsPage() {
       setForm(null);
       await loadPageData();
     } catch (err) {
-      setModalError(err instanceof Error ? err.message : "No se pudo registrar el envio.");
+      setModalError(err instanceof Error ? err.message : "No se pudo registrar el envío.");
     } finally {
       setSaving(false);
     }
@@ -299,11 +299,11 @@ export function ShipmentsPage() {
             <table className="data-table airports-data-table">
               <thead>
                 <tr>
-                  <th>CODIGO</th>
-                  <th>AEROPUERTO_ORIGEN</th>
-                  <th>AEROPUERTO_DESTINO</th>
-                  <th>MALETAS</th>
-                  <th>FECHA_ENVIO</th>
+                  <th>Código</th>
+                  <th>Aeropuerto origen</th>
+                  <th>Aeropuerto destino</th>
+                  <th>Maletas</th>
+                  <th>Fecha de envío</th>
                 </tr>
               </thead>
               <tbody>
@@ -370,7 +370,7 @@ export function ShipmentsPage() {
             <div className="modal-header">
               <div>
                 <h2 id="shipment-editor-title">Nuevo envío</h2>
-                <span>Se guardara con status REGISTERED</span>
+                <span>Se guardará con estado registrado</span>
               </div>
               <button className="icon-button" type="button" onClick={closeCreator} disabled={saving}>
                 x
@@ -450,7 +450,7 @@ export function ShipmentsPage() {
             <div className="modal-header">
               <div>
                 <h2 id="shipment-batch-title">Nuevo lote</h2>
-                <span>Se guardara cada linea con status REGISTERED</span>
+                <span>Se guardará cada línea con estado registrado</span>
               </div>
               <button className="icon-button" type="button" onClick={closeCreator} disabled={saving}>
                 x

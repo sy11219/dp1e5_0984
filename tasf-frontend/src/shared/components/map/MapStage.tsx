@@ -24,6 +24,7 @@ type MapStageProps = {
   selectedFlightId?: string | null;
   selectedShipment?: Shipment | null;
   focusTarget?: MapFocusTarget | null;
+  resetViewToken?: number;
   displayGmtOffset?: number;
   onSelectAirport: (code: string) => void;
   onSelectFlight?: (id: string) => void;
@@ -61,6 +62,7 @@ export default function MapStage({
   selectedFlightId,
   selectedShipment,
   focusTarget,
+  resetViewToken,
   displayGmtOffset,
   onSelectAirport,
   onSelectFlight,
@@ -79,6 +81,7 @@ export default function MapStage({
   const airportMarkersRef = useRef(new Map<string, AirportMarkerItem>());
   const onSelectAirportRef = useRef(onSelectAirport);
   const didFitBoundsRef = useRef(false);
+  const lastResetViewTokenRef = useRef(resetViewToken ?? 0);
   const lastDrawKeyRef = useRef("");
   const autoCloseTimerRef = useRef<number | null>(null);
   const autoCloseFlightIdRef = useRef<string | null>(null);
@@ -589,6 +592,14 @@ export default function MapStage({
     map.setZoom(clamped, { animate: false });
     setZoom(Number(clamped.toFixed(2)));
   }, []);
+
+  useEffect(() => {
+    if (resetViewToken === undefined || resetViewToken === lastResetViewTokenRef.current) return;
+
+    lastResetViewTokenRef.current = resetViewToken;
+    setMapInfo(null);
+    fitDefaultAirportBounds(true);
+  }, [fitDefaultAirportBounds, resetViewToken]);
 
   return (
     <div className="map-stage">

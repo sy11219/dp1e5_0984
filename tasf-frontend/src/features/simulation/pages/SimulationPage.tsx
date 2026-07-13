@@ -12,7 +12,6 @@ import {
   ownsBatchSimulation,
 } from "../../../api/simulationApi"
 import { Navbar } from "../../../shared/components/Navbar/Navbar"
-import { AirportDetail } from "../components/panel/AirportDetail"
 import { AirportsTable } from "../components/panel/tables/AirportsTable"
 import { CapacityLegend } from "../components/panel/CapacityLegend"
 import { FlightsTable } from "../components/panel/tables/FlightsTable"
@@ -264,6 +263,7 @@ export function SimulationPage() {
   )
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null)
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null)
+  const [mapResetViewToken, setMapResetViewToken] = useState(0)
   const [initialFinalSummary] = useState(readFinalSummaryStorage)
   const [reportDismissed, setReportDismissed] = useState(false)
   const [stopSummaryOpen, setStopSummaryOpen] = useState(false)
@@ -778,7 +778,6 @@ export function SimulationPage() {
     () => [...(displayData.shipments ?? [])].sort((a, b) => a.requestMinute - b.requestMinute),
     [displayData.shipments]
   );
-  const selected = displayData.airports.find((a) => a.code === selectedAirport)
   const controlsBusy = loading || fetching || cancelling
   const ownsCurrentSimulation = ownsBatchSimulation(data)
   const canControlSimulation = !data?.simulationId || ownsCurrentSimulation
@@ -802,31 +801,19 @@ export function SimulationPage() {
     ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
     : undefined
 
-  const handleAirportStatusUpdated = (code: string, active: boolean, status: string) => {
-    const updateAirport = (airport: Airport) =>
-      airport.code === code
-        ? { ...airport, active, operationalStatus: status }
-        : airport
-
-    setAirportCatalog((airports) => airports.map(updateAirport))
-    setData((current) => current
-      ? { ...current, airports: current.airports.map(updateAirport) }
-      : current
-    )
-  }
-
-  const clearMapSelection = useCallback(() => {
+  const clearMapSelection = useCallback((options?: { resetView?: boolean }) => {
     setSelectedAirport(null)
     setSelectedFlightId(null)
     setSelectedShipment(null)
     setMapFocusTarget(null)
+    if (options?.resetView) setMapResetViewToken((token) => token + 1)
     writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
   }, [])
 
   const focusAirport = useCallback((code: string) => {
     // Si es el mismo aeropuerto, deseleccionar
     if (selectedAirport === code) {
-      clearMapSelection()
+      clearMapSelection({ resetView: true })
     } else {
       setSelectedAirport(code)
       setSelectedFlightId(null)
@@ -839,7 +826,7 @@ export function SimulationPage() {
   const focusFlight = useCallback((id: string) => {
     // Si es el mismo vuelo, deseleccionar
     if (selectedFlightId === id) {
-      clearMapSelection()
+      clearMapSelection({ resetView: true })
     } else {
       setSelectedAirport(null)
       setSelectedFlightId(id)
@@ -851,7 +838,7 @@ export function SimulationPage() {
 
   const focusShipment = useCallback((shipment: Shipment) => {
     if (selectedShipment?.id === shipment.id) {
-      clearMapSelection()
+      clearMapSelection({ resetView: true })
       return
     }
 
@@ -1157,6 +1144,7 @@ export function SimulationPage() {
             selectedFlightId={mapSelectedFlightId}
             selectedShipment={selectedShipment}
             focusTarget={mapFocusTarget}
+            resetViewToken={mapResetViewToken}
             displayGmtOffset={displayGmtOffset}
             onSelectAirport={focusAirport}
             onSelectFlight={focusFlight}
@@ -1169,7 +1157,7 @@ export function SimulationPage() {
               displayGmtOffset={displayGmtOffset}
               displayAirportLabel={displayAirportLabel}
             />
-            <DraggableMapOverlay initialX={18} initialY={168} className="map-global-indicators-overlay">
+            <DraggableMapOverlay anchor="bottom-right" initialX={18} initialY={76} className="map-global-indicators-overlay">
               <GlobalIndicators
                 data={data}
                 currentMinute={simMinute}
@@ -1193,32 +1181,6 @@ export function SimulationPage() {
               <PanelRightClose size={18} />
             </button>
           </div>
-          <section className="panel section">
-            <div className="section-header">
-              <h3>{selected ? `${selected.code} - ${selected.city}` : "Aeropuerto"}</h3>
-              {selected && (
-                <button
-                  type="button"
-                  className="icon-button section-close"
-                  onClick={clearMapSelection}
-                  aria-label="Quitar aeropuerto seleccionado"
-                  title="Quitar seleccion"
-                >
-                  x
-                </button>
-              )}
-            </div>
-            {loadingAirports && <div className="empty-state">Cargando aeropuertos...</div>}
-            {selected && (
-              <AirportDetail
-                airport={selected}
-                load={airportLoads[selected.code] || 0}
-                peakLoad={displayData.airportEvents.length ? airportPeakLoads[selected.code] : undefined}
-                showMetrics={false}
-                onStatusUpdated={handleAirportStatusUpdated}
-              />
-            )}
-          </section>
           <section className="panel section collapsible-section">
             <button
               type="button"
@@ -1289,6 +1251,7 @@ export function SimulationPage() {
             {openRightPanelSection === "airports" && (
               <div className="collapsible-content">
             <h3>Aeropuertos</h3>
+            {loadingAirports && <div className="empty-state">Cargando aeropuertos...</div>}
             {displayData.airports.length ? (
               <AirportsTable
                 airports={displayData.airports}
@@ -1417,7 +1380,7 @@ function SimulationControls({
           <label>Cancelar vuelo</label>
           <input
             type="text"
-            placeholder="flight_code (ej: SKBO-VIDP-0005)"
+            placeholder="código de vuelo (ej: SKBO-VIDP-0005)"
             value={flightToCancel}
             onChange={(e) => onFlightToCancelChange(e.target.value)}
             disabled={!hasSimulation || busy}

@@ -11,6 +11,7 @@ import {
   assignManualAirportTime,
   useAssignedAirportTime,
 } from "../../simulation/utils/assignedAirportTime";
+import { operationalStatusLabel } from "../../simulation/utils/statusLabels";
 
 const PAGE_SIZE = 12;
 
@@ -26,14 +27,18 @@ function formatNumber(value: number | undefined, digits = 0) {
   });
 }
 
-function statusLabel(airport: Airport) {
+function statusValue(airport: Airport) {
   if (airport.operationalStatus) return airport.operationalStatus;
   return airport.active === false ? "INACTIVE" : "ACTIVE";
 }
 
+function airportStatusLabel(airport: Airport) {
+  return operationalStatusLabel(statusValue(airport), airport.active);
+}
+
 function isActive(airport: Airport) {
   if (typeof airport.active === "boolean") return airport.active;
-  return statusLabel(airport).toUpperCase() === "ACTIVE";
+  return statusValue(airport).toUpperCase() === "ACTIVE";
 }
 
 function airportToForm(airport: Airport): AirportForm {
@@ -119,7 +124,8 @@ export function AirportsPage() {
           airport.city,
           airport.country,
           airport.continent,
-          airport.operationalStatus,
+          statusValue(airport),
+          airportStatusLabel(airport),
         ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
@@ -226,7 +232,7 @@ export function AirportsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Aeropuertos</h1>
-            <p>Catalogo completo leído desde la base de datos al iniciar la aplicación.</p>
+            <p>Catálogo completo leído desde la base de datos al iniciar la aplicación.</p>
           </div>
           <div className="toolbar-actions">
             <button
@@ -271,7 +277,7 @@ export function AirportsPage() {
                     ? `${assignedAirportTime.city} - UTC${
                         (assignedAirportTime.gmtOffset ?? 0) >= 0 ? "+" : ""
                       }${assignedAirportTime.gmtOffset ?? 0}`
-                    : "se usara la deteccion automatica si encuentra coincidencia"}
+                    : "se usará la detección automática si encuentra coincidencia"}
                 </small>
               </div>
             </div>
@@ -337,7 +343,7 @@ export function AirportsPage() {
                 <tr>
                   <th>Código</th>
                   <th>Ciudad</th>
-                  <th>Pais</th>
+                  <th>País</th>
                   <th>Continente</th>
                   <th>Estado</th>
                   <th>Latitud</th>
@@ -368,7 +374,7 @@ export function AirportsPage() {
                     <td>{airport.continent}</td>
                     <td>
                       <span className={`status-pill ${isActive(airport) ? "active" : "inactive"}`}>
-                        {statusLabel(airport)}
+                        {airportStatusLabel(airport)}
                       </span>
                     </td>
                     <td>{formatNumber(airport.latitude, 4)}</td>
@@ -437,7 +443,7 @@ export function AirportsPage() {
                 </h2>
                 <span>
                   {editorMode === "create"
-                    ? "Se guardara como ACTIVE"
+                    ? "Se guardará como activo"
                     : selectedAirport?.city}
                 </span>
               </div>
@@ -470,7 +476,7 @@ export function AirportsPage() {
                 />
               </div>
               <div className="field">
-                <label>Pais</label>
+                <label>País</label>
                 <input
                   value={form.country}
                   onChange={(event) => updateForm("country", event.target.value)}
@@ -494,8 +500,8 @@ export function AirportsPage() {
                       updateForm("operationalStatus", event.target.value as "ACTIVE" | "INACTIVE")
                     }
                   >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="ACTIVE">Activo</option>
+                    <option value="INACTIVE">Inactivo</option>
                   </select>
                 </div>
               )}

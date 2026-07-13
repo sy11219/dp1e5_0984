@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import type { ReactNode, PointerEvent } from "react";
+import type { CSSProperties, ReactNode, PointerEvent } from "react";
 
 type DraggableMapOverlayProps = {
   children: ReactNode;
   initialX?: number;
   initialY?: number;
+  anchor?: "top-left" | "bottom-right";
   className?: string;
 };
 
@@ -12,10 +13,11 @@ export function DraggableMapOverlay({
   children,
   initialX = 18,
   initialY = 18,
+  anchor = "top-left",
   className = "",
 }: DraggableMapOverlayProps) {
-  const dragStart = useRef<{ pointerId: number; x: number; y: number; left: number; top: number } | null>(null);
-  const [position, setPosition] = useState({ left: initialX, top: initialY });
+  const dragStart = useRef<{ pointerId: number; x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const [position, setPosition] = useState({ offsetX: initialX, offsetY: initialY });
   const [dragging, setDragging] = useState(false);
 
   const startDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -27,8 +29,8 @@ export function DraggableMapOverlay({
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      left: position.left,
-      top: position.top,
+      offsetX: position.offsetX,
+      offsetY: position.offsetY,
     };
     setDragging(true);
   };
@@ -37,10 +39,20 @@ export function DraggableMapOverlay({
     const start = dragStart.current;
     if (!start || start.pointerId !== event.pointerId) return;
 
-    setPosition({
-      left: Math.max(0, start.left + event.clientX - start.x),
-      top: Math.max(0, start.top + event.clientY - start.y),
-    });
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+
+    setPosition(
+      anchor === "bottom-right"
+        ? {
+            offsetX: Math.max(0, start.offsetX - deltaX),
+            offsetY: Math.max(0, start.offsetY - deltaY),
+          }
+        : {
+            offsetX: Math.max(0, start.offsetX + deltaX),
+            offsetY: Math.max(0, start.offsetY + deltaY),
+          }
+    );
   };
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -50,10 +62,25 @@ export function DraggableMapOverlay({
     }
   };
 
+  const style: CSSProperties =
+    anchor === "bottom-right"
+      ? {
+          left: "auto",
+          top: "auto",
+          right: 0,
+          bottom: 0,
+          transform: `translate(${-position.offsetX}px, ${-position.offsetY}px)`,
+        }
+      : {
+          left: 0,
+          top: 0,
+          transform: `translate(${position.offsetX}px, ${position.offsetY}px)`,
+        };
+
   return (
     <div
       className={["map-draggable-overlay", dragging ? "is-dragging" : "", className].filter(Boolean).join(" ")}
-      style={{ transform: `translate(${position.left}px, ${position.top}px)` }}
+      style={style}
       onPointerDown={startDrag}
       onPointerMove={moveDrag}
       onPointerUp={endDrag}

@@ -163,6 +163,7 @@ export async function getBatchShipmentsPageRequest(
   params: {
     page: number;
     pageSize: number;
+    currentMinute?: number;
     search?: string;
     origin?: string;
     destination?: string;
@@ -172,6 +173,7 @@ export async function getBatchShipmentsPageRequest(
   const query = new URLSearchParams();
   query.set("page", String(params.page));
   query.set("pageSize", String(params.pageSize));
+  if (params.currentMinute !== undefined) query.set("currentMinute", String(params.currentMinute));
   if (params.search?.trim()) query.set("search", params.search.trim());
   if (params.origin?.trim()) query.set("origin", params.origin.trim());
   if (params.destination?.trim()) query.set("destination", params.destination.trim());

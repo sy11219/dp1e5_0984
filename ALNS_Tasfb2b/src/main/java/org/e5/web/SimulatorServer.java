@@ -585,7 +585,8 @@ public class SimulatorServer {
                                 query.getOrDefault("search", ""),
                                 query.getOrDefault("origin", ""),
                                 query.getOrDefault("destination", ""),
-                                query.getOrDefault("status", "")));
+                                query.getOrDefault("status", ""),
+                                queryInt(query, "currentMinute", -1)));
                 return;
             }
 

@@ -393,7 +393,8 @@ public class RealtimeSimulationService {
 
     public String batchShipments(String id, int page, int pageSize,
                                  String search, String origin,
-                                 String destination, String status) {
+                                 String destination, String status,
+                                 int currentMinute) {
         RealtimeSession session = sessions.get(id);
         if (session == null) {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
@@ -402,7 +403,7 @@ public class RealtimeSimulationService {
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
         }
-        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status);
+        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
     }
 
     private static int parseStartTime(String startTime) {
@@ -1657,9 +1658,11 @@ public class RealtimeSimulationService {
 
         synchronized String shipmentsPageJson(int page, int pageSize,
                                                String search, String origin,
-                                               String destination, String statusFilter) {
+                                               String destination, String statusFilter,
+                                               int currentMinute) {
             int safePageSize = Math.max(1, Math.min(100, pageSize));
             int safePage = Math.max(1, page);
+            int referenceMinute = currentMinute >= 0 ? currentMinute : tick;
             String normalizedSearch = normalizeFilter(search);
             String normalizedOrigin = normalizeFilter(origin);
             String normalizedDestination = normalizeFilter(destination);
@@ -1674,14 +1677,13 @@ public class RealtimeSimulationService {
                         normalizedSearch,
                         normalizedOrigin,
                         normalizedDestination,
-                        normalizedStatus)) {
+                        normalizedStatus,
+                        referenceMinute)) {
                     continue;
                 }
                 filtered.add(shipment);
             }
-            filtered.sort(Comparator
-                    .comparingInt(Shipment::getRequestMinute)
-                    .thenComparing(Shipment::getShipmentId));
+            filtered.sort((a, b) -> compareShipmentsByNextDelivery(a, b, referenceMinute));
 
             int total = filtered.size();
             int totalPages = total == 0 ? 1 : (int) Math.ceil(total / (double) safePageSize);
@@ -1705,6 +1707,47 @@ public class RealtimeSimulationService {
             return json.toString();
         }
 
+        private int compareShipmentsByNextDelivery(Shipment a, Shipment b, int referenceMinute) {
+            int bucketDiff = shipmentDeliveryBucket(a, referenceMinute) - shipmentDeliveryBucket(b, referenceMinute);
+            if (bucketDiff != 0) return bucketDiff;
+
+            boolean aDelivered = isShipmentDelivered(a, referenceMinute);
+            boolean bDelivered = isShipmentDelivered(b, referenceMinute);
+            boolean aUpcoming = isShipmentUpcoming(a, referenceMinute);
+            boolean bUpcoming = isShipmentUpcoming(b, referenceMinute);
+
+            if (aUpcoming && bUpcoming) {
+                int arrivalDiff = Integer.compare(a.getEstimatedArrival(), b.getEstimatedArrival());
+                if (arrivalDiff != 0) return arrivalDiff;
+            }
+            if (aDelivered && bDelivered) {
+                int arrivalDiff = Integer.compare(b.getEstimatedArrival(), a.getEstimatedArrival());
+                if (arrivalDiff != 0) return arrivalDiff;
+            }
+
+            int requestDiff = Integer.compare(a.getRequestMinute(), b.getRequestMinute());
+            if (requestDiff != 0) return requestDiff;
+            return a.getShipmentId().compareTo(b.getShipmentId());
+        }
+
+        private int shipmentDeliveryBucket(Shipment shipment, int referenceMinute) {
+            if (isShipmentUpcoming(shipment, referenceMinute)) return 0;
+            if (!isShipmentDelivered(shipment, referenceMinute)) return 1;
+            return 2;
+        }
+
+        private boolean isShipmentUpcoming(Shipment shipment, int referenceMinute) {
+            return shipment.isPlanned()
+                    && shipment.getEstimatedArrival() > 0
+                    && shipment.getEstimatedArrival() > referenceMinute;
+        }
+
+        private boolean isShipmentDelivered(Shipment shipment, int referenceMinute) {
+            return shipment.isPlanned()
+                    && shipment.getEstimatedArrival() > 0
+                    && shipment.getEstimatedArrival() <= referenceMinute;
+        }
+
         private String normalizeFilter(String value) {
             if (value == null || value.isBlank()) return "";
             String trimmed = value.trim();
@@ -1720,16 +1763,12 @@ public class RealtimeSimulationService {
                                                String search,
                                                String origin,
                                                String destination,
-                                               String statusFilter) {
-            if (!origin.isBlank()
-                    && !shipment.getOriginCode().toLowerCase(Locale.ROOT).equals(origin)) {
+                                               String statusFilter,
+                                               int referenceMinute) {
+            if (!matchesShipmentAirportFilters(shipment, origin, destination)) {
                 return false;
             }
-            if (!destination.isBlank()
-                    && !shipment.getDestCode().toLowerCase(Locale.ROOT).equals(destination)) {
-                return false;
-            }
-            if (!statusFilter.isBlank() && !matchesShipmentStatus(shipment, statusFilter)) {
+            if (!statusFilter.isBlank() && !matchesShipmentStatus(shipment, statusFilter, referenceMinute)) {
                 return false;
             }
             if (search.isBlank()) return true;
@@ -1751,20 +1790,57 @@ public class RealtimeSimulationService {
             return false;
         }
 
-        private boolean matchesShipmentStatus(Shipment shipment, String statusFilter) {
+        private boolean matchesShipmentAirportFilters(Shipment shipment, String origin, String destination) {
+            if (origin.isBlank() && destination.isBlank()) return true;
+
+            if (matchesAirportPair(shipment.getOriginCode(), shipment.getDestCode(), origin, destination)) {
+                return true;
+            }
+
+            Route route = shipment.getAssignedRoute();
+            if (route == null) return false;
+            for (Flight flight : route.getFlights()) {
+                if (matchesAirportPair(flight.getOriginCode(), flight.getDestCode(), origin, destination)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean matchesAirportPair(String originCode, String destinationCode, String origin, String destination) {
+            return (origin.isBlank() || originCode.toLowerCase(Locale.ROOT).equals(origin))
+                    && (destination.isBlank() || destinationCode.toLowerCase(Locale.ROOT).equals(destination));
+        }
+
+        private boolean matchesShipmentStatus(Shipment shipment, String statusFilter, int referenceMinute) {
             return switch (statusFilter) {
-                case "planned", "planificado" -> shipment.isPlanned();
+                case "planned", "planificado" -> shipment.isPlanned()
+                        && !isShipmentDelivered(shipment, referenceMinute)
+                        && !isShipmentInFlight(shipment, referenceMinute);
+                case "in-progress", "in_progress", "en-curso", "en_curso" ->
+                        isShipmentInFlight(shipment, referenceMinute);
                 case "unplanned", "sin-ruta", "sin_ruta" -> !shipment.isPlanned();
                 case "ontime", "on-time", "a-tiempo", "a_tiempo" -> shipment.isPlanned() && shipment.isOnTime();
                 case "late", "tarde" -> shipment.isPlanned() && !shipment.isOnTime();
-                case "delivered", "entregado" -> shipment.isPlanned()
-                        && shipment.getEstimatedArrival() > 0
-                        && shipment.getEstimatedArrival() <= maxTick;
+                case "delivered", "entregado" -> isShipmentDelivered(shipment, referenceMinute);
                 case "pending", "pendiente" -> !shipment.isPlanned()
                         || shipment.getEstimatedArrival() <= 0
-                        || shipment.getEstimatedArrival() > maxTick;
+                        || shipment.getEstimatedArrival() > referenceMinute;
                 default -> true;
             };
+        }
+
+        private boolean isShipmentInFlight(Shipment shipment, int referenceMinute) {
+            if (!shipment.isPlanned()) return false;
+            Route route = shipment.getAssignedRoute();
+            if (route == null) return false;
+            for (Flight flight : route.getFlights()) {
+                if (referenceMinute >= flight.absoluteDepartureMinute()
+                        && referenceMinute <= flight.absoluteArrivalMinute()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         String snapshotJsonForRead() {

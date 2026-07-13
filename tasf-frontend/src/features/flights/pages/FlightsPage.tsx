@@ -10,6 +10,7 @@ import {
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
 import type { Airport } from "../../simulation/types";
 import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
+import { flightScheduleStatusLabel } from "../../simulation/utils/statusLabels";
 
 const PAGE_SIZE = 12;
 type EditorMode = "create" | "edit";
@@ -19,12 +20,17 @@ function formatDateTime(value: string) {
   return value.replace("T", " ").replace("Z", " UTC");
 }
 
-function statusLabel(flight: FlightPlanRecord) {
+function statusValue(flight: FlightPlanRecord) {
   return flight.flightStatus || flight.scheduleStatus || "SCHEDULED";
 }
 
+function statusLabel(flight: FlightPlanRecord) {
+  return flightScheduleStatusLabel(statusValue(flight));
+}
+
 function isCanceled(flight: FlightPlanRecord) {
-  return statusLabel(flight).toUpperCase() === "CANCELED";
+  const status = statusValue(flight).toUpperCase();
+  return status === "CANCELED" || status === "CANCELLED";
 }
 
 function toDateTimeInput(value: string) {
@@ -101,7 +107,7 @@ export function FlightsPage() {
   }, [search, status, assignedAirportTime?.code]);
 
   const statuses = useMemo(
-    () => Array.from(new Set(flights.map(statusLabel).filter(Boolean))).sort(),
+    () => Array.from(new Set(flights.map(statusValue).filter(Boolean))).sort(),
     [flights]
   );
 
@@ -126,10 +132,11 @@ export function FlightsPage() {
           flight.arrival_time_local,
           flight.departure_time_utc,
           flight.arrival_time_utc,
+          statusValue(flight),
           statusLabel(flight),
         ].some((value) => String(value).toLowerCase().includes(query));
       })
-      .filter((flight) => status === "ALL" || statusLabel(flight) === status)
+      .filter((flight) => status === "ALL" || statusValue(flight) === status)
       .sort(
         (a, b) =>
           a.departure_time_utc.localeCompare(b.departure_time_utc) ||
@@ -283,7 +290,7 @@ export function FlightsPage() {
                 <option value="ALL">Todos</option>
                 {statuses.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {flightScheduleStatusLabel(item)}
                   </option>
                 ))}
               </select>
@@ -294,15 +301,15 @@ export function FlightsPage() {
             <table className="data-table flights-data-table">
               <thead>
                 <tr>
-                  <th>CODIGO</th>
-                  <th>AEROPUERTO_ORIGEN</th>
-                  <th>AEROPUERTO_DESTINO</th>
-                  <th>SALIDA_LOCAL</th>
-                  <th>LLEGADA_LOCAL</th>
-                  <th>SALIDA_UTC</th>
-                  <th>LLEGADA_UTC</th>
-                  <th>CAPACIDAD</th>
-                  <th>STATUS</th>
+                  <th>Código</th>
+                  <th>Aeropuerto origen</th>
+                  <th>Aeropuerto destino</th>
+                  <th>Salida local</th>
+                  <th>Llegada local</th>
+                  <th>Salida UTC</th>
+                  <th>Llegada UTC</th>
+                  <th>Capacidad</th>
+                  <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -392,7 +399,7 @@ export function FlightsPage() {
                 </h2>
                 <span>
                   {editorMode === "create"
-                    ? `Se guardara como SCHEDULED desde ${assignedAirportTime?.code || "aeropuerto asignado"}`
+                    ? `Se guardará como programado desde ${assignedAirportTime?.code || "aeropuerto asignado"}`
                     : `${selectedFlight?.origin} -> ${selectedFlight?.destination}`}
                 </span>
               </div>
@@ -403,7 +410,7 @@ export function FlightsPage() {
 
             <form className="airport-form" onSubmit={saveFlight}>
               <div className="field">
-                <label>AEROPUERTO_DESTINO</label>
+                <label>Aeropuerto destino</label>
                 <select
                   value={form.destinationAirportCode}
                   onChange={(event) => updateForm("destinationAirportCode", event.target.value)}
@@ -420,7 +427,7 @@ export function FlightsPage() {
                 </select>
               </div>
               <div className="field">
-                <label>SALIDA_LOCAL</label>
+                <label>Salida local</label>
                 <input
                   type="datetime-local"
                   step="1"
@@ -430,7 +437,7 @@ export function FlightsPage() {
                 />
               </div>
               <div className="field">
-                <label>LLEGADA_LOCAL</label>
+                <label>Llegada local</label>
                 <input
                   type="datetime-local"
                   step="1"
@@ -440,7 +447,7 @@ export function FlightsPage() {
                 />
               </div>
               <div className="field">
-                <label>CAPACIDAD</label>
+                <label>Capacidad</label>
                 <input
                   type="number"
                   min="1"
@@ -452,15 +459,15 @@ export function FlightsPage() {
               </div>
               {editorMode === "edit" && (
                 <div className="field">
-                  <label>STATUS</label>
+                  <label>Estado</label>
                   <select
                     value={form.status}
                     onChange={(event) =>
                       updateForm("status", event.target.value as "SCHEDULED" | "CANCELED")
                     }
                   >
-                    <option value="SCHEDULED">SCHEDULED</option>
-                    <option value="CANCELED">CANCELED</option>
+                    <option value="SCHEDULED">Programado</option>
+                    <option value="CANCELED">Cancelado</option>
                   </select>
                 </div>
               )}

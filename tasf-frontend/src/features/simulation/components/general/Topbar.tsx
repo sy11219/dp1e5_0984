@@ -151,3 +151,60 @@ export function SimulationStatusCards({
     </>
   );
 }
+
+interface OperationsStatusCardsProps {
+  data: SimulationData | null;
+  operationalMinute: number;
+  realNow: Date;
+  realDurationMs: number;
+  displayGmtOffset?: number;
+}
+
+export function OperationsStatusCards({
+  data,
+  operationalMinute,
+  realNow,
+  realDurationMs,
+  displayGmtOffset,
+}: OperationsStatusCardsProps) {
+  const minutesFromStart = data
+    ? operationalMinute - (data.startOffsetMinutes ?? 0)
+    : 0;
+
+  return (
+    <>
+      <DraggableMapOverlay initialX={18} initialY={18} className="map-status-overlay">
+        <StackedStatusCard
+          items={[
+            {
+              label: "Fecha y hora de inicio",
+              value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
+            },
+            {
+              label: "Fecha y hora operativa",
+              value: data ? formatFlightMoment(data, operationalMinute, displayGmtOffset) : "--",
+            },
+          ]}
+        />
+      </DraggableMapOverlay>
+      <DraggableMapOverlay initialX={18} initialY={92} className="map-status-overlay">
+        <StackedStatusCard
+          items={[
+            {
+              label: "Fecha y hora actual",
+              value: formatDateTime(realNow, displayGmtOffset),
+            },
+            {
+              label: "Duración real de operación",
+              value: data ? formatRealTime(realDurationMs) : "--",
+            },
+            {
+              label: "Tiempo transcurrido en operación",
+              value: data ? formatElapsedSimulation(minutesFromStart) : "--",
+            },
+          ]}
+        />
+      </DraggableMapOverlay>
+    </>
+  );
+}

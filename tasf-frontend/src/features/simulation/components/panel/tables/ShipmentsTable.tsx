@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
 import type { Flight, Shipment, SimulationData } from "../../../types";
 import { formatSimMinute } from "../../../utils/formatters";
@@ -18,38 +18,70 @@ interface ShipmentsTableProps {
 const ANY = "Cualquiera";
 const PAGE_SIZE = 25;
 
-function getFirstFlightDepartureMinute(
-  flightIds: string[],
-  requestMinute: number
-): number | null {
-  if (flightIds.length === 0) return null;
-
-  const parts = flightIds[0].split("-");
-  const departureTime = parts[2];
-  if (!departureTime || departureTime.length !== 4) return null;
-
-  const hour = Number.parseInt(departureTime.slice(0, 2), 10);
-  const min = Number.parseInt(departureTime.slice(2), 10);
-  const departureMinute = hour * 60 + min;
-  const requestDay = Math.floor(requestMinute / 1440);
-  const requestMinuteOfDay = requestMinute % 1440;
-
-  return requestMinuteOfDay <= departureMinute
-    ? requestDay * 1440 + departureMinute
-    : (requestDay + 1) * 1440 + departureMinute;
-}
+type ShipmentState = "Entregado" | "En curso" | "Planeado" | "Sin ruta";
 
 function getShipmentStatus(
   shipment: Shipment,
   simMinute: number,
-  absoluteDepartureMinute: number | null
-): string {
-  const isCompleted = shipment.planned && simMinute >= shipment.estimatedArrival;
-  if (isCompleted) return "Entregado";
-  if (absoluteDepartureMinute !== null) {
-    return simMinute >= absoluteDepartureMinute ? "En curso" : "Planeado";
+  flightById: Map<string, Flight>
+): ShipmentState {
+  if (!shipment.planned) return "Sin ruta";
+
+  const routeFlights = shipment.flightIds
+    .map((id) => flightById.get(id))
+    .filter((flight): flight is Flight => Boolean(flight));
+
+  if (
+    routeFlights.some(
+      (flight) =>
+        simMinute >= flight.absoluteDepartureMinute &&
+        simMinute <= flight.absoluteArrivalMinute
+    )
+  ) {
+    return "En curso";
   }
-  return shipment.planned ? "Planeado" : "Sin ruta";
+
+  if (shipment.estimatedArrival > 0 && simMinute >= shipment.estimatedArrival) return "Entregado";
+  return "Planeado";
+}
+
+function matchesAirportFilters(
+  shipment: Shipment,
+  originAirport: string,
+  destinationAirport: string,
+  flightById: Map<string, Flight>
+): boolean {
+  if (originAirport === ANY && destinationAirport === ANY) return true;
+
+  const matches = (origin: string, destination: string) =>
+    (originAirport === ANY || origin === originAirport) &&
+    (destinationAirport === ANY || destination === destinationAirport);
+
+  if (matches(shipment.origin, shipment.destination)) return true;
+
+  return shipment.flightIds.some((id) => {
+    const flight = flightById.get(id);
+    return Boolean(flight && matches(flight.origin, flight.destination));
+  });
+}
+
+function compareShipmentsByNextDelivery(a: Shipment, b: Shipment, simMinute: number): number {
+  const aDelivered = a.planned && a.estimatedArrival > 0 && simMinute >= a.estimatedArrival;
+  const bDelivered = b.planned && b.estimatedArrival > 0 && simMinute >= b.estimatedArrival;
+  const aUpcoming = a.planned && a.estimatedArrival > 0 && !aDelivered;
+  const bUpcoming = b.planned && b.estimatedArrival > 0 && !bDelivered;
+
+  const bucket = (upcoming: boolean, delivered: boolean) => {
+    if (upcoming) return 0;
+    if (!delivered) return 1;
+    return 2;
+  };
+
+  const bucketDiff = bucket(aUpcoming, aDelivered) - bucket(bUpcoming, bDelivered);
+  if (bucketDiff !== 0) return bucketDiff;
+  if (aUpcoming && bUpcoming) return a.estimatedArrival - b.estimatedArrival;
+  if (aDelivered && bDelivered) return b.estimatedArrival - a.estimatedArrival;
+  return a.requestMinute - b.requestMinute || a.id.localeCompare(b.id);
 }
 
 export function ShipmentsTable({
@@ -68,6 +100,7 @@ export function ShipmentsTable({
   const [statusFilter, setStatusFilter] = useState(ANY);
   const [page, setPage] = useState(1);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [localSelectedShipmentId, setLocalSelectedShipmentId] = useState<string | null>(null);
   const [remoteShipments, setRemoteShipments] = useState<Shipment[]>([]);
   const [remoteTotal, setRemoteTotal] = useState(0);
   const [remoteTotalPages, setRemoteTotalPages] = useState(1);
@@ -75,7 +108,14 @@ export function ShipmentsTable({
   const [remoteError, setRemoteError] = useState("");
   const gmtOffset = displayGmtOffset ?? 0;
   const simulationId = data?.simulationId;
-  const useRemoteShipments = Boolean(simulationId);
+  const useRemoteShipments = Boolean(simulationId) && (data?.planningWindowMinutes ?? 0) > 2;
+  const isSelectionControlled = selectedShipmentId !== undefined;
+  const effectiveSelectedShipmentId = isSelectionControlled ? selectedShipmentId : localSelectedShipmentId;
+  const remoteSortMinute = Math.floor(simMinute / 10) * 10;
+  const flightById = useMemo(
+    () => new Map(flights.map((flight) => [flight.id, flight])),
+    [flights]
+  );
 
   const airportOptions = useMemo(() => {
     const set = new Set<string>();
@@ -92,7 +132,7 @@ export function ShipmentsTable({
   }, [flights, remoteShipments, shipments, useRemoteShipments]);
 
   const filtered = useMemo(() => {
-    let result = [...shipments].sort((a, b) => a.requestMinute - b.requestMinute);
+    let result = [...shipments].sort((a, b) => compareShipmentsByNextDelivery(a, b, simMinute));
 
     if (search.trim()) {
       const query = search.toLowerCase();
@@ -106,18 +146,15 @@ export function ShipmentsTable({
       );
     }
 
-    if (originAirport !== ANY) result = result.filter((shipment) => shipment.origin === originAirport);
-    if (destinationAirport !== ANY) {
-      result = result.filter((shipment) => shipment.destination === destinationAirport);
+    if (originAirport !== ANY || destinationAirport !== ANY) {
+      result = result.filter((shipment) =>
+        matchesAirportFilters(shipment, originAirport, destinationAirport, flightById)
+      );
     }
 
     if (statusFilter !== ANY) {
       result = result.filter((shipment) => {
-        const absoluteDepartureMinute = getFirstFlightDepartureMinute(
-          shipment.flightIds,
-          shipment.requestMinute
-        );
-        const shipmentStatus = getShipmentStatus(shipment, simMinute, absoluteDepartureMinute);
+        const shipmentStatus = getShipmentStatus(shipment, simMinute, flightById);
         if (statusFilter === "in-progress") return shipmentStatus === "En curso";
         if (statusFilter === "delivered") return shipmentStatus === "Entregado";
         if (statusFilter === "planned") return shipmentStatus === "Planeado";
@@ -127,10 +164,10 @@ export function ShipmentsTable({
     }
 
     return result;
-  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute]);
+  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute, flightById]);
 
   useEffect(() => {
-    if (!simulationId) {
+    if (!useRemoteShipments || !simulationId) {
       setRemoteShipments([]);
       setRemoteTotal(0);
       setRemoteTotalPages(1);
@@ -146,6 +183,7 @@ export function ShipmentsTable({
     void getBatchShipmentsPageRequest(simulationId, {
       page,
       pageSize: PAGE_SIZE,
+      currentMinute: remoteSortMinute,
       search,
       origin: originAirport !== ANY ? originAirport : undefined,
       destination: destinationAirport !== ANY ? destinationAirport : undefined,
@@ -172,7 +210,7 @@ export function ShipmentsTable({
     return () => {
       cancelled = true;
     };
-  }, [destinationAirport, originAirport, page, search, simulationId, statusFilter]);
+  }, [destinationAirport, originAirport, page, remoteSortMinute, search, simulationId, statusFilter, useRemoteShipments]);
 
   const totalPages = useRemoteShipments
     ? remoteTotalPages
@@ -190,8 +228,21 @@ export function ShipmentsTable({
     destinationAirport !== ANY ||
     statusFilter !== ANY;
 
-  const handleSelectShipment = (shipment: Shipment) => {
+  const toggleSelectShipment = (shipment: Shipment) => {
+    const nextSelected = effectiveSelectedShipmentId === shipment.id ? null : shipment.id;
+    if (!isSelectionControlled) setLocalSelectedShipmentId(nextSelected);
+    onSelectShipment?.(shipment);
+  };
+
+  const openShipmentRoute = (shipment: Shipment) => {
+    if (!isSelectionControlled) setLocalSelectedShipmentId(shipment.id);
+    if (effectiveSelectedShipmentId !== shipment.id) onSelectShipment?.(shipment);
     setSelectedShipment(shipment);
+  };
+
+  const clearSelectedShipment = (shipment: Shipment) => {
+    if (!isSelectionControlled) setLocalSelectedShipmentId(null);
+    setSelectedShipment(null);
     onSelectShipment?.(shipment);
   };
 
@@ -286,11 +337,7 @@ export function ShipmentsTable({
         ) : (
           paginatedItems.map((shipment) => {
             const status = !shipment.planned ? "red" : shipment.onTime ? "green" : "yellow";
-            const absoluteDepartureMinute = getFirstFlightDepartureMinute(
-              shipment.flightIds,
-              shipment.requestMinute
-            );
-            const shipmentState = getShipmentStatus(shipment, simMinute, absoluteDepartureMinute);
+            const shipmentState = getShipmentStatus(shipment, simMinute, flightById);
             const statusColor =
               shipmentState === "Entregado"
                 ? "#2f855a"
@@ -302,29 +349,51 @@ export function ShipmentsTable({
             const arrivalLabel = shipment.planned
               ? formatSimMinute(shipment.estimatedArrival, gmtOffset)
               : "pendiente";
-            const isSelected = selectedShipmentId === shipment.id;
+            const isSelected = effectiveSelectedShipmentId === shipment.id;
 
             return (
-              <div className={`row ${isSelected ? "selected" : ""}`} key={`${shipment.id}-${shipment.requestMinute}`}>
-                <span className={`dot ${status}`}></span>
-                <div className="row-main">
-                  <strong>{shipment.id}</strong>
-                  <span>{`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas`}</span>
-                  <span>{`Pedido: ${formatSimMinute(shipment.requestMinute, gmtOffset)} - Llegada: ${arrivalLabel}`}</span>
-                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem", flexWrap: "wrap" }}>
+              <Fragment key={`${shipment.id}-${shipment.requestMinute}`}>
+                <div
+                  className={`row ${isSelected ? "selected" : ""}`}
+                  onClick={() => toggleSelectShipment(shipment)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <span className={`dot ${status}`}></span>
+                  <div className="row-main">
+                    <strong>{shipment.id}</strong>
+                    <span>{`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas`}</span>
+                    <span>{`Pedido: ${formatSimMinute(shipment.requestMinute, gmtOffset)} - Llegada: ${arrivalLabel}`}</span>
+                  </div>
+                  <span className="capacity-pill" style={{ background: statusColor, color: "#fff" }}>
+                    {shipmentState}
+                  </span>
+                </div>
+                {isSelected && (
+                  <div className="table-action-bar" aria-label={`Acciones del envío ${shipment.id}`}>
                     <button
                       type="button"
-                      onClick={() => handleSelectShipment(shipment)}
-                      style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem", background: "#4a5568", color: "#fff", border: "none", borderRadius: "4px" }}
+                      className="table-action-button"
+                      onClick={() => openShipmentRoute(shipment)}
                     >
-                      Ver ruta ({shipment.flightIds.length})
+                      Ver ruta
                     </button>
-                    <span className="capacity-pill" style={{ background: statusColor, color: "#fff" }}>
-                      {shipmentState}
-                    </span>
+                    <button
+                      type="button"
+                      className="table-action-button"
+                      onClick={() => openShipmentRoute(shipment)}
+                    >
+                      Ver escalas
+                    </button>
+                    <button
+                      type="button"
+                      className="table-action-button table-action-button-ghost"
+                      onClick={() => clearSelectedShipment(shipment)}
+                    >
+                      Quitar selección
+                    </button>
                   </div>
-                </div>
-              </div>
+                )}
+              </Fragment>
             );
           })
         )}

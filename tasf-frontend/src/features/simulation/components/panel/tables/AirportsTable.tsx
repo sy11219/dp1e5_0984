@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Airport, AirportLoads, CapacityStatus, Flight, Shipment } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
-import { getShipmentsForAirport, getFlightsForAirport, getNextFlightByAirport } from "../../../utils/airportRelations";
+import { getFlightsForAirport, getNextFlightByAirport, getShipmentsForAirport } from "../../../utils/airportRelations";
 import { AirportDataTable } from "./AirportDataTable";
 
 interface AirportsTableProps {
@@ -39,15 +39,14 @@ export function AirportsTable({
   const [localSelectedAirport, setLocalSelectedAirport] = useState<string | null>(null);
   const [expandedAirportCode, setExpandedAirportCode] = useState<string | null>(null);
   const [expandedView, setExpandedView] = useState<ViewType | null>(null);
-  const [selectorOpen, setSelectorOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const selectorRef = useRef<HTMLDivElement>(null);
   const colorFilter = colorFilterProp ?? localColorFilter;
   const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
+  const isSelectionControlled = selectedAirportProp !== undefined;
 
   const continents = useMemo(
-    () => Array.from(new Set(airports.map((a) => a.continent))),
+    () => Array.from(new Set(airports.map((airport) => airport.continent))).filter(Boolean),
     [airports]
   );
 
@@ -72,21 +71,21 @@ export function AirportsTable({
     if (search.trim()) {
       const query = search.toLowerCase();
       result = result.filter(
-        (a) =>
-          a.code.toLowerCase().includes(query) ||
-          a.continent.toLowerCase().includes(query) ||
-          a.city.toLowerCase().includes(query)
+        (airport) =>
+          airport.code.toLowerCase().includes(query) ||
+          airport.continent.toLowerCase().includes(query) ||
+          airport.city.toLowerCase().includes(query)
       );
     }
 
     if (continentFilter !== "Cualquiera") {
-      result = result.filter((a) => a.continent === continentFilter);
+      result = result.filter((airport) => airport.continent === continentFilter);
     }
 
     if (colorFilter !== "Todos") {
-      result = result.filter((a) => {
-        const load = loads[a.code] || 0;
-        const utilization = a.maxCapacity ? load / a.maxCapacity : 0;
+      result = result.filter((airport) => {
+        const load = loads[airport.code] || 0;
+        const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
         return capacityStatus(utilization) === colorFilter;
       });
     }
@@ -99,31 +98,17 @@ export function AirportsTable({
         return (aUtil - bUtil) * direction;
       }
 
-      if (sortBy === "nextFlight") {
-        const aNext = nextFlightByAirport.get(a.code);
-        const bNext = nextFlightByAirport.get(b.code);
-        const aTime = aNext?.time ?? Infinity;
-        const bTime = bNext?.time ?? Infinity;
-        return (aTime - bTime) * direction;
-      }
-
-      return 0;
+      const aNext = nextFlightByAirport.get(a.code);
+      const bNext = nextFlightByAirport.get(b.code);
+      const aTime = aNext?.time ?? Infinity;
+      const bTime = bNext?.time ?? Infinity;
+      return (aTime - bTime) * direction;
     });
 
     return result;
-  }, [search, continentFilter, colorFilter, airports, loads, sortBy, sortOrder, nextFlightByAirport]);
+  }, [airports, colorFilter, continentFilter, loads, nextFlightByAirport, search, sortBy, sortOrder]);
 
   const visible = filtered.slice(0, 10);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
-        setSelectorOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     if (!expandedView) return;
@@ -145,6 +130,11 @@ export function AirportsTable({
   if (!airports.length) {
     return <div className="empty-state">No hay aeropuertos activos.</div>;
   }
+
+  const selectAirport = (code: string, isSelected: boolean) => {
+    if (!isSelectionControlled) setLocalSelectedAirport(isSelected ? null : code);
+    onSelectAirport?.(code);
+  };
 
   return (
     <div className="airports-table" ref={containerRef}>
@@ -181,7 +171,7 @@ export function AirportsTable({
               type="text"
               placeholder="Buscar..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               style={{ width: "100%" }}
             />
           </div>
@@ -191,12 +181,12 @@ export function AirportsTable({
               Continente:
               <select
                 value={continentFilter}
-                onChange={(e) => setContinentFilter(e.target.value)}
+                onChange={(event) => setContinentFilter(event.target.value)}
               >
                 <option value="Cualquiera">Cualquiera</option>
-                {continents.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {continents.map((continent) => (
+                  <option key={continent} value={continent}>
+                    {continent}
                   </option>
                 ))}
               </select>
@@ -208,7 +198,7 @@ export function AirportsTable({
               Ordenar por:
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "utilization" | "nextFlight")}
+                onChange={(event) => setSortBy(event.target.value as "utilization" | "nextFlight")}
               >
                 <option value="utilization">Ocupación</option>
                 <option value="nextFlight">Próximo vuelo</option>
@@ -219,7 +209,7 @@ export function AirportsTable({
               Dirección:
               <select
                 value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+                onChange={(event) => setSortOrder(event.target.value as "asc" | "desc")}
               >
                 <option value="desc">Descendente</option>
                 <option value="asc">Ascendente</option>
@@ -230,12 +220,13 @@ export function AirportsTable({
               Color:
               <select
                 value={colorFilter}
-                onChange={(e) => setColorFilter(e.target.value as ColorFilter)}
+                onChange={(event) => setColorFilter(event.target.value as ColorFilter)}
               >
                 <option value="Todos">Todos</option>
                 <option value="green">Verde</option>
                 <option value="yellow">Amarillo</option>
                 <option value="red">Rojo</option>
+                <option value="gray">Gris</option>
               </select>
             </label>
           </div>
@@ -248,151 +239,67 @@ export function AirportsTable({
                 const load = loads[airport.code] || 0;
                 const utilization = airport.maxCapacity ? load / airport.maxCapacity : 0;
                 const status = capacityStatus(utilization);
-                const currentSelectedAirport = selectedAirportProp ?? localSelectedAirport;
+                const currentSelectedAirport = isSelectionControlled ? selectedAirportProp : localSelectedAirport;
                 const isSelected = currentSelectedAirport === airport.code;
 
                 return (
-                  <div
-                    className={`row ${isSelected ? "selected" : ""}`}
-                    key={airport.code}
-                    onClick={() => {
-                      setLocalSelectedAirport(isSelected ? null : airport.code);
-                      onSelectAirport?.(airport.code);
-                    }}
-                    style={{ cursor: "pointer", position: "relative" }}
-                  >
-                    <span className={`dot ${status}`}></span>
-                    <div className="row-main">
-                      <strong>{`${airport.code} - ${airport.city}`}</strong>
-                      <span>{`${load}/${airport.maxCapacity} maletas - ${airport.continent}`}</span>
+                  <Fragment key={airport.code}>
+                    <div
+                      className={`row ${isSelected ? "selected" : ""}`}
+                      onClick={() => selectAirport(airport.code, isSelected)}
+                      style={{ cursor: "pointer", position: "relative" }}
+                    >
+                      <span className={`dot ${status}`}></span>
+                      <div className="row-main">
+                        <strong>{`${airport.code} - ${airport.city}`}</strong>
+                        <span>{`${load}/${airport.maxCapacity} maletas - ${airport.continent}`}</span>
+                      </div>
+                      <span className="capacity-pill" style={{ background: STATUS_COLOR[status] }}>
+                        {`${Math.round(utilization * 100)}%`}
+                      </span>
                     </div>
-                    <span className="capacity-pill" style={{ background: STATUS_COLOR[status], position: "relative" }}>
-                      <span style={{ marginRight: 8 }}>{`${Math.round(utilization * 100)}%`}</span>
-                      <button
-                        aria-label={`Ver opciones ${airport.code}`}
-                        className="flights-trigger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (expandedAirportCode === airport.code) {
-                            setSelectorOpen(!selectorOpen);
-                          } else {
+                    {isSelected && (
+                      <div className="table-action-bar" aria-label={`Acciones de ${airport.code}`}>
+                        <button
+                          type="button"
+                          className="table-action-button"
+                          onClick={() => {
                             setExpandedAirportCode(airport.code);
-                            setSelectorOpen(true);
-                          }
-                        }}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "inherit",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                          padding: 0,
-                        }}
-                      >
-                        &gt;
-                      </button>
-
-                      {selectorOpen && expandedAirportCode === airport.code && (
-                        <div
-                          ref={selectorRef}
-                          style={{
-                            position: "absolute",
-                            right: 0,
-                            top: "calc(100% + 4px)",
-                            background: "white",
-                            border: "1px solid #cbd5e0",
-                            borderRadius: 6,
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                            zIndex: 1000,
-                            minWidth: 180,
-                            overflow: "visible",
+                            setExpandedView("incoming");
                           }}
-                          onClick={(e) => e.stopPropagation()}
                         >
-                          <button
-                            onClick={() => {
-                              setExpandedView("incoming");
-                              setSelectorOpen(false);
-                            }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 16px",
-                              background: "transparent",
-                              border: "none",
-                              borderBottom: "1px solid #e2e8f0",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              fontSize: 14,
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#f7fafc";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                            }}
-                          >
-                            Vuelos entrantes
-                          </button>
-                          <button
-                            onClick={() => {
-                              setExpandedView("outgoing");
-                              setSelectorOpen(false);
-                            }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 16px",
-                              background: "transparent",
-                              border: "none",
-                              borderBottom: "1px solid #e2e8f0",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              fontSize: 14,
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#f7fafc";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                            }}
-                          >
-                            Vuelos salientes
-                          </button>
-                          <button
-                            onClick={() => {
-                              setExpandedView("shipments");
-                              setSelectorOpen(false);
-                            }}
-                            style={{
-                              display: "block",
-                              width: "100%",
-                              padding: "10px 16px",
-                              background: "transparent",
-                              border: "none",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              fontSize: 14,
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "#f7fafc";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                            }}
-                          >
-                            Envíos
-                          </button>
-                        </div>
-                      )}
-                    </span>
-                  </div>
+                          Vuelos entrantes
+                        </button>
+                        <button
+                          type="button"
+                          className="table-action-button"
+                          onClick={() => {
+                            setExpandedAirportCode(airport.code);
+                            setExpandedView("outgoing");
+                          }}
+                        >
+                          Vuelos salientes
+                        </button>
+                        <button
+                          type="button"
+                          className="table-action-button"
+                          onClick={() => {
+                            setExpandedAirportCode(airport.code);
+                            setExpandedView("shipments");
+                          }}
+                        >
+                          Envíos
+                        </button>
+                        <button
+                          type="button"
+                          className="table-action-button table-action-button-ghost"
+                          onClick={() => selectAirport(airport.code, true)}
+                        >
+                          Quitar selección
+                        </button>
+                      </div>
+                    )}
+                  </Fragment>
                 );
               })
             )}

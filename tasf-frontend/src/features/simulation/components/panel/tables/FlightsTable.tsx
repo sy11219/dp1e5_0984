@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { formatFlightMoment } from "../../../utils/formatters";
@@ -46,9 +46,9 @@ export function FlightsTable({
   const colorFilter = colorFilterProp ?? localColorFilter;
   const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
 
-  const origins = useMemo(() => Array.from(new Set(flights.map((f) => f.origin))), [flights]);
+  const origins = useMemo(() => Array.from(new Set(flights.map((flight) => flight.origin))), [flights]);
   const destinations = useMemo(
-    () => Array.from(new Set(flights.map((f) => f.destination))),
+    () => Array.from(new Set(flights.map((flight) => flight.destination))),
     [flights]
   );
 
@@ -80,34 +80,34 @@ export function FlightsTable({
     if (search.trim()) {
       const query = search.toLowerCase();
       result = result.filter(
-        (f) =>
-          f.id.toLowerCase().includes(query) ||
-          f.origin.toLowerCase().includes(query) ||
-          f.destination.toLowerCase().includes(query)
+        (flight) =>
+          flight.id.toLowerCase().includes(query) ||
+          flight.origin.toLowerCase().includes(query) ||
+          flight.destination.toLowerCase().includes(query)
       );
     }
 
     if (originFilter !== "Cualquiera") {
-      result = result.filter((f) => f.origin === originFilter);
+      result = result.filter((flight) => flight.origin === originFilter);
     }
 
     if (destinationFilter !== "Cualquiera") {
-      result = result.filter((f) => f.destination === destinationFilter);
+      result = result.filter((flight) => flight.destination === destinationFilter);
     }
 
     if (statusFilter === "Activos") {
-      result = result.filter((f) => activeFlightIds.has(f.id));
+      result = result.filter((flight) => activeFlightIds.has(flight.id));
     } else if (statusFilter === "Inactivos") {
-      result = result.filter((f) => !activeFlightIds.has(f.id));
+      result = result.filter((flight) => !activeFlightIds.has(flight.id));
     }
 
     if (colorFilter !== "Todos") {
-      result = result.filter((f) => {
-        const perc = f.utilization;
-        if (colorFilter === "green") return perc > 0 && perc < 0.7;
-        if (colorFilter === "yellow") return perc >= 0.7 && perc < 0.9;
-        if (colorFilter === "red") return perc >= 0.9;
-        if (colorFilter === "gray") return perc <= 0.001;
+      result = result.filter((flight) => {
+        const utilization = flight.utilization;
+        if (colorFilter === "green") return utilization > 0 && utilization < 0.7;
+        if (colorFilter === "yellow") return utilization >= 0.7 && utilization < 0.9;
+        if (colorFilter === "red") return utilization >= 0.9;
+        if (colorFilter === "gray") return utilization <= 0.001;
         return false;
       });
     }
@@ -129,7 +129,7 @@ export function FlightsTable({
     });
 
     return result;
-  }, [flights, search, originFilter, destinationFilter, statusFilter, colorFilter, sortBy, sortOrder, activeFlightIds]);
+  }, [activeFlightIds, colorFilter, destinationFilter, flights, originFilter, search, sortBy, sortOrder, statusFilter]);
 
   const visibleFlights = useMemo(() => {
     const base = filteredAndSortedFlights.slice(0, 10);
@@ -176,8 +176,6 @@ export function FlightsTable({
     );
   }
 
-
-
   return (
     <div className="flights-table">
       <div className="search-bar" style={{ marginBottom: "0.5rem" }}>
@@ -185,7 +183,7 @@ export function FlightsTable({
           type="text"
           placeholder="Buscar..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
           style={{ width: "100%" }}
         />
       </div>
@@ -193,7 +191,7 @@ export function FlightsTable({
       <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Estado:
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "Todos" | "Activos" | "Inactivos")}>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Todos" | "Activos" | "Inactivos")}>
             <option value="Todos">Todos</option>
             <option value="Activos">Activos</option>
             <option value="Inactivos">Inactivos</option>
@@ -202,11 +200,11 @@ export function FlightsTable({
 
         <label className="text-sm">
           Origen:
-          <select value={originFilter} onChange={(e) => setOriginFilter(e.target.value)}>
+          <select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
-            {origins.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {origins.map((origin) => (
+              <option key={origin} value={origin}>
+                {origin}
               </option>
             ))}
           </select>
@@ -214,11 +212,11 @@ export function FlightsTable({
 
         <label className="text-sm">
           Destino:
-          <select value={destinationFilter} onChange={(e) => setDestinationFilter(e.target.value)}>
+          <select value={destinationFilter} onChange={(event) => setDestinationFilter(event.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
-            {destinations.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            {destinations.map((destination) => (
+              <option key={destination} value={destination}>
+                {destination}
               </option>
             ))}
           </select>
@@ -228,7 +226,7 @@ export function FlightsTable({
       <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Ordenar por:
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}>
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}>
             <option value="utilization">Ocupación</option>
             <option value="departureMinute">Hora de salida</option>
             <option value="arrivalMinute">Hora de llegada</option>
@@ -240,8 +238,7 @@ export function FlightsTable({
         <div className="flex items-center gap-2">
           <label className="text-sm">
             Dirección:
-            <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-              >
+            <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "asc" | "desc")}>
               <option value="asc">Ascendente</option>
               <option value="desc">Descendente</option>
             </select>
@@ -249,7 +246,7 @@ export function FlightsTable({
           {!hideColorFilter && (
             <label className="text-sm">
               Color:
-              <select value={colorFilter} onChange={(e) => setColorFilter(e.target.value as ColorFilter)}>
+              <select value={colorFilter} onChange={(event) => setColorFilter(event.target.value as ColorFilter)}>
                 <option value="Todos">Todos</option>
                 <option value="green">Verde</option>
                 <option value="yellow">Amarillo</option>
@@ -268,73 +265,71 @@ export function FlightsTable({
           visibleFlights.map((flight) => {
             const active = activeFlightIds.has(flight.id);
             const relatedCount = relatedShipmentCounts.get(flight.id) ?? 0;
+            const isSelected = selectedFlightId === flight.id;
 
             return (
-              <div
-                className={[
-                  "row",
-                  !active ? "row-inactive" : "",
-                  selectedFlightId === flight.id ? "selected" : "",
-                ].filter(Boolean).join(" ")}
-                key={flight.id}
-                onClick={() => onSelectFlight?.(flight.id)}
-                style={{
-                  opacity: active ? 1 : 0.6,
-                  cursor: onSelectFlight ? "pointer" : undefined,
-                }}
-              >
-                <span className={`dot ${flight.status}`}></span>
-                <div className="row-main flight-route-main">
-                  <div className="flight-route-point">
-                    <strong>{flight.origin}</strong>
-                    <span>{formatFlightMoment(flightMomentData, flight.absoluteDepartureMinute, displayGmtOffset)}</span>
-                  </div>
-                  <span className="flight-route-arrow">-&gt;</span>
-                  <div className="flight-route-point">
-                    <strong>{flight.destination}</strong>
-                    <span>{formatFlightMoment(flightMomentData, flight.absoluteArrivalMinute, displayGmtOffset)}</span>
-                  </div>
-                </div>
-                <span
-                  className="capacity-pill"
+              <Fragment key={flight.id}>
+                <div
+                  className={[
+                    "row",
+                    !active ? "row-inactive" : "",
+                    isSelected ? "selected" : "",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => onSelectFlight?.(flight.id)}
                   style={{
-                    background: STATUS_COLOR[flight.status],
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                    padding: "0.2rem 0.5rem",
-                    minWidth: "auto",
-                    whiteSpace: "nowrap",
+                    opacity: active ? 1 : 0.6,
+                    cursor: onSelectFlight ? "pointer" : undefined,
                   }}
                 >
-                  {active
-                    ? `${Math.round(flight.utilization * 100)}%`
-                    : "Inactivo"
-                  }
-                  {relatedCount > 0 && (
+                  <span className={`dot ${flight.status}`}></span>
+                  <div className="row-main flight-route-main">
+                    <div className="flight-route-point">
+                      <strong>{flight.origin}</strong>
+                      <span>{formatFlightMoment(flightMomentData, flight.absoluteDepartureMinute, displayGmtOffset)}</span>
+                    </div>
+                    <span className="flight-route-arrow">-&gt;</span>
+                    <div className="flight-route-point">
+                      <strong>{flight.destination}</strong>
+                      <span>{formatFlightMoment(flightMomentData, flight.absoluteArrivalMinute, displayGmtOffset)}</span>
+                    </div>
+                  </div>
+                  <span
+                    className="capacity-pill"
+                    style={{
+                      background: STATUS_COLOR[flight.status],
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "0.2rem 0.5rem",
+                      minWidth: "auto",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {active ? `${Math.round(flight.utilization * 100)}%` : "Inactivo"}
+                  </span>
+                </div>
+                {isSelected && (
+                  <div className="table-action-bar" aria-label={`Acciones del vuelo ${flight.id}`}>
                     <button
                       type="button"
-                      aria-label={`Ver envíos del vuelo ${flight.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      className="table-action-button"
+                      disabled={relatedCount === 0}
+                      onClick={() => {
                         setSelectedFlightShipments(flight);
                         setViewMode("flight-shipments");
                       }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "inherit",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
                     >
-                      &gt;
+                      {relatedCount > 0 ? `Ver envíos (${relatedCount})` : "Sin envíos"}
                     </button>
-                  )}
-                </span>
-              </div>
+                    <button
+                      type="button"
+                      className="table-action-button table-action-button-ghost"
+                      onClick={() => onSelectFlight?.(flight.id)}
+                    >
+                      Quitar selección
+                    </button>
+                  </div>
+                )}
+              </Fragment>
             );
           })
         )}
