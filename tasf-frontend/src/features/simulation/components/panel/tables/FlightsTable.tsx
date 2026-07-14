@@ -35,7 +35,7 @@ export function FlightsTable({
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
   const [destinationFilter, setDestinationFilter] = useState("Cualquiera");
-  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activos" | "Inactivos">("Todos");
+  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activos" | "No iniciados">("Todos");
   const [localColorFilter, setLocalColorFilter] = useState<ColorFilter>("Todos");
   const [sortBy, setSortBy] = useState<
     "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination"
@@ -163,7 +163,7 @@ export function FlightsTable({
 
     if (statusFilter === "Activos") {
       result = result.filter((flight) => activeFlightIds.has(flight.id));
-    } else if (statusFilter === "Inactivos") {
+    } else if (statusFilter === "No iniciados") {
       result = result.filter((flight) => !activeFlightIds.has(flight.id));
     }
 
@@ -263,10 +263,10 @@ export function FlightsTable({
       <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Estado:
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Todos" | "Activos" | "Inactivos")}>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Todos" | "Activos" | "No iniciados")}>
             <option value="Todos">Todos</option>
             <option value="Activos">Activos</option>
-            <option value="Inactivos">Inactivos</option>
+            <option value="No iniciados">No iniciados</option>
           </select>
         </label>
 
@@ -395,7 +395,7 @@ export function FlightsTable({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {active ? `${Math.round(flight.utilization * 100)}%` : "Inactivo"}
+                    {active ? `${Math.round(flight.utilization * 100)}%` : "No iniciado"}
                   </span>
                 </div>
                 {isSelected && (
