@@ -447,11 +447,24 @@ public class RealtimeSimulationService {
                 .thenComparing(Flight::getFlightId));
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
-        int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
         int simulationEndMinute = startOffsetMinutes + days * 1440;
-        List<Shipment> shipments = "SIMULACION_LOTES".equals(scenario)
-                ? shipmentParser.parseAll("data/envios", startDate, shipmentDaysToLoad)
-                : shipmentParser.parseAllFromDatabase(startDate, shipmentDaysToLoad, sessionZone);
+        List<Shipment> shipments;
+
+        if (days <= 5) {
+            // Escenario original: carga completa (5 días)
+            int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
+            shipments = "SIMULACION_LOTES".equals(scenario)
+                    ? shipmentParser.parseAll("data/envios", startDate, shipmentDaysToLoad)
+                    : shipmentParser.parseAllFromDatabase(startDate, shipmentDaysToLoad, sessionZone);
+        } else {
+            // Escenario largo (> 5 días): carga inicial limitada a 5 días
+            int windowDays = 5;
+            int windowEndMinute = startOffsetMinutes + (windowDays * 1440);
+            shipments = "SIMULACION_LOTES".equals(scenario)
+                    ? shipmentParser.parseShipmentsInWindow("data/envios", startDate, startOffsetMinutes, windowEndMinute, sessionZone)
+                    : shipmentParser.parseShipmentsInWindow(startDate, startOffsetMinutes, windowEndMinute, sessionZone);
+        }
+
         shipments.removeIf(s -> s.getRequestMinute() < startOffsetMinutes
                 || s.getRequestMinute() >= simulationEndMinute);
         shipments.sort(Comparator.comparingInt(Shipment::getRequestMinute));

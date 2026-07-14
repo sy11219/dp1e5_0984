@@ -23,7 +23,7 @@ import { SimulationStatusCards } from "../../simulation/components/general/Topba
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay"
 import { useSimulationPlayer } from "../../simulation/hooks/useSimulationPlayer"
 import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../../simulation/types"
-import { DEFAULT_START_DATE, DEFAULT_START_TIME } from "../../simulation/utils/constants" // Quitamos SIMULATION_DAYS
+import { DEFAULT_START_DATE, DEFAULT_START_TIME } from "../../simulation/utils/constants"
 import { capacityStatus, computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../../simulation/utils/calculations"
 import { SimulationResultModal } from "../../simulation/components/general/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage"
@@ -166,7 +166,7 @@ export function CollapsePage() {
   const [startDate, setStartDate] = useState(DEFAULT_START_DATE)
   const [startTime, setStartTime] = useState(DEFAULT_START_TIME)
   
-  const [days] = useState(5) 
+  const [days] = useState(1100) 
   
   const [data, setData] = useState<SimulationData | null>(null)
   const [airportCatalog, setAirportCatalog] = useState<Airport[]>([])

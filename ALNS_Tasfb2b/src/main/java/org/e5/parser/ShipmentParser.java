@@ -415,6 +415,157 @@ public class ShipmentParser {
         return defaultValue;
     }
 
+    /**
+     * Carga envíos solo dentro de una ventana de minutos específica desde la BD.
+     * Evita cargar meses de datos en memoria cuando la simulación es larga (> 5 días).
+     */
+    public List<Shipment> parseShipmentsInWindow(
+            String simulationStartDate,
+            int startMinute,
+            int endMinute,
+            ZoneId simulationZone
+    ) throws IOException {
+        if (simulationStartDate == null || !simulationStartDate.matches("\\d{8}")) {
+            throw new IOException("La fecha inicial debe tener formato aaaammdd.");
+        }
+        if (startMinute < 0 || endMinute <= startMinute) {
+            throw new IOException("Rango de minutos inválido.");
+        }
 
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
+        ZoneId zone = simulationZone == null ? ZoneOffset.UTC : simulationZone;
+
+        Instant startInstant = startDate.atStartOfDay(zone).plusMinutes(startMinute).toInstant();
+        Instant endInstant = startDate.atStartOfDay(zone).plusMinutes(endMinute).toInstant();
+        Instant absoluteStartInstant = startDate.atStartOfDay(zone).toInstant();
+
+        List<Shipment> shipments = new ArrayList<>();
+        try (Connection connection = openConnection()) {
+            boolean hasClientId = columnExists(connection, "shipments", "client_id");
+            String clientColumn = hasClientId ? "s.client_id AS client_id," : "NULL AS client_id,";
+
+            String sql = """
+                SELECT s.shipment_code,
+                %s
+                oa.code AS origin_code,
+                da.code AS destination_code,
+                s.baggage_count,
+                s.registered_at
+                FROM shipments s
+                JOIN airports oa ON oa.id = s.origin_airport_id
+                JOIN airports da ON da.id = s.destination_airport_id
+                WHERE s.registered_at >= ?
+                AND s.registered_at < ?
+                AND (s.status IS NULL OR UPPER(s.status) <> 'CANCELED')
+                ORDER BY s.registered_at, s.shipment_code
+                """.formatted(clientColumn);
+
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC));
+                statement.setObject(2, OffsetDateTime.ofInstant(endInstant, ZoneOffset.UTC));
+
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        Timestamp registeredTimestamp = result.getTimestamp("registered_at");
+                        if (registeredTimestamp == null) continue;
+
+                        Instant registeredInstant = registeredTimestamp.toInstant();
+                        int requestMinute = (int) Duration.between(absoluteStartInstant, registeredInstant).toMinutes();
+
+                        if (requestMinute < startMinute || requestMinute >= endMinute) continue;
+
+                        String originCode = result.getString("origin_code");
+                        OffsetDateTime originLocalTime = registeredInstant.atOffset(ZoneOffset.UTC)
+                                .withOffsetSameInstant(originOffset(originCode));
+                        String clientId = result.getString("client_id");
+
+                        shipments.add(new Shipment(
+                                result.getString("shipment_code"),
+                                originCode,
+                                result.getString("destination_code"),
+                                requestMinute,
+                                result.getInt("baggage_count"),
+                                clientId == null ? "" : clientId,
+                                originLocalTime.format(RAW_DATE),
+                                twoDigits(originLocalTime.getHour()),
+                                twoDigits(originLocalTime.getMinute())
+                        ));
+                    }
+                }
+            }
+        } catch (IllegalStateException | SQLException e) {
+            System.err.printf("[ShipmentParser] Error BD: %s. Fallback a TXT limitado.%n", e.getMessage());
+            return parseShipmentsInWindowTxt("data/envios", simulationStartDate, startMinute, endMinute, simulationZone);
+        }
+
+        System.out.printf("[ShipmentParser] Ventana BD [%d, %d]: %d envíos cargados.%n", startMinute, endMinute, shipments.size());
+        return shipments;
+    }
+
+    /**
+     * Fallback para cargar desde TXT con ventana de minutos.
+     */
+    public List<Shipment> parseShipmentsInWindowTxt(
+            String folderPath,
+            String simulationStartDate,
+            int startMinute,
+            int endMinute,
+            ZoneId simulationZone
+    ) throws IOException {
+        List<Shipment> allShipments = new ArrayList<>();
+        File folder = new File(folderPath);
+        if (!folder.exists() || !folder.isDirectory()) return allShipments;
+
+        File[] files = folder.listFiles();
+        if (files == null || files.length == 0) return allShipments;
+
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
+        String earliestRelevantDate = startDate.minusDays(1).format(RAW_DATE);
+        String latestExclusiveDate = startDate.plusDays((endMinute / 1440) + 2L).format(RAW_DATE);
+
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            Matcher fm = FILE_PATTERN.matcher(file.getName());
+            if (!fm.matches()) continue;
+            String airportCode = fm.group(1).toUpperCase();
+
+            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.startsWith("#") || line.startsWith("//")) continue;
+                    Matcher m = LINE_PATTERN.matcher(line);
+                    if (!m.matches()) continue;
+
+                    String date = m.group(2);
+                    if (date.compareTo(earliestRelevantDate) < 0) continue;
+                    if (date.compareTo(latestExclusiveDate) >= 0 && ASSUME_SORTED_TXT_SHIPMENTS) break;
+
+                    int requestMinute = dateTimeToSimMinutes(date, m.group(3), m.group(4), simulationStartDate, airportCode, airportMap);
+
+                    if (requestMinute >= startMinute && requestMinute < endMinute) {
+                        allShipments.add(new Shipment(
+                                airportCode + "-" + m.group(1), airportCode, m.group(5),
+                                requestMinute, Integer.parseInt(m.group(6)), m.group(7),
+                                date, m.group(3), m.group(4)
+                        ));
+                    }
+                }
+            }
+        }
+        System.out.printf("[ShipmentParser] Ventana TXT [%d, %d]: %d envíos cargados.%n", startMinute, endMinute, allShipments.size());
+        return allShipments;
+    }
+
+    // Sobrecarga para mantener compatibilidad con la llamada que incluye folderPath
+    public List<Shipment> parseShipmentsInWindow(
+            String folderPath,
+            String simulationStartDate,
+            int startMinute,
+            int endMinute,
+            ZoneId simulationZone
+    ) throws IOException {
+        return parseShipmentsInWindowTxt(folderPath, simulationStartDate, startMinute, endMinute, simulationZone);
+    }
 
 }
