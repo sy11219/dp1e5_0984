@@ -263,13 +263,13 @@ public class RealtimeSimulationService {
     }
 
     public synchronized String startBatchSimulation(String startDate, int days, String startTime,
-                                                   String timeZone) throws Exception {
+                                                    String timeZone) throws Exception {
         return startBatchSimulation(startDate, days, startTime, timeZone, "", "");
     }
 
     public synchronized String startBatchSimulation(String startDate, int days, String startTime,
-                                                   String timeZone, String clientId,
-                                                   String controlToken) throws Exception {
+                                                    String timeZone, String clientId,
+                                                    String controlToken) throws Exception {
         validate(startDate, days, true);
         RealtimeSession current = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         if (current != null && !current.completed) {
@@ -365,7 +365,7 @@ public class RealtimeSimulationService {
             if ("SIMULACION_LOTES".equals(session.scenario)) {
                 requireBatchControl(session, clientId, controlToken);
                 if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJsonForRead();
-                session.advanceBatch(BATCH_MINUTES);
+                session.advanceBatch(session.getEffectiveBatchMinutes());
             } else {
                 session.advanceRealtimeIfDue();
             }
@@ -669,6 +669,23 @@ public class RealtimeSimulationService {
             return "SIMULACION_LOTES".equals(scenario);
         }
 
+        private boolean isLongSimulation() {
+            return this.days > 5;
+        }
+
+        private int getEffectiveBatchMinutes() {
+            if (!isBatchScenario()) return REALTIME_PLANNING_WINDOW_MINUTES;
+            // Para > 5 días: cada lote es una "mini simulación de 5 días"
+            return isLongSimulation() ? (5 * 1440) : BATCH_MINUTES;
+        }
+
+        private long getEffectiveIntervalMs() {
+            if (!isBatchScenario()) return REALTIME_EXECUTION_INTERVAL_MS;
+            // Animamos 5 días de simulación en 60 segundos reales
+            return isLongSimulation() ? 120_000L : BATCH_INTERVAL_MS;
+        }
+        // ──────────────────────────────────────────────────────────────────────
+
         private static boolean isBatchScenarioName(String scenario) {
             return "SIMULACION_LOTES".equals(scenario);
         }
@@ -688,11 +705,15 @@ public class RealtimeSimulationService {
         }
 
         private int planningTimeScale() {
-            return isBatchScenario() ? SIMULATION_PLANNING_K : REALTIME_PLANNING_K;
+            return isLongSimulation()
+                    ? 3600
+                    : isBatchScenario() ? SIMULATION_PLANNING_K : REALTIME_PLANNING_K;
         }
 
         private int planningWindowMinutes() {
-            return isBatchScenario() ? BATCH_MINUTES : REALTIME_PLANNING_WINDOW_MINUTES;
+            return isLongSimulation()
+                    ? (5 * 1440)
+                    : (isBatchScenario() ? BATCH_MINUTES : REALTIME_PLANNING_WINDOW_MINUTES);
         }
 
         private boolean planningStable() {
@@ -857,101 +878,101 @@ public class RealtimeSimulationService {
 
             planningInProgress = true;
             try {
-            long batchStartMs = System.currentTimeMillis();
-            int batchStart = tick;
-            int batchEnd   = Math.min(tick + steps, maxTick);
-            lastBatchStart = batchStart;
-            lastBatchEnd   = batchEnd;
-            applyQueuedCancellationRequests();
+                long batchStartMs = System.currentTimeMillis();
+                int batchStart = tick;
+                int batchEnd   = Math.min(tick + steps, maxTick);
+                lastBatchStart = batchStart;
+                lastBatchEnd   = batchEnd;
+                applyQueuedCancellationRequests();
 
-            // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
-            List<Shipment> nuevosShipments = new ArrayList<>();
-            for (int min = batchStart; min < batchEnd; min++) {
-                List<Shipment> en = shipmentsByMinute.getOrDefault(min, Collections.emptyList());
-                nuevosShipments.addAll(en);
-            }
-            List<Shipment> backlogDisponible = new ArrayList<>(batchPlanningBacklog);
-            int backlogEntrante = backlogDisponible.size();
-            Map<String, Double> prioridadOrigen =
-                    calcularPrioridadPreventivaOrigen(nuevosShipments, backlogDisponible, batchStart);
-            List<Shipment> backlogSeleccionado =
-                    seleccionarBacklogPreventivo(backlogDisponible, batchStart, prioridadOrigen);
-            batchPlanningBacklog.clear();
-            batchPlanningBacklogIds.clear();
-            Set<String> backlogSeleccionadoIds = new HashSet<>();
-            for (Shipment shipment : backlogSeleccionado) {
-                backlogSeleccionadoIds.add(shipment.getShipmentId());
-            }
-            for (Shipment shipment : backlogDisponible) {
-                if (!backlogSeleccionadoIds.contains(shipment.getShipmentId())) {
-                    reencolarBacklogBatch(shipment);
+                // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
+                List<Shipment> nuevosShipments = new ArrayList<>();
+                for (int min = batchStart; min < batchEnd; min++) {
+                    List<Shipment> en = shipmentsByMinute.getOrDefault(min, Collections.emptyList());
+                    nuevosShipments.addAll(en);
                 }
-            }
-            List<Shipment> loteShipments = new ArrayList<>(backlogSeleccionado);
-            loteShipments.addAll(nuevosShipments);
+                List<Shipment> backlogDisponible = new ArrayList<>(batchPlanningBacklog);
+                int backlogEntrante = backlogDisponible.size();
+                Map<String, Double> prioridadOrigen =
+                        calcularPrioridadPreventivaOrigen(nuevosShipments, backlogDisponible, batchStart);
+                List<Shipment> backlogSeleccionado =
+                        seleccionarBacklogPreventivo(backlogDisponible, batchStart, prioridadOrigen);
+                batchPlanningBacklog.clear();
+                batchPlanningBacklogIds.clear();
+                Set<String> backlogSeleccionadoIds = new HashSet<>();
+                for (Shipment shipment : backlogSeleccionado) {
+                    backlogSeleccionadoIds.add(shipment.getShipmentId());
+                }
+                for (Shipment shipment : backlogDisponible) {
+                    if (!backlogSeleccionadoIds.contains(shipment.getShipmentId())) {
+                        reencolarBacklogBatch(shipment);
+                    }
+                }
+                List<Shipment> loteShipments = new ArrayList<>(backlogSeleccionado);
+                loteShipments.addAll(nuevosShipments);
 
-            // 2. Vuelos disponibles: no cancelados y que aún no han despegado
-            int routeSearchHorizon = Math.min(planningMaxTick, batchEnd + MAX_DELIVERY_DEADLINE_MINUTES);
-            List<Flight> vuelosDisponibles = availableFlightsFrom(batchStart, routeSearchHorizon);
+                // 2. Vuelos disponibles: no cancelados y que aún no han despegado
+                int routeSearchHorizon = Math.min(planningMaxTick, batchEnd + MAX_DELIVERY_DEADLINE_MINUTES);
+                List<Flight> vuelosDisponibles = availableFlightsFrom(batchStart, routeSearchHorizon);
 
-            System.out.printf("[Lote] Ventana %d–%d | %d envíos | %d vuelos disponibles%n",
-                    batchStart, batchEnd, loteShipments.size(), vuelosDisponibles.size());
+                System.out.printf("[Lote] Ventana %d–%d | %d envíos | %d vuelos disponibles%n",
+                        batchStart, batchEnd, loteShipments.size(), vuelosDisponibles.size());
 
-            System.out.printf("[Lote] Backlog preventivo: %d/%d seleccionados | origenes priorizados: %d%n",
-                    backlogSeleccionado.size(), backlogEntrante, prioridadOrigen.size());
+                System.out.printf("[Lote] Backlog preventivo: %d/%d seleccionados | origenes priorizados: %d%n",
+                        backlogSeleccionado.size(), backlogEntrante, prioridadOrigen.size());
 
-            // 3. Ejecutar ALNS incremental (conserva capacidad de lotes anteriores)
-            if (!loteShipments.isEmpty()) {
-                int n       = loteShipments.size();
-                int iters   = Math.max(BATCH_ALNS_MIN_ITERATIONS,
-                        Math.min(BATCH_ALNS_MAX_ITERATIONS, n * BATCH_ALNS_ITERATIONS_PER_SHIPMENT));
-                int seg     = Math.max(8, iters / 10);
-                int nDestr  = Math.max(3, Math.min(n / 8 + 3, BATCH_ALNS_DESTROY_CAP));
-                boolean fastMode = plannerFastMode();
+                // 3. Ejecutar ALNS incremental (conserva capacidad de lotes anteriores)
+                if (!loteShipments.isEmpty()) {
+                    int n       = loteShipments.size();
+                    int iters   = Math.max(BATCH_ALNS_MIN_ITERATIONS,
+                            Math.min(BATCH_ALNS_MAX_ITERATIONS, n * BATCH_ALNS_ITERATIONS_PER_SHIPMENT));
+                    int seg     = Math.max(8, iters / 10);
+                    int nDestr  = Math.max(3, Math.min(n / 8 + 3, BATCH_ALNS_DESTROY_CAP));
+                    boolean fastMode = plannerFastMode();
 
-                ALNS alns = new ALNS(iters, seg, nDestr, 260.0, 0.994, BATCH_ALNS_MAX_ESCALAS,
-                        9.0, 3.0, 0.0, 0.8, fastMode)
-                        .withOriginPriorities(prioridadOrigen)
-                        .withTimeBudgetMillis(BATCH_ALNS_TIME_BUDGET_MS);
+                    ALNS alns = new ALNS(iters, seg, nDestr, 260.0, 0.994, BATCH_ALNS_MAX_ESCALAS,
+                            9.0, 3.0, 0.0, 0.8, fastMode)
+                            .withOriginPriorities(prioridadOrigen)
+                            .withTimeBudgetMillis(BATCH_ALNS_TIME_BUDGET_MS);
 
-                Map<String, Route> resultado = alns.ejecutarIncremental(
-                        loteShipments, vuelosDisponibles, airportMap, todosLosShipmentsProcesados);
+                    Map<String, Route> resultado = alns.ejecutarIncremental(
+                            loteShipments, vuelosDisponibles, airportMap, todosLosShipmentsProcesados);
 
-                registrarEventosLote(loteShipments, resultado);
+                    registrarEventosLote(loteShipments, resultado);
 
-                solucionGlobal.putAll(resultado);
-                registrarBatchProcesados(loteShipments);
-                reencolarBatchNoPlanificados(loteShipments);
+                    solucionGlobal.putAll(resultado);
+                    registrarBatchProcesados(loteShipments);
+                    reencolarBatchNoPlanificados(loteShipments);
 
-                System.out.printf("[Lote] Rutas: %d / %d | backlog entrante: %d | backlog saliente: %d%n",
-                        resultado.size(), n, backlogEntrante, batchPlanningBacklog.size());
-            }
-            captureLastPlanningSummary(loteShipments, batchEnd);
+                    System.out.printf("[Lote] Rutas: %d / %d | backlog entrante: %d | backlog saliente: %d%n",
+                            resultado.size(), n, backlogEntrante, batchPlanningBacklog.size());
+                }
+                captureLastPlanningSummary(loteShipments, batchEnd);
 
-            batchCount++;
-            tick = batchEnd;
-            boolean completedThisBatch = false;
-            if (tick >= maxTick) {
-                tick = maxTick;
-                queue.clear();
-                completed = true;
-                completedThisBatch = true;
-                System.out.println("[Lote] Simulación completada.");
-            }
+                batchCount++;
+                tick = batchEnd;
+                boolean completedThisBatch = false;
+                if (tick >= maxTick) {
+                    tick = maxTick;
+                    queue.clear();
+                    completed = true;
+                    completedThisBatch = true;
+                    System.out.println("[Lote] Simulación completada.");
+                }
 
-            addVisibleEvent(tick, "SYSTEM", loteShipments.size(), "batch_complete");
+                addVisibleEvent(tick, "SYSTEM", loteShipments.size(), "batch_complete");
 
-            lastBatchRuntimeMs = System.currentTimeMillis() - batchStartMs;
-            visualWindowStartedAtMs = batchStartMs;
-            visualWindowStartTick = batchStart;
-            visualWindowEndTick = tick;
-            if (completedThisBatch && realFinishedAtMs == 0) {
-                realFinishedAtMs = visualWindowStartedAtMs + BATCH_INTERVAL_MS;
-            }
-            System.out.printf("[Lote] Completado en %d ms (animación sugerida: %d ms)%n",
-                    lastBatchRuntimeMs, BATCH_INTERVAL_MS);
-            System.out.printf("[Planificacion fija][Lote] Sa=%d ms | K=%d | Sc=%d min | Ta=%d ms | estable=%s%n",
-                    planningIntervalMs(), planningTimeScale(), planningWindowMinutes(), lastBatchRuntimeMs, planningStable());
+                lastBatchRuntimeMs = System.currentTimeMillis() - batchStartMs;
+                visualWindowStartedAtMs = batchStartMs;
+                visualWindowStartTick = batchStart;
+                visualWindowEndTick = tick;
+                if (completedThisBatch && realFinishedAtMs == 0) {
+                    realFinishedAtMs = visualWindowStartedAtMs + BATCH_INTERVAL_MS;
+                }
+                System.out.printf("[Lote] Completado en %d ms (animación sugerida: %d ms)%n",
+                        lastBatchRuntimeMs, BATCH_INTERVAL_MS);
+                System.out.printf("[Planificacion fija][Lote] Sa=%d ms | K=%d | Sc=%d min | Ta=%d ms | estable=%s%n",
+                        planningIntervalMs(), planningTimeScale(), planningWindowMinutes(), lastBatchRuntimeMs, planningStable());
             } finally {
                 planningInProgress = false;
             }
@@ -1670,9 +1691,9 @@ public class RealtimeSimulationService {
         }
 
         synchronized String shipmentsPageJson(int page, int pageSize,
-                                               String search, String origin,
-                                               String destination, String statusFilter,
-                                               int currentMinute) {
+                                              String search, String origin,
+                                              String destination, String statusFilter,
+                                              int currentMinute) {
             int safePageSize = Math.max(1, Math.min(100, pageSize));
             int safePage = Math.max(1, page);
             int referenceMinute = currentMinute >= 0 ? currentMinute : tick;
@@ -1886,7 +1907,7 @@ public class RealtimeSimulationService {
 
             String message = cancellations.isEmpty() ? "" :
                     "Vuelos cancelados: " + String.join(", ", cancellations) +
-                    ". Replanificación completada.";
+                            ". Replanificación completada.";
 
             json.objStart();
             json.prop("simulationId", id).comma();
@@ -1902,11 +1923,14 @@ public class RealtimeSimulationService {
             json.prop("maxTick", effectiveMaxTick()).comma();
             json.prop("planningMaxTick", planningMaxTick).comma();
             json.prop("startOffsetMinutes", startOffsetMinutes).comma();
-            json.prop("batchMinutes", planningWindowMinutes()).comma();
-            json.prop("batchIntervalMs", planningIntervalMs()).comma();
+//            json.prop("batchMinutes", planningWindowMinutes()).comma();
+//            json.prop("batchIntervalMs", planningIntervalMs()).comma();
+//            json.prop("planningIntervalMs", planningIntervalMs()).comma();
+            json.prop("batchMinutes", getEffectiveBatchMinutes()).comma();
+            json.prop("batchIntervalMs", getEffectiveIntervalMs()).comma();
+            json.prop("planningIntervalMs", getEffectiveIntervalMs()).comma();
             json.prop("planningMode", "FIXED_SCHEDULE").comma();
             json.prop("planningExecutionMs", lastBatchRuntimeMs).comma();
-            json.prop("planningIntervalMs", planningIntervalMs()).comma();
             json.prop("planningIntervalMinutes", planningIntervalMinutes()).comma();
             json.prop("planningTimeScale", planningTimeScale()).comma();
             json.prop("planningWindowMinutes", planningWindowMinutes()).comma();

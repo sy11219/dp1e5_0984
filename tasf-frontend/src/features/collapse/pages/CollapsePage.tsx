@@ -203,10 +203,10 @@ export function CollapsePage() {
   const focusTokenRef = useRef(0)
   const animatingRef = useRef(false)
   const stoppedSimulationIdRef = useRef<string | null>(null)
-
+  const BATCH_MINUTES = 7200 // 5 días
   const maxMinute = data?.maxTick ?? 9999999 // Sin límite de minutos
 
-  const { simMinute, setSimMinute, playing, setPlaying, animateBatch, stopAnimation, reset, onBatchCompleteRef, BATCH_MINUTES } = useSimulationPlayer(maxMinute)
+  const { simMinute, setSimMinute, playing, setPlaying, animateBatch, stopAnimation, reset, onBatchCompleteRef } = useSimulationPlayer(maxMinute)
 
   const isBatchStoppedLocally = useCallback((simulationId?: string | null) => {
     return Boolean(simulationId && stoppedSimulationIdRef.current === simulationId)
