@@ -20,4 +20,11 @@ class SimulatorServerTest {
             assertTrue(selectedPort > 0);
         }
     }
+
+    @Test
+    void validatesMapTileCoordinatesWithinZoomBounds() {
+        assertTrue(SimulatorServer.isValidMapTileCoordinate(3, 4, 2));
+        assertTrue(!SimulatorServer.isValidMapTileCoordinate(3, 8, 2));
+        assertTrue(!SimulatorServer.isValidMapTileCoordinate(20, 0, 0));
+    }
 }

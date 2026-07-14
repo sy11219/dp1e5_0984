@@ -50,6 +50,12 @@ const MAP_MIN_ZOOM = 2;
 const MAP_MAX_ZOOM = 8;
 const MAP_ZOOM_STEP = 0.01;
 const MAP_BUTTON_ZOOM_STEP = 0.25;
+const DEFAULT_MAP_TILES_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const DEFAULT_MAP_TILES_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const SPANISH_MAP_TILES_URL = "/api/map/tiles/{z}/{x}/{y}.png";
+const SPANISH_MAP_TILES_ATTRIBUTION =
+  '&copy; <a href="https://www.maptilesapi.com/">MapTiles API</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export default function MapStage({
   data,
@@ -191,12 +197,7 @@ export default function MapStage({
     setPaneZIndex(map, "activeFlights", PANE_Z_INDEX.activeFlights);
     setPaneZIndex(map, "airports", PANE_Z_INDEX.airports);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 8,
-      minZoom: 2,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    addBaseMapLayer(map);
 
     airportLayerRef.current = L.layerGroup().addTo(map);
 
@@ -612,6 +613,30 @@ export default function MapStage({
       {children}
     </div>
   );
+}
+
+function addBaseMapLayer(map: L.Map) {
+  const spanishLayer = L.tileLayer(SPANISH_MAP_TILES_URL, {
+    maxZoom: 8,
+    minZoom: 2,
+    attribution: SPANISH_MAP_TILES_ATTRIBUTION,
+  });
+
+  spanishLayer.once("tileerror", () => {
+    if (!map.hasLayer(spanishLayer)) return;
+    map.removeLayer(spanishLayer);
+    createDefaultMapLayer().addTo(map);
+  });
+
+  spanishLayer.addTo(map);
+}
+
+function createDefaultMapLayer() {
+  return L.tileLayer(DEFAULT_MAP_TILES_URL, {
+    maxZoom: 8,
+    minZoom: 2,
+    attribution: DEFAULT_MAP_TILES_ATTRIBUTION,
+  });
 }
 
 function isAirportActive(airport: Airport) {

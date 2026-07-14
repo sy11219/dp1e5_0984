@@ -1,5 +1,19 @@
 # React + TypeScript + Vite
 
+## Etiquetas del mapa en español
+
+Para mostrar los países y ciudades en español, configura la clave de MapTiles API
+en el entorno del backend y reinicia el servidor:
+
+```powershell
+$env:TASF_MAPTILES_API_KEY="tu_clave"
+```
+
+La clave nunca llega al navegador: el backend obtiene los mosaicos y la capa
+alternativa conserva marcadores, vuelos, controles y el ajuste automático de zoom.
+Si el servicio no está disponible, el mapa vuelve automáticamente a la capa estándar
+de OpenStreetMap.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

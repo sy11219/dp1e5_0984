@@ -12,8 +12,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.URI;
 import java.net.URLDecoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +28,12 @@ import java.util.concurrent.CountDownLatch;
 
 public class SimulatorServer {
     private static final int DEFAULT_PORT = 8080;
+    private static final String MAP_TILES_HOST = "maptiles.p.rapidapi.com";
+    private static final String MAP_TILES_API_KEY = envString("TASF_MAPTILES_API_KEY", "");
+    private static final HttpClient MAP_TILES_HTTP_CLIENT = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
     private static final int DEFAULT_REALTIME_DAYS =
             envPositiveInt("TASF_REALTIME_DAYS", 5);
     private static final String DEFAULT_REALTIME_TIME_ZONE =
@@ -34,6 +45,7 @@ public class SimulatorServer {
     private static final Pattern AIRPORT_STATUS_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})/status$");
     private static final Pattern AIRPORT_PATH = Pattern.compile("^/api/airports/([A-Za-z]{4})$");
     private static final Pattern FLIGHT_PATH = Pattern.compile("^/api/flights/([^/]+)$");
+    private static final Pattern MAP_TILE_PATH = Pattern.compile("^/api/map/tiles/(\\d{1,2})/(\\d{1,7})/(\\d{1,7})\\.png$");
     private static final Pattern STEPS = Pattern.compile("\"steps\"\\s*:\\s*(\\d+)");
     private static final Pattern EXPECTED_TICK = Pattern.compile("\"expectedTick\"\\s*:\\s*(-?\\d+)");
     private static final Pattern START_TIME = Pattern.compile("\"startTime\"\\s*:\\s*\"(\\d{2}:\\d{2})\"");
@@ -149,6 +161,7 @@ public class SimulatorServer {
         server.createContext("/api/simulations/batch", this::batchSimulation);
         server.createContext("/api/realtime", this::realtime);
         server.createContext("/api/upload", this::upload);
+        server.createContext("/api/map/tiles", this::mapTiles);
         server.createContext("/", this::staticFile);
         server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(
                 Math.max(4, Runtime.getRuntime().availableProcessors())));
@@ -176,6 +189,57 @@ public class SimulatorServer {
     private void health(HttpExchange exchange) throws IOException {
         if (preflight(exchange)) return;
         send(exchange, 200, "application/json", "{\"status\":\"ok\",\"service\":\"ALNS simulator\"}");
+    }
+
+    private void mapTiles(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            send(exchange, 405, "application/json", "{\"error\":\"Use GET\"}");
+            return;
+        }
+        if (MAP_TILES_API_KEY.isBlank()) {
+            send(exchange, 503, "application/json", "{\"error\":\"MapTiles no esta configurado\"}");
+            return;
+        }
+
+        Matcher matcher = MAP_TILE_PATH.matcher(exchange.getRequestURI().getPath());
+        if (!matcher.matches()) {
+            send(exchange, 404, "application/json", "{\"error\":\"Mosaico no encontrado\"}");
+            return;
+        }
+
+        int zoom = Integer.parseInt(matcher.group(1));
+        int x = Integer.parseInt(matcher.group(2));
+        int y = Integer.parseInt(matcher.group(3));
+        if (!isValidMapTileCoordinate(zoom, x, y)) {
+            send(exchange, 400, "application/json", "{\"error\":\"Coordenadas de mosaico invalidas\"}");
+            return;
+        }
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://" + MAP_TILES_HOST + "/es/map/v1/" + zoom + "/" + x + "/" + y + ".png"))
+                .header("Accept", "image/png")
+                .header("x-rapidapi-host", MAP_TILES_HOST)
+                .header("x-rapidapi-key", MAP_TILES_API_KEY)
+                .timeout(Duration.ofSeconds(20))
+                .GET()
+                .build();
+
+        try {
+            HttpResponse<byte[]> response = MAP_TILES_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200) {
+                send(exchange, 502, "application/json", "{\"error\":\"No se pudo obtener el mosaico en espanol\"}");
+                return;
+            }
+
+            String contentType = response.headers().firstValue("Content-Type").orElse("image/png");
+            sendBinary(exchange, 200, contentType, response.body());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            send(exchange, 504, "application/json", "{\"error\":\"Tiempo de espera al obtener el mosaico\"}");
+        } catch (IOException e) {
+            send(exchange, 502, "application/json", "{\"error\":\"No se pudo conectar con MapTiles\"}");
+        }
     }
 
     private void upload(HttpExchange exchange) throws IOException {
@@ -655,6 +719,17 @@ public class SimulatorServer {
         }
     }
 
+    private void sendBinary(HttpExchange exchange, int status, String contentType, byte[] bytes) throws IOException {
+        Headers headers = exchange.getResponseHeaders();
+        addCors(headers);
+        headers.set("Content-Type", contentType);
+        headers.set("Cache-Control", "public, max-age=86400");
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
+    }
+
     private void addCors(Headers headers) {
         headers.set("Access-Control-Allow-Origin", "*");
         headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
@@ -693,6 +768,12 @@ public class SimulatorServer {
         } catch (NumberFormatException ignored) {
             return fallback;
         }
+    }
+
+    static boolean isValidMapTileCoordinate(int zoom, int x, int y) {
+        if (zoom < 0 || zoom > 19 || x < 0 || y < 0) return false;
+        int tilesPerAxis = 1 << zoom;
+        return x < tilesPerAxis && y < tilesPerAxis;
     }
 
     private String readString(Pattern pattern, String body, String fallback) {
