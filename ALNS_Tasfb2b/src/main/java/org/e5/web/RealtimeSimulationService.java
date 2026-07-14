@@ -681,8 +681,8 @@ public class RealtimeSimulationService {
 
         private long getEffectiveIntervalMs() {
             if (!isBatchScenario()) return REALTIME_EXECUTION_INTERVAL_MS;
-            // Animamos 5 días de simulación en 60 segundos reales
-            return isLongSimulation() ? 120_000L : BATCH_INTERVAL_MS;
+            // Animamos 5 días de simulación en 4 minutos reales
+            return isLongSimulation() ? 240_000L : BATCH_INTERVAL_MS;
         }
         // ──────────────────────────────────────────────────────────────────────
 
@@ -706,7 +706,7 @@ public class RealtimeSimulationService {
 
         private int planningTimeScale() {
             return isLongSimulation()
-                    ? 3600
+                    ? 180
                     : isBatchScenario() ? SIMULATION_PLANNING_K : REALTIME_PLANNING_K;
         }
 
