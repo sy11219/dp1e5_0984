@@ -609,6 +609,31 @@ select {
   padding: 0 11px 11px;
 }
 
+/* La sección abierta debe usar todo el alto libre del panel de operaciones. */
+.right-panel > .collapsible-section:has(.collapsible-content) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.right-panel > .collapsible-section:has(.collapsible-content) .collapsible-content,
+.right-panel .collapsible-content > .flights-table,
+.right-panel .collapsible-content > .shipments-table,
+.right-panel .collapsible-content > .airports-table {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.right-panel .collapsible-content .table {
+  align-content: start;
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+
 .collapsible-content > h3,
 .list-toolbar h3 {
   display: none;

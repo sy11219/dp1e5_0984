@@ -1199,7 +1199,6 @@ export function SimulationPage() {
                   activeFlightIds={activeFlightIds}
                   shipments={visibleShipments}
                   data={displayData}
-                  simMinute={simMinute}
                   selectedFlightId={selectedFlightId}
                   onSelectFlight={focusFlight}
                   displayGmtOffset={displayGmtOffset}

@@ -552,7 +552,6 @@ export const OperationsPage = () => {
                   activeFlightIds={activeFlightIds}
                   shipments={visibleShipments}
                   data={data}
-                  simMinute={operationalMinute}
                   selectedFlightId={selectedFlightId}
                   onSelectFlight={focusFlight}
                   displayGmtOffset={displayGmtOffset}

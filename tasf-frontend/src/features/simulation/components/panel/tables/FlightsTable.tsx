@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
 import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
@@ -9,7 +10,6 @@ interface FlightsTableProps {
   activeFlightIds: Set<string>;
   shipments: Shipment[];
   data?: SimulationData | null;
-  simMinute: number;
   selectedFlightId?: string | null;
   onSelectFlight?: (id: string) => void;
   displayGmtOffset?: number;
@@ -25,7 +25,6 @@ export function FlightsTable({
   activeFlightIds,
   shipments,
   data,
-  simMinute,
   selectedFlightId,
   onSelectFlight,
   displayGmtOffset,
@@ -44,8 +43,16 @@ export function FlightsTable({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedFlightShipments, setSelectedFlightShipments] = useState<Flight | null>(null);
   const [viewMode, setViewMode] = useState<"flights" | "flight-shipments">("flights");
+  const [remoteFlightId, setRemoteFlightId] = useState<string | null>(null);
+  const [remoteFlightShipments, setRemoteFlightShipments] = useState<Shipment[]>([]);
+  const [remoteFlightShipmentsLoading, setRemoteFlightShipmentsLoading] = useState(false);
+  const [remoteFlightShipmentsError, setRemoteFlightShipmentsError] = useState("");
   const colorFilter = colorFilterProp ?? localColorFilter;
   const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
+  const batchSimulationId = data?.simulationId;
+  const usesRemoteBatchShipments = Boolean(
+    batchSimulationId && (data?.planningWindowMinutes ?? 0) > 2
+  );
 
   const origins = useMemo(() => Array.from(new Set(flights.map((flight) => flight.origin))), [flights]);
   const destinations = useMemo(
@@ -53,17 +60,75 @@ export function FlightsTable({
     [flights]
   );
 
+  const selectedFlight = useMemo(
+    () => (selectedFlightId ? flights.find((flight) => flight.id === selectedFlightId) ?? null : null),
+    [flights, selectedFlightId]
+  );
+
+  useEffect(() => {
+    if (!usesRemoteBatchShipments || !batchSimulationId || !selectedFlight) {
+      setRemoteFlightId(null);
+      setRemoteFlightShipments([]);
+      setRemoteFlightShipmentsLoading(false);
+      setRemoteFlightShipmentsError("");
+      return;
+    }
+
+    let cancelled = false;
+    const flightId = selectedFlight.id;
+    setRemoteFlightId(flightId);
+    setRemoteFlightShipments([]);
+    setRemoteFlightShipmentsLoading(true);
+    setRemoteFlightShipmentsError("");
+
+    void (async () => {
+      try {
+        const pageSize = 100;
+        const firstPage = await getBatchShipmentsPageRequest(batchSimulationId, {
+          page: 1,
+          pageSize,
+          search: flightId,
+        });
+        const remainingPages = await Promise.all(
+          Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) =>
+            getBatchShipmentsPageRequest(batchSimulationId, {
+              page: index + 2,
+              pageSize,
+              search: flightId,
+            })
+          )
+        );
+        const matchingShipments = [firstPage, ...remainingPages]
+          .flatMap((page) => page.items)
+          .filter((shipment) => shipment.flightIds.includes(flightId));
+
+        if (!cancelled) setRemoteFlightShipments(matchingShipments);
+      } catch (error) {
+        if (!cancelled) {
+          setRemoteFlightShipmentsError(
+            error instanceof Error ? error.message : "No se pudieron cargar los envíos del vuelo."
+          );
+        }
+      } finally {
+        if (!cancelled) setRemoteFlightShipmentsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batchSimulationId, selectedFlight, usesRemoteBatchShipments]);
+
   const relatedShipments = useMemo(() => {
     if (!selectedFlightShipments) return [];
-    return shipments
-      .filter((shipment) => {
-        if (!shipment.flightIds.includes(selectedFlightShipments.id)) return false;
-        if (shipment.requestMinute > simMinute) return false;
-        if (!shipment.planned) return true;
-        return simMinute <= shipment.estimatedArrival;
-      })
+    const source =
+      usesRemoteBatchShipments && remoteFlightId === selectedFlightShipments.id
+        ? remoteFlightShipments
+        : shipments;
+    return source
+      .filter((shipment) => shipment.flightIds.includes(selectedFlightShipments.id))
       .sort((a, b) => a.requestMinute - b.requestMinute);
-  }, [shipments, selectedFlightShipments, simMinute]);
+  }, [remoteFlightId, remoteFlightShipments, selectedFlightShipments, shipments, usesRemoteBatchShipments]);
 
   const relatedShipmentCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -137,6 +202,15 @@ export function FlightsTable({
   const flightMomentData = data ?? null;
 
   if (viewMode === "flight-shipments" && selectedFlightShipments) {
+    const isLoadingRelatedShipments =
+      usesRemoteBatchShipments &&
+      remoteFlightId === selectedFlightShipments.id &&
+      remoteFlightShipmentsLoading;
+    const relatedShipmentsError =
+      usesRemoteBatchShipments && remoteFlightId === selectedFlightShipments.id
+        ? remoteFlightShipmentsError
+        : "";
+
     return (
       <div className="flights-table">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -150,7 +224,11 @@ export function FlightsTable({
           </button>
         </div>
         <div className="table">
-          {relatedShipments.length === 0 ? (
+          {isLoadingRelatedShipments ? (
+            <div className="empty-state">Cargando envíos del vuelo...</div>
+          ) : relatedShipmentsError ? (
+            <div className="empty-state">{relatedShipmentsError}</div>
+          ) : relatedShipments.length === 0 ? (
             <div className="empty-state">No se encontraron envíos relacionados.</div>
           ) : (
             relatedShipments.map((shipment) => (
@@ -258,8 +336,18 @@ export function FlightsTable({
         ) : (
           visibleFlights.map((flight) => {
             const active = activeFlightIds.has(flight.id);
-            const relatedCount = relatedShipmentCounts.get(flight.id) ?? 0;
             const isSelected = selectedFlightId === flight.id;
+            const remoteResultMatchesFlight = remoteFlightId === flight.id;
+            const isLoadingFlightShipments =
+              isSelected &&
+              usesRemoteBatchShipments &&
+              (!remoteResultMatchesFlight || remoteFlightShipmentsLoading);
+            const remoteFlightError =
+              isSelected && remoteResultMatchesFlight ? remoteFlightShipmentsError : "";
+            const relatedCount =
+              isSelected && usesRemoteBatchShipments && remoteResultMatchesFlight
+                ? remoteFlightShipments.length
+                : relatedShipmentCounts.get(flight.id) ?? 0;
             const status = capacityStatus(flight.utilization);
             const accentColor = STATUS_COLOR[status];
 
@@ -315,13 +403,19 @@ export function FlightsTable({
                     <button
                       type="button"
                       className="table-action-button"
-                      disabled={relatedCount === 0}
+                      disabled={isLoadingFlightShipments || Boolean(remoteFlightError) || relatedCount === 0}
                       onClick={() => {
                         setSelectedFlightShipments(flight);
                         setViewMode("flight-shipments");
                       }}
                     >
-                      {relatedCount > 0 ? `Ver envíos (${relatedCount})` : "Sin envíos"}
+                      {isLoadingFlightShipments
+                        ? "Buscando envíos..."
+                        : remoteFlightError
+                          ? "No se pudieron cargar"
+                          : relatedCount > 0
+                            ? `Ver envíos (${relatedCount})`
+                            : "Sin envíos"}
                     </button>
                     <button
                       type="button"
