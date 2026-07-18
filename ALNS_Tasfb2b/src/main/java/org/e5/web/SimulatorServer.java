@@ -159,6 +159,7 @@ public class SimulatorServer {
         server.createContext("/api/flights", this::flights);
         server.createContext("/api/shipments", this::shipments);
         server.createContext("/api/simulations/batch", this::batchSimulation);
+        server.createContext("/api/collapse", this::collapseSimulation);
         server.createContext("/api/realtime", this::realtime);
         server.createContext("/api/upload", this::upload);
         server.createContext("/api/map/tiles", this::mapTiles);
@@ -670,6 +671,108 @@ public class SimulatorServer {
         } catch (Exception e) {
             e.printStackTrace();
             send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulacion por lotes\"}");
+        }
+    }
+
+    private void collapseSimulation(HttpExchange exchange) throws IOException {
+        if (preflight(exchange)) return;
+
+        String method = exchange.getRequestMethod();
+        String path = exchange.getRequestURI().getPath();
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+
+        try {
+            if ("/api/collapse/start".equals(path) && "POST".equalsIgnoreCase(method)) {
+                String startDate = readString(START_DATE, body, "20260102");
+                int days = readInt(DAYS, body, 1100);
+                String startTime = readString(START_TIME, body, "00:00");
+                String timeZone = readString(TIME_ZONE, body, "");
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.startCollapseSimulation(
+                                startDate, days, startTime, timeZone, clientId, controlToken));
+                return;
+            }
+
+            if ("/api/collapse/current".equals(path) && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.currentCollapseSimulation());
+                return;
+            }
+
+            Matcher stateMatcher = Pattern.compile("^/api/collapse/([^/]+)$").matcher(path);
+            if (stateMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json", realtimeSimulationService.collapseState(stateMatcher.group(1)));
+                return;
+            }
+
+            Matcher advanceMatcher = Pattern.compile("^/api/collapse/([^/]+)/advance$").matcher(path);
+            if (advanceMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                int expectedTick = readInt(EXPECTED_TICK, body, -1);
+                String clientId = readString(CLIENT_ID, body, "");
+                String controlToken = readString(CONTROL_TOKEN, body, "");
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.advanceCollapseSimulation(
+                                advanceMatcher.group(1), expectedTick, clientId, controlToken));
+                return;
+            }
+
+            Matcher pauseMatcher = Pattern.compile("^/api/collapse/([^/]+)/pause$").matcher(path);
+            if (pauseMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                Boolean paused = readBoolean(PAUSED, body);
+                if (paused == null) {
+                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    return;
+                }
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.pauseCollapseSimulation(
+                                pauseMatcher.group(1), paused,
+                                readString(CLIENT_ID, body, ""),
+                                readString(CONTROL_TOKEN, body, "")));
+                return;
+            }
+
+            Matcher cancelMatcher = Pattern.compile("^/api/collapse/([^/]+)/cancel$").matcher(path);
+            if (cancelMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.cancelCollapseSimulation(
+                                cancelMatcher.group(1),
+                                readString(CLIENT_ID, body, ""),
+                                readString(CONTROL_TOKEN, body, "")));
+                return;
+            }
+
+            Matcher clearMatcher = Pattern.compile("^/api/collapse/([^/]+)/clear$").matcher(path);
+            if (clearMatcher.matches() && "POST".equalsIgnoreCase(method)) {
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.clearCollapseSimulation(clearMatcher.group(1)));
+                return;
+            }
+
+            Matcher shipmentsMatcher = Pattern.compile("^/api/collapse/([^/]+)/shipments$").matcher(path);
+            if (shipmentsMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                Map<String, String> query = queryParams(exchange);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.collapseShipments(
+                                shipmentsMatcher.group(1),
+                                queryInt(query, "page", 1),
+                                queryInt(query, "pageSize", 25),
+                                query.getOrDefault("search", ""),
+                                query.getOrDefault("origin", ""),
+                                query.getOrDefault("destination", ""),
+                                query.getOrDefault("status", ""),
+                                queryInt(query, "currentMinute", -1)));
+                return;
+            }
+
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint de colapso no encontrado\"}");
+        } catch (SecurityException e) {
+            send(exchange, 403, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar el escenario de colapso\"}");
         }
     }
 

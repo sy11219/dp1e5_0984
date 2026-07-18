@@ -64,6 +64,11 @@ public class RealtimeSimulationService {
     public static final long BATCH_INTERVAL_MS = readPositiveLong(
             "TASF_SIMULATION_SA_MS",
             SIMULATION_PLANNING_INTERVAL_MINUTES * MINUTE_MS);
+    /** Escenario de colapso: 12 horas simuladas por cada ventana visual de 2 minutos. */
+    public static final int COLLAPSE_WINDOW_MINUTES = readPositiveInt(
+            "TASF_COLLAPSE_SC_MINUTES", 12 * 60);
+    public static final long COLLAPSE_INTERVAL_MS = readPositiveLong(
+            "TASF_COLLAPSE_SA_MS", 2 * MINUTE_MS);
     private static final int BATCH_ALNS_MIN_ITERATIONS = readPositiveInt(
             "TASF_BATCH_ALNS_MIN_ITERATIONS", 35);
     private static final int BATCH_ALNS_MAX_ITERATIONS = readPositiveInt(
@@ -119,6 +124,7 @@ public class RealtimeSimulationService {
     });
     private volatile String sharedRealtimeSessionId;
     private volatile String sharedSimulationSessionId;
+    private volatile String sharedCollapseSessionId;
     private volatile String lastCreatedSessionId;
 
     public RealtimeSimulationService() {
@@ -215,6 +221,7 @@ public class RealtimeSimulationService {
     private void advanceSharedSessionsIfDue() {
         advanceSharedRealtimeIfDue();
         advanceSharedBatchIfDue();
+        advanceSharedCollapseIfDue();
     }
 
     private void advanceSharedRealtimeIfDue() {
@@ -234,6 +241,16 @@ public class RealtimeSimulationService {
             current.advanceBatchIfDue();
         } catch (Exception e) {
             System.err.printf("[Lote] Error en scheduler: %s%n", e.getMessage());
+        }
+    }
+
+    private void advanceSharedCollapseIfDue() {
+        try {
+            RealtimeSession current = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+            if (current == null || current.completed || current.paused) return;
+            current.advanceBatchIfDue();
+        } catch (Exception e) {
+            System.err.printf("[Colapso] Error en scheduler: %s%n", e.getMessage());
         }
     }
 
@@ -366,8 +383,10 @@ public class RealtimeSimulationService {
                 requireBatchControl(session, clientId, controlToken);
                 if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJsonForRead();
                 session.advanceBatch(BATCH_MINUTES);
-            } else {
+            } else if ("TIEMPO_REAL".equals(session.scenario)) {
                 session.advanceRealtimeIfDue();
+            } else {
+                throw new IllegalArgumentException("Use el endpoint propio del escenario de colapso.");
             }
             return session.snapshotJson();
         }
@@ -383,6 +402,9 @@ public class RealtimeSimulationService {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         }
         if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (!"SIMULACION_LOTES".equals(session.scenario)) {
+            throw new IllegalArgumentException("Las cancelaciones no estan disponibles en esta sesion.");
+        }
         session.cancel(flightId, flightPlanService);
         return session.snapshotJson();
     }
@@ -402,6 +424,123 @@ public class RealtimeSimulationService {
         if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+        }
+        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
+    }
+
+    // ── Escenario de colapso ───────────────────────────────────────────────
+
+    /**
+     * Inicia una ejecucion aislada de colapso. A diferencia de la simulacion
+     * de 5 dias, esta sesion consume los TXT en ventanas de 12 horas hasta
+     * hallar el primer incumplimiento.
+     */
+    public synchronized String startCollapseSimulation(String startDate, int days, String startTime,
+                                                       String timeZone, String clientId,
+                                                       String controlToken) throws Exception {
+        validate(startDate, days, true);
+        RealtimeSession current = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        if (current != null) {
+            if (!current.completed) {
+                requireBatchControl(current, clientId, controlToken);
+                throw new IllegalStateException("Ya hay un escenario de colapso en ejecucion. Pauselo o cancelalo antes de iniciar otro.");
+            }
+            throw new IllegalStateException("El escenario anterior termino. Cualquier maquina puede limpiarlo antes de iniciar uno nuevo.");
+        }
+
+        int startOffsetMinutes = parseStartTime(startTime);
+        String ownerClientId = normalizeClientId(clientId);
+        String json = createSession(startDate, days, "COLAPSO", startOffsetMinutes, timeZone, ownerClientId);
+        sharedCollapseSessionId = lastCreatedSessionId;
+        RealtimeSession created = sessions.get(sharedCollapseSessionId);
+        return created == null ? json : created.snapshotJson(true);
+    }
+
+    public String currentCollapseSimulation() {
+        RealtimeSession current = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        return current == null ? "{}" : current.snapshotJsonForRead();
+    }
+
+    public String collapseState(String id) {
+        RealtimeSession session = sessions.get(id);
+        if (session != null && "COLAPSO".equals(session.scenario)) return session.snapshotJsonForRead();
+        RealtimeSession current = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        return current == null ? "{}" : current.snapshotJsonForRead();
+    }
+
+    public String advanceCollapseSimulation(String id, int expectedTick,
+                                            String clientId, String controlToken) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        }
+        if (session == null) return "{}";
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+        }
+
+        synchronized (session) {
+            requireBatchControl(session, clientId, controlToken);
+            if (expectedTick >= 0 && session.tick != expectedTick) return session.snapshotJsonForRead();
+            session.advanceBatch(COLLAPSE_WINDOW_MINUTES);
+            return session.snapshotJson();
+        }
+    }
+
+    public synchronized String pauseCollapseSimulation(String id, boolean paused,
+                                                       String clientId, String controlToken) {
+        RealtimeSession session = require(id);
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+        }
+        requireBatchControl(session, clientId, controlToken);
+        session.setPaused(paused);
+        return session.snapshotJson();
+    }
+
+    /** Solo la maquina dueña puede cancelar una ejecucion activa. */
+    public synchronized String cancelCollapseSimulation(String id, String clientId, String controlToken) {
+        RealtimeSession session = require(id);
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+        }
+        requireBatchControl(session, clientId, controlToken);
+        session.cancelCollapse();
+        return session.snapshotJson();
+    }
+
+    /**
+     * Una ejecucion que termino o fue cancelada puede eliminarse desde cualquier
+     * maquina. La sesion activa nunca se limpia por esta ruta.
+     */
+    public synchronized String clearCollapseSimulation(String id) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) return "{}";
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+        }
+        if (!session.completed) {
+            throw new IllegalStateException("No se puede limpiar un escenario de colapso que sigue activo.");
+        }
+        sessions.remove(id);
+        if (id.equals(sharedCollapseSessionId)) {
+            sharedCollapseSessionId = null;
+        }
+        session.closeResources();
+        return "{}";
+    }
+
+    public String collapseShipments(String id, int page, int pageSize,
+                                    String search, String origin,
+                                    String destination, String status,
+                                    int currentMinute) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
         }
         return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
     }
@@ -450,7 +589,11 @@ public class RealtimeSimulationService {
         int simulationEndMinute = startOffsetMinutes + days * 1440;
         List<Shipment> shipments;
 
-        if (days <= 5) {
+        if ("COLAPSO".equals(scenario)) {
+            // El colapso no precarga anos de datos: los TXT se consumen de forma
+            // secuencial cuando se abre cada ventana de 12 horas.
+            shipments = new ArrayList<>();
+        } else if (days <= 5) {
             // Escenario original: carga completa (5 días)
             int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
             shipments = "SIMULACION_LOTES".equals(scenario)
@@ -577,6 +720,7 @@ public class RealtimeSimulationService {
         final List<Flight> flights;
         final Map<String, Flight> flightById;
         final List<Shipment> shipments;
+        final CollapseShipmentSource collapseShipmentSource;
 
         // Índice por minuto para acceso O(1)
         final Map<Integer, List<Shipment>> shipmentsByMinute = new HashMap<>();
@@ -601,6 +745,8 @@ public class RealtimeSimulationService {
         final int maxTick;
         final int planningMaxTick;
         boolean completed = false;
+        boolean cancelled = false;
+        CollapseOutcome collapseOutcome;
         volatile boolean planningInProgress = false;
         volatile String lastSnapshotJson = "{}";
         int lastBatchStart = -1;
@@ -630,7 +776,7 @@ public class RealtimeSimulationService {
                         ZoneId originZone,
                         List<Airport> airports, Map<String, Airport> airportMap,
                         List<Flight> flights, List<Shipment> shipments,
-                        String ownerClientId) {
+                        String ownerClientId) throws IOException {
             this.startDate  = startDate;
             this.days       = days;
             this.scenario   = scenario;
@@ -655,6 +801,9 @@ public class RealtimeSimulationService {
             this.planningMaxTick = isBatchScenario()
                     ? this.maxTick + MAX_DELIVERY_DEADLINE_MINUTES
                     : this.maxTick;
+            this.collapseShipmentSource = isCollapseScenario()
+                    ? new CollapseShipmentSource(startDate, this.maxTick, airportMap)
+                    : null;
             this.visualWindowStartedAtMs = System.currentTimeMillis();
             this.visualWindowStartTick = startOffsetMinutes;
             this.visualWindowEndTick = startOffsetMinutes;
@@ -666,11 +815,15 @@ public class RealtimeSimulationService {
         }
 
         private boolean isBatchScenario() {
-            return "SIMULACION_LOTES".equals(scenario);
+            return "SIMULACION_LOTES".equals(scenario) || isCollapseScenario();
         }
 
         private static boolean isBatchScenarioName(String scenario) {
-            return "SIMULACION_LOTES".equals(scenario);
+            return "SIMULACION_LOTES".equals(scenario) || "COLAPSO".equals(scenario);
+        }
+
+        private boolean isCollapseScenario() {
+            return "COLAPSO".equals(scenario);
         }
 
         private boolean controlsAllowed(String clientId, String token) {
@@ -680,6 +833,7 @@ public class RealtimeSimulationService {
         }
 
         private long planningIntervalMs() {
+            if (isCollapseScenario()) return COLLAPSE_INTERVAL_MS;
             return isBatchScenario() ? BATCH_INTERVAL_MS : REALTIME_EXECUTION_INTERVAL_MS;
         }
 
@@ -688,10 +842,15 @@ public class RealtimeSimulationService {
         }
 
         private int planningTimeScale() {
+            if (isCollapseScenario()) {
+                return Math.max(1, (int) Math.round(COLLAPSE_WINDOW_MINUTES
+                        / (COLLAPSE_INTERVAL_MS / (double) MINUTE_MS)));
+            }
             return isBatchScenario() ? SIMULATION_PLANNING_K : REALTIME_PLANNING_K;
         }
 
         private int planningWindowMinutes() {
+            if (isCollapseScenario()) return COLLAPSE_WINDOW_MINUTES;
             return isBatchScenario() ? BATCH_MINUTES : REALTIME_PLANNING_WINDOW_MINUTES;
         }
 
@@ -831,8 +990,31 @@ public class RealtimeSimulationService {
             events.add(new RealtimeEvent(visualTick, "SYSTEM", 0, "simulation_resumed"));
         }
 
+        synchronized void cancelCollapse() {
+            if (!isCollapseScenario() || completed) return;
+            long now = System.currentTimeMillis();
+            int visualTick = Math.min(tick, currentVisualTick(now));
+            cancelled = true;
+            completed = true;
+            paused = false;
+            tick = visualTick;
+            lastBatchEnd = visualTick;
+            visualWindowStartTick = visualTick;
+            visualWindowEndTick = visualTick;
+            visualWindowStartedAtMs = now;
+            realFinishedAtMs = now;
+            addVisibleEvent(visualTick, "SYSTEM", 0, "scenario_cancelled");
+            closeResources();
+        }
+
+        synchronized void closeResources() {
+            if (collapseShipmentSource != null) {
+                collapseShipmentSource.close();
+            }
+        }
+
         private int effectiveMaxTick() {
-            return maxTick;
+            return collapseOutcome == null ? maxTick : collapseOutcome.minute;
         }
 
         // ── SIMULACION_LOTES: avance de un lote completo ─────────────────────
@@ -863,6 +1045,10 @@ public class RealtimeSimulationService {
             lastBatchStart = batchStart;
             lastBatchEnd   = batchEnd;
             applyQueuedCancellationRequests();
+
+            if (isCollapseScenario()) {
+                loadCollapseShipments(batchStart, batchEnd);
+            }
 
             // 1. Recoger envíos que caen en esta ventana [batchStart, batchEnd)
             List<Shipment> nuevosShipments = new ArrayList<>();
@@ -929,9 +1115,19 @@ public class RealtimeSimulationService {
             captureLastPlanningSummary(loteShipments, batchEnd);
 
             batchCount++;
-            tick = batchEnd;
+            CollapseOutcome outcome = isCollapseScenario()
+                    ? findFirstCollapseOutcome(batchStart, batchEnd)
+                    : null;
+            tick = outcome == null ? batchEnd : outcome.minute;
             boolean completedThisBatch = false;
-            if (tick >= maxTick) {
+            if (outcome != null) {
+                collapseOutcome = outcome;
+                completed = true;
+                completedThisBatch = true;
+                lastBatchEnd = outcome.minute;
+                addVisibleEvent(outcome.minute, "SYSTEM", 0, "system_collapsed");
+                System.out.printf("[Colapso] %s en minuto %d%n", outcome.reason, outcome.minute);
+            } else if (tick >= maxTick) {
                 tick = maxTick;
                 queue.clear();
                 completed = true;
@@ -946,14 +1142,36 @@ public class RealtimeSimulationService {
             visualWindowStartTick = batchStart;
             visualWindowEndTick = tick;
             if (completedThisBatch && realFinishedAtMs == 0) {
-                realFinishedAtMs = visualWindowStartedAtMs + BATCH_INTERVAL_MS;
+                realFinishedAtMs = visualWindowStartedAtMs + planningIntervalMs();
             }
             System.out.printf("[Lote] Completado en %d ms (animación sugerida: %d ms)%n",
                     lastBatchRuntimeMs, BATCH_INTERVAL_MS);
             System.out.printf("[Planificacion fija][Lote] Sa=%d ms | K=%d | Sc=%d min | Ta=%d ms | estable=%s%n",
                     planningIntervalMs(), planningTimeScale(), planningWindowMinutes(), lastBatchRuntimeMs, planningStable());
+            if (completedThisBatch) {
+                closeResources();
+            }
             } finally {
                 planningInProgress = false;
+            }
+        }
+
+        private void loadCollapseShipments(int startMinute, int endMinute) {
+            if (collapseShipmentSource == null) return;
+            try {
+                List<Shipment> loaded = collapseShipmentSource.takeWindow(startMinute, endMinute);
+                for (Shipment shipment : loaded) {
+                    if (!knownShipmentIds.add(shipment.getShipmentId())) continue;
+                    shipments.add(shipment);
+                    shipmentsByMinute.computeIfAbsent(shipment.getRequestMinute(), ignored -> new ArrayList<>())
+                            .add(shipment);
+                }
+                if (!loaded.isEmpty()) {
+                    System.out.printf("[Colapso] Ventana TXT %d-%d: %d envios consumidos%n",
+                            startMinute, endMinute, loaded.size());
+                }
+            } catch (IOException e) {
+                throw new IllegalStateException("No se pudieron consumir los TXT del escenario de colapso.", e);
             }
         }
 
@@ -1046,6 +1264,103 @@ public class RealtimeSimulationService {
                 if (!shipment.isSplitPart() && shipment.getShipmentId().equals(rootId)) return shipment;
             }
             return null;
+        }
+
+        /**
+         * El colapso se evalua contra la operacion real hasta el final de la
+         * ventana: capacidad fisica de almacenes y vencimiento real del SLA.
+         * Un envio sin ruta no colapsa de inmediato; lo hace cuando vence su
+         * plazo de 1 o 2 dias y aun falta alguna de sus maletas.
+         */
+        private CollapseOutcome findFirstCollapseOutcome(int windowStart, int windowEnd) {
+            CollapseOutcome capacity = findWarehouseCapacityBreach(windowStart, windowEnd);
+            CollapseOutcome deadline = findDeliveryDeadlineBreach(windowStart, windowEnd);
+
+            if (capacity == null) return deadline;
+            if (deadline == null) return capacity;
+            return capacity.minute <= deadline.minute ? capacity : deadline;
+        }
+
+        private CollapseOutcome findWarehouseCapacityBreach(int windowStart, int windowEnd) {
+            Map<String, Integer> loads = new HashMap<>();
+            List<RealtimeEvent> ordered = new ArrayList<>(events);
+            ordered.sort(Comparator
+                    .comparingInt(RealtimeEvent::minute)
+                    .thenComparingInt(event -> eventPriority(event.type)));
+
+            for (RealtimeEvent event : ordered) {
+                if (event.minute > windowEnd) break;
+                if (!airportMap.containsKey(event.airport)) continue;
+
+                int previous = loads.getOrDefault(event.airport, 0);
+                int next = Math.max(0, previous + event.delta);
+                loads.put(event.airport, next);
+
+                if (event.minute < windowStart) continue;
+                Airport airport = airportMap.get(event.airport);
+                if (next > airport.getMaxCapacity()) {
+                    return CollapseOutcome.capacity(event.minute, airport, next);
+                }
+            }
+            return null;
+        }
+
+        private Map<String, Integer> airportLoadsAt(int minute) {
+            Map<String, Integer> loads = new HashMap<>();
+            List<RealtimeEvent> ordered = new ArrayList<>(events);
+            ordered.sort(Comparator
+                    .comparingInt(RealtimeEvent::minute)
+                    .thenComparingInt(event -> eventPriority(event.type)));
+            for (RealtimeEvent event : ordered) {
+                if (event.minute > minute) break;
+                if (!airportMap.containsKey(event.airport)) continue;
+                loads.compute(event.airport, (ignored, current) ->
+                        Math.max(0, (current == null ? 0 : current) + event.delta));
+            }
+            return loads;
+        }
+
+        private CollapseOutcome findDeliveryDeadlineBreach(int windowStart, int windowEnd) {
+            Map<String, List<Shipment>> byRoot = new LinkedHashMap<>();
+            for (Shipment shipment : todosLosShipmentsProcesados) {
+                String rootId = rootShipmentId(shipment);
+                byRoot.computeIfAbsent(rootId, ignored -> new ArrayList<>()).add(shipment);
+            }
+
+            CollapseOutcome first = null;
+            for (Map.Entry<String, List<Shipment>> entry : byRoot.entrySet()) {
+                List<Shipment> group = entry.getValue();
+                Shipment root = group.stream()
+                        .filter(shipment -> !shipment.isSplitPart())
+                        .findFirst()
+                        .orElse(group.get(0));
+                Airport origin = airportMap.get(root.getOriginCode());
+                Airport destination = airportMap.get(root.getDestCode());
+                int deadline = root.getRequestMinute() + Shipment.getDeadlineMinutes(
+                        origin == null ? "" : origin.getContinent(),
+                        destination == null ? "" : destination.getContinent());
+                if (deadline < windowStart || deadline > windowEnd) continue;
+
+                boolean split = group.stream().anyMatch(Shipment::isSplitPart);
+                int deliveredOnTime = 0;
+                for (Shipment shipment : group) {
+                    if (split && !shipment.isSplitPart()) continue;
+                    if (!split && shipment.isSplitPart()) continue;
+                    if (shipment.isPlanned()
+                            && shipment.getEstimatedArrival() > 0
+                            && shipment.getEstimatedArrival() <= deadline) {
+                        deliveredOnTime += Math.max(0, shipment.getSuitcaseCount());
+                    }
+                }
+
+                int expected = Math.max(0, root.getOriginalSuitcaseCount());
+                if (deliveredOnTime >= expected) continue;
+
+                CollapseOutcome candidate = CollapseOutcome.deadline(
+                        deadline, root, expected, deliveredOnTime);
+                if (first == null || candidate.minute < first.minute) first = candidate;
+            }
+            return first;
         }
 
         private Shipment findShipmentById(String shipmentId, List<Shipment> loteShipments) {
@@ -1614,6 +1929,7 @@ public class RealtimeSimulationService {
 
         private int snapshotWindowEnd() {
             if (!isBatchScenario()) return maxTick;
+            if (isCollapseScenario()) return Math.min(effectiveMaxTick(), visualWindowEndTick);
             int anchor = Math.max(tick, visualWindowEndTick);
             return Math.min(maxTick, anchor + BATCH_SNAPSHOT_LOOKAHEAD_MINUTES);
         }
@@ -1639,7 +1955,7 @@ public class RealtimeSimulationService {
                 }
             }
 
-            if (visible.size() <= BATCH_SNAPSHOT_MAX_SHIPMENTS) return visible;
+            if (isCollapseScenario() || visible.size() <= BATCH_SNAPSHOT_MAX_SHIPMENTS) return visible;
             return new ArrayList<>(visible.subList(
                     visible.size() - BATCH_SNAPSHOT_MAX_SHIPMENTS,
                     visible.size()));
@@ -1663,7 +1979,7 @@ public class RealtimeSimulationService {
                     .thenComparing(RealtimeEvent::airport)
                     .thenComparingInt(e -> eventPriority(e.type))
                     .thenComparing(RealtimeEvent::type));
-            if (visible.size() > BATCH_SNAPSHOT_MAX_EVENTS) {
+            if (!isCollapseScenario() && visible.size() > BATCH_SNAPSHOT_MAX_EVENTS) {
                 visible = new ArrayList<>(visible.subList(
                         visible.size() - BATCH_SNAPSHOT_MAX_EVENTS,
                         visible.size()));
@@ -1893,8 +2209,13 @@ public class RealtimeSimulationService {
             int snapshotStart = snapshotWindowStart();
             int snapshotEnd = snapshotWindowEnd();
             List<Shipment> shipmentPayload = shipmentsForSnapshot(shipmentSource, snapshotStart, snapshotEnd);
-            PlanningMetrics planMetrics = calculatePlanningMetrics(shipmentSource);
+            PlanningMetrics planMetrics = calculatePlanningMetrics(
+                    shipmentSource,
+                    isBatchScenario() ? Math.min(effectiveMaxTick(), tick) : maxTick);
             int processedShipmentCount = planMetrics.totalShipments;
+            Map<String, Integer> snapshotAirportLoads = isBatchScenario()
+                    ? airportLoadsAt(snapshotEnd)
+                    : Collections.emptyMap();
             int usedFlights = (int) flights.stream()
                     .filter(this::flightVisibleInSnapshot)
                     .filter(f -> f.getAssignedLoad() > 0)
@@ -1903,11 +2224,14 @@ public class RealtimeSimulationService {
             String message = cancellations.isEmpty() ? "" :
                     "Vuelos cancelados: " + String.join(", ", cancellations) +
                     ". Replanificación completada.";
+            String lifecycleStatus = collapseOutcome != null ? "COLLAPSED" :
+                    cancelled ? "CANCELLED" :
+                            completed ? "COMPLETED" : paused ? "PAUSED" : "RUNNING";
 
             json.objStart();
             json.prop("simulationId", id).comma();
             json.prop("scenario", scenarioLabel()).comma();
-            json.prop("status", completed ? "COMPLETED" : paused ? "PAUSED" : "RUNNING").comma();
+            json.prop("status", lifecycleStatus).comma();
             json.prop("paused", paused).comma();
             json.prop("ownerClientId", ownerClientId).comma();
             if (includeControlToken && !controlToken.isBlank()) {
@@ -1945,12 +2269,37 @@ public class RealtimeSimulationService {
             json.prop("message", message).comma();
             json.prop("simulationStartDateTime", simulationStartInstant).comma();
             json.prop("simulationEndDateTime", simulationEndInstant).comma();
+            json.prop("simulationStoppedDateTime", completed ? simulationInstantAt(tick) : "").comma();
             long effectiveRealFinishedAtMs = realFinishedAtMs > 0
                     ? realFinishedAtMs
                     : System.currentTimeMillis();
             json.prop("realStartedAt", java.time.Instant.ofEpochMilli(realStartedAtMs).toString()).comma();
             json.prop("realFinishedAt", java.time.Instant.ofEpochMilli(effectiveRealFinishedAtMs).toString()).comma();
             json.prop("runtimeMs", effectiveRealFinishedAtMs - realStartedAtMs).comma();
+
+            json.name("collapse").objStart();
+            if (collapseOutcome != null) {
+                json.prop("reason", collapseOutcome.reason).comma();
+                json.prop("minute", collapseOutcome.minute).comma();
+                json.prop("occurredAt", simulationInstantAt(collapseOutcome.minute)).comma();
+                json.prop("airport", collapseOutcome.airportCode).comma();
+                json.prop("shipmentId", collapseOutcome.shipmentId).comma();
+                json.prop("expectedBags", collapseOutcome.expectedBags).comma();
+                json.prop("deliveredBags", collapseOutcome.deliveredBags).comma();
+                json.prop("currentLoad", collapseOutcome.currentLoad).comma();
+                json.prop("maxCapacity", collapseOutcome.maxCapacity);
+            } else {
+                json.prop("reason", "").comma();
+                json.prop("minute", -1).comma();
+                json.prop("occurredAt", "").comma();
+                json.prop("airport", "").comma();
+                json.prop("shipmentId", "").comma();
+                json.prop("expectedBags", 0).comma();
+                json.prop("deliveredBags", 0).comma();
+                json.prop("currentLoad", 0).comma();
+                json.prop("maxCapacity", 0);
+            }
+            json.objEnd().comma();
 
             // cancelledFlightIds
             json.name("cancelledFlightIds").arrayStart();
@@ -2016,7 +2365,10 @@ public class RealtimeSimulationService {
             json.name("airports").arrayStart();
             for (int i = 0; i < airports.size(); i++) {
                 Airport a = airports.get(i);
-                double util = ratio(a.getCurrentLoad(), a.getMaxCapacity());
+                int airportLoad = isBatchScenario()
+                        ? snapshotAirportLoads.getOrDefault(a.getCode(), 0)
+                        : a.getCurrentLoad();
+                double util = ratio(airportLoad, a.getMaxCapacity());
                 json.objStart();
                 json.prop("code", a.getCode()).comma();
                 json.prop("city", a.getCity()).comma();
@@ -2026,8 +2378,8 @@ public class RealtimeSimulationService {
                 json.prop("longitude", a.getLongitude()).comma();
                 json.prop("gmtOffset", a.getGmtOffset()).comma();
                 json.prop("maxCapacity", a.getMaxCapacity()).comma();
-                json.prop("peakLoad", a.getCurrentLoad()).comma();
-                json.prop("finalLoad", a.getCurrentLoad()).comma();
+                json.prop("peakLoad", airportLoad).comma();
+                json.prop("finalLoad", airportLoad).comma();
                 json.prop("utilization", util).comma();
                 json.prop("status", status(util));
                 json.objEnd();
@@ -2231,6 +2583,43 @@ public class RealtimeSimulationService {
             boolean deliveryCompleteWithinSimulation;
         }
 
+        private static class CollapseOutcome {
+            final String reason;
+            final int minute;
+            final String airportCode;
+            final String shipmentId;
+            final int expectedBags;
+            final int deliveredBags;
+            final int currentLoad;
+            final int maxCapacity;
+
+            private CollapseOutcome(String reason, int minute, String airportCode,
+                                    String shipmentId, int expectedBags, int deliveredBags,
+                                    int currentLoad, int maxCapacity) {
+                this.reason = reason;
+                this.minute = minute;
+                this.airportCode = airportCode;
+                this.shipmentId = shipmentId;
+                this.expectedBags = expectedBags;
+                this.deliveredBags = deliveredBags;
+                this.currentLoad = currentLoad;
+                this.maxCapacity = maxCapacity;
+            }
+
+            static CollapseOutcome capacity(int minute, Airport airport, int currentLoad) {
+                return new CollapseOutcome(
+                        "WAREHOUSE_CAPACITY", minute, airport.getCode(), "", 0, 0,
+                        currentLoad, airport.getMaxCapacity());
+            }
+
+            static CollapseOutcome deadline(int minute, Shipment shipment,
+                                            int expectedBags, int deliveredBags) {
+                return new CollapseOutcome(
+                        "DELIVERY_DEADLINE", minute, "", shipment.getShipmentId(),
+                        expectedBags, deliveredBags, 0, 0);
+            }
+        }
+
         private int eventPriority(String type) {
             return switch (type) {
                 case "flight_departure", "connection_departure", "final_pickup" -> 0;
@@ -2265,7 +2654,16 @@ public class RealtimeSimulationService {
         }
 
         private String scenarioLabel() {
+            if (isCollapseScenario()) return "Colapso";
             return "SIMULACION_LOTES".equals(scenario) ? "Simulación 5 días" : "Tiempo real";
+        }
+
+        private String simulationInstantAt(int minute) {
+            return LocalDate.parse(startDate, RAW_DATE)
+                    .atStartOfDay(originZone)
+                    .plusMinutes(minute)
+                    .toInstant()
+                    .toString();
         }
 
         private void captureLastPlanningSummary(List<Shipment> plannedScope, int deliveredByMinute) {

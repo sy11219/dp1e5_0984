@@ -55,6 +55,8 @@ export interface AirportEvent {
     | "flight_cancel_redirected"
     | "simulation_paused"
     | "simulation_resumed"
+    | "system_collapsed"
+    | "scenario_cancelled"
     | "snapshot_baseline";
 }
 
@@ -105,6 +107,18 @@ export interface Shipment {
   flightIds: string[];
 }
 
+export interface CollapseInfo {
+  reason: "WAREHOUSE_CAPACITY" | "DELIVERY_DEADLINE" | "" | string;
+  minute: number;
+  occurredAt: string;
+  airport: string;
+  shipmentId: string;
+  expectedBags: number;
+  deliveredBags: number;
+  currentLoad: number;
+  maxCapacity: number;
+}
+
 export interface SimulationData {
   simulationId?: string;
   ownerClientId?: string;
@@ -139,6 +153,7 @@ export interface SimulationData {
   realtimeExecutionIntervalMs?: number;
   pendingCancellationCount?: number;
   cancelledFlightIds?: string[];
+  collapse?: CollapseInfo;
   airports: Airport[];
   flights: Flight[];
   shipments: Shipment[];

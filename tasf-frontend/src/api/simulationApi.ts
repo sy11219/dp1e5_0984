@@ -5,6 +5,7 @@ import { api } from "./apiClient";
 const clientTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "";
 const BATCH_CLIENT_ID_KEY = "tasf.simulation5d.clientId";
 const BATCH_CONTROL_TOKEN_PREFIX = "tasf.simulation5d.controlToken.";
+const COLLAPSE_CONTROL_TOKEN_PREFIX = "tasf.collapse.controlToken.";
 
 export function getBatchClientId(): string {
   try {
@@ -47,6 +48,33 @@ function rememberBatchControlToken(data: SimulationData): void {
 export function ownsBatchSimulation(data: SimulationData | null | undefined): boolean {
   if (!data?.simulationId || !data.ownerClientId) return false;
   return data.ownerClientId === getBatchClientId() && Boolean(getBatchControlToken(data.simulationId));
+}
+
+function collapseTokenKey(simulationId: string): string {
+  return `${COLLAPSE_CONTROL_TOKEN_PREFIX}${simulationId}`;
+}
+
+export function getCollapseControlToken(simulationId?: string): string {
+  if (!simulationId) return "";
+  try {
+    return window.localStorage.getItem(collapseTokenKey(simulationId)) || "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberCollapseControlToken(data: SimulationData): void {
+  if (!data.simulationId || !data.controlToken) return;
+  try {
+    window.localStorage.setItem(collapseTokenKey(data.simulationId), data.controlToken);
+  } catch {
+    // Sin localStorage, la maquina queda como observadora tras recargar.
+  }
+}
+
+export function ownsCollapseSimulation(data: SimulationData | null | undefined): boolean {
+  if (!data?.simulationId || !data.ownerClientId) return false;
+  return data.ownerClientId === getBatchClientId() && Boolean(getCollapseControlToken(data.simulationId));
 }
 
 // ── Simulación estática (un solo disparo, sin lotes) ─────────────────────────
@@ -168,7 +196,8 @@ export async function getBatchShipmentsPageRequest(
     origin?: string;
     destination?: string;
     status?: string;
-  }
+  },
+  scenario?: string
 ): Promise<ShipmentPage> {
   const query = new URLSearchParams();
   query.set("page", String(params.page));
@@ -179,10 +208,76 @@ export async function getBatchShipmentsPageRequest(
   if (params.destination?.trim()) query.set("destination", params.destination.trim());
   if (params.status?.trim()) query.set("status", params.status.trim());
 
-  const response = await api.get<ShipmentPage>(
-    `/simulations/batch/${simulationId}/shipments?${query.toString()}`
-  );
+  const basePath = scenario === "Colapso"
+    ? `/collapse/${simulationId}/shipments`
+    : `/simulations/batch/${simulationId}/shipments`;
+  const response = await api.get<ShipmentPage>(`${basePath}?${query.toString()}`);
   return response.data;
+}
+
+// ── Escenario de colapso (aislado de tiempo real y simulación de 5 días) ──
+
+export async function startCollapseSimulationRequest(
+  startDate: string,
+  days: number,
+  startTime = "00:00",
+  currentSimulationId?: string
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>("/collapse/start", {
+    startDate: startDate.replaceAll("-", ""),
+    days,
+    startTime,
+    timeZone: clientTimeZone(),
+    clientId: getBatchClientId(),
+    controlToken: getCollapseControlToken(currentSimulationId),
+  });
+  rememberCollapseControlToken(response.data);
+  return response.data;
+}
+
+export async function getCurrentCollapseSimulationRequest(): Promise<SimulationData | null> {
+  const response = await api.get<SimulationData | Record<string, never>>("/collapse/current");
+  const data = response.data as Partial<SimulationData>;
+  return data.simulationId ? (data as SimulationData) : null;
+}
+
+export async function advanceCollapseSimulationRequest(
+  simulationId: string,
+  expectedTick: number
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(`/collapse/${simulationId}/advance`, {
+    expectedTick,
+    clientId: getBatchClientId(),
+    controlToken: getCollapseControlToken(simulationId),
+  });
+  rememberCollapseControlToken(response.data);
+  return response.data;
+}
+
+export async function pauseCollapseSimulationRequest(
+  simulationId: string,
+  paused: boolean
+): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(`/collapse/${simulationId}/pause`, {
+    paused,
+    clientId: getBatchClientId(),
+    controlToken: getCollapseControlToken(simulationId),
+  });
+  rememberCollapseControlToken(response.data);
+  return response.data;
+}
+
+export async function cancelCollapseSimulationRequest(simulationId: string): Promise<SimulationData> {
+  const response = await api.post<SimulationData>(`/collapse/${simulationId}/cancel`, {
+    clientId: getBatchClientId(),
+    controlToken: getCollapseControlToken(simulationId),
+  });
+  rememberCollapseControlToken(response.data);
+  return response.data;
+}
+
+export async function clearCollapseSimulationRequest(simulationId: string): Promise<void> {
+  await api.post(`/collapse/${simulationId}/clear`);
 }
 
 let realtimeOperationPromise: Promise<SimulationData> | null = null;

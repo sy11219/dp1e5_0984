@@ -188,7 +188,7 @@ export function ShipmentsTable({
       origin: originAirport !== ANY ? originAirport : undefined,
       destination: destinationAirport !== ANY ? destinationAirport : undefined,
       status: statusFilter !== ANY ? statusFilter : undefined,
-    })
+    }, data?.scenario)
       .then((response) => {
         if (cancelled) return;
         setRemoteShipments(response.items);
@@ -210,7 +210,7 @@ export function ShipmentsTable({
     return () => {
       cancelled = true;
     };
-  }, [destinationAirport, originAirport, page, remoteSortMinute, search, simulationId, statusFilter, useRemoteShipments]);
+  }, [data?.scenario, destinationAirport, originAirport, page, remoteSortMinute, search, simulationId, statusFilter, useRemoteShipments]);
 
   const totalPages = useRemoteShipments
     ? remoteTotalPages

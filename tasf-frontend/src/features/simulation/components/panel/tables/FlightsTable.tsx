@@ -91,14 +91,14 @@ export function FlightsTable({
           page: 1,
           pageSize,
           search: flightId,
-        });
+        }, data?.scenario);
         const remainingPages = await Promise.all(
           Array.from({ length: Math.max(0, firstPage.totalPages - 1) }, (_, index) =>
             getBatchShipmentsPageRequest(batchSimulationId, {
               page: index + 2,
               pageSize,
               search: flightId,
-            })
+            }, data?.scenario)
           )
         );
         const matchingShipments = [firstPage, ...remainingPages]
@@ -120,7 +120,7 @@ export function FlightsTable({
     return () => {
       cancelled = true;
     };
-  }, [batchSimulationId, selectedFlight, usesRemoteBatchShipments]);
+  }, [batchSimulationId, data?.scenario, selectedFlight, usesRemoteBatchShipments]);
 
   const relatedShipments = useMemo(() => {
     if (!selectedFlightShipments) return [];

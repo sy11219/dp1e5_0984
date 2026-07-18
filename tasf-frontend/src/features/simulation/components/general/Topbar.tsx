@@ -109,20 +109,35 @@ export function Topbar({
   );
 }
 
+interface SimulationStatusCardsProps extends Pick<TopbarProps, "data" | "simMinute" | "durationMs" | "displayGmtOffset" | "displayAirportLabel"> {
+  variant?: "simulation" | "collapse";
+}
+
 export function SimulationStatusCards({
   data,
   simMinute,
   durationMs,
   displayGmtOffset,
-}: Pick<TopbarProps, "data" | "simMinute" | "durationMs" | "displayGmtOffset" | "displayAirportLabel">) {
+  variant = "simulation",
+}: SimulationStatusCardsProps) {
   const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
   const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
+  const collapse = variant === "collapse";
 
   return (
     <>
       <DraggableMapOverlay initialX={18} initialY={18} className="map-status-overlay">
         <StackedStatusCard
-          items={[
+          items={collapse ? [
+            {
+              label: "Fecha y hora de inicio",
+              value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
+            },
+            {
+              label: "Fecha y hora en colapso",
+              value: data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--",
+            },
+          ] : [
             {
               label: "Fecha y hora de inicio",
               value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
@@ -138,11 +153,11 @@ export function SimulationStatusCards({
         <StackedStatusCard
           items={[
             {
-              label: "Duración de la simulación",
+              label: collapse ? "Duración del colapso" : "Duración de la simulación",
               value: data ? formatRealTime(simulationDurationMs) : "--",
             },
             {
-              label: "Tiempo transcurrido en simulación",
+              label: collapse ? "Tiempo transcurrido en colapso" : "Tiempo transcurrido en simulación",
               value: data ? formatElapsedSimulation(minutesFromStart) : "--",
             },
           ]}
