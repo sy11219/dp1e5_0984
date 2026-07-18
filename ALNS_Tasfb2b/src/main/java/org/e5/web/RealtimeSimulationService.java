@@ -1323,6 +1323,13 @@ public class RealtimeSimulationService {
             Flight requested = findFlight(flightId);
             Flight toCancel = resolveCancellationFlight(flightId);
             if (toCancel == null) {
+                if (!hasCancellationCode(flightId)) {
+                    throw new IllegalArgumentException("Vuelo no encontrado: " + normalizeFlightInput(flightId));
+                }
+                if (isBatchScenario()) {
+                    throw new IllegalArgumentException(
+                            "No hay una salida futura cancelable para el vuelo: " + normalizeFlightInput(flightId));
+                }
                 queueCancellationRequest(flightId);
                 events.add(new RealtimeEvent(tick, "SYSTEM", 1, "flight_cancelled_pending"));
                 return;
@@ -1376,10 +1383,19 @@ public class RealtimeSimulationService {
             if (input == null || input.isBlank()) {
                 throw new IllegalArgumentException("Codigo de vuelo invalido.");
             }
-            String normalized = input.trim();
+            String normalized = normalizeFlightInput(input);
             boolean exists = queuedCancellationRequests.stream()
                     .anyMatch(request -> request.matchesInput(normalized));
             if (!exists) queuedCancellationRequests.add(new CancellationRequest(normalized));
+        }
+
+        private boolean hasCancellationCode(String input) {
+            if (input == null || input.isBlank()) return false;
+            return flights.stream().anyMatch(f -> sameCancellationCode(f, input));
+        }
+
+        private String normalizeFlightInput(String input) {
+            return input == null ? "" : input.trim();
         }
 
         private void applyQueuedCancellationRequests() {
