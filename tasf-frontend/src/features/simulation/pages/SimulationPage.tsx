@@ -1077,15 +1077,6 @@ export function SimulationPage() {
             onStartDateChange={setStartDate}
             onStartTimeChange={setStartTime}
           />
-          <CapacityLegend />
-          <section className="panel section">
-            <h3>Indicadores</h3>
-            {data ? (
-              <Metrics data={data} />
-            ) : (
-              <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
-            )}
-          </section>
           {canShowSimulationActions && (
             <section className="panel section simulation-bottom-actions">
               {showSimulationFinalActions ? (
@@ -1118,6 +1109,15 @@ export function SimulationPage() {
               ) : null}
             </section>
           )}
+          <section className="panel section">
+            <h3>Indicadores</h3>
+            {data ? (
+              <Metrics data={data} />
+            ) : (
+              <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
+            )}
+          </section>
+          <CapacityLegend />
         </aside>
         ) : (
         <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
@@ -1379,7 +1379,7 @@ function SimulationControls({
           <label>Cancelar vuelo</label>
           <input
             type="text"
-            placeholder="código de vuelo (ej: SKBO-VIDP-0005)"
+            placeholder="ID: SKBO-VIDP-0005"
             value={flightToCancel}
             onChange={(e) => onFlightToCancelChange(e.target.value)}
             disabled={!hasSimulation || busy}

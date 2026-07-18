@@ -641,11 +641,6 @@ export function CollapsePage() {
               if (!animatingRef.current && data?.simulationId && data.status !== "COMPLETED") { setPlaying(true); void fetchNextBatch(data.simulationId, data.tick ?? 0) } 
               else { setPlaying(true) }
             }} onRunSimulation={runSimulation} onStartDateChange={setStartDate} onStartTimeChange={setStartTime} />
-          <CapacityLegend />
-          <section className="panel section">
-            <h3>Indicadores</h3>
-            {data ? <Metrics data={data} /> : <div className="empty-state">Ejecuta el simulador para ver métricas.</div>}
-          </section>
           {canShowSimulationActions && (
             <section className="panel section simulation-bottom-actions">
               {showSimulationFinalActions ? (
@@ -662,6 +657,11 @@ export function CollapsePage() {
               ) : null}
             </section>
           )}
+          <section className="panel section">
+            <h3>Indicadores</h3>
+            {data ? <Metrics data={data} /> : <div className="empty-state">Ejecuta el simulador para ver métricas.</div>}
+          </section>
+          <CapacityLegend />
         </aside>
         ) : (
         <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
@@ -735,7 +735,7 @@ function SimulationControls({ error, notice, flightToCancel, hasSimulation, load
         <div className="field"><label>Fecha inicial</label><input type="date" value={startDate} onChange={(e) => onStartDateChange(e.target.value)} disabled={busy || hasSimulation || !canControlSimulation} /></div>
         <div className="field"><label>Hora inicial</label><input type="time" value={startTime} onChange={(e) => onStartTimeChange(e.target.value)} disabled={busy || hasSimulation || !canControlSimulation} /></div>
         {canControlSimulation && (<button className="primary" onClick={hasSimulation && !playing ? onPlay : onRunSimulation} disabled={busy || (hasSimulation && playing)}>{loading ? "Iniciando..." : "Ejecutar Simulación Continua"}</button>)}
-        <div className="field"><label>Cancelar vuelo</label><input type="text" placeholder="código de vuelo (ej: SKBO-VIDP-0005)" value={flightToCancel} onChange={(e) => onFlightToCancelChange(e.target.value)} disabled={!hasSimulation || busy} /></div>
+        <div className="field"><label>Cancelar vuelo</label><input type="text" placeholder="ID: SKBO-VIDP-0005" value={flightToCancel} onChange={(e) => onFlightToCancelChange(e.target.value)} disabled={!hasSimulation || busy} /></div>
         <button className="primary" onClick={onCancelFlight} disabled={!hasSimulation || busy}>{cancelling ? "Registrando..." : "Registrar cancelación"}</button>
         {notice && <div className="success">{notice}</div>}
         {error && <div className="error">{error}</div>}

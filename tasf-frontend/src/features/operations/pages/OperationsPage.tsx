@@ -428,7 +428,7 @@ export const OperationsPage = () => {
                 <label>Cancelar vuelo</label>
                 <input
                   type="text"
-                  placeholder="código de vuelo (ej: SKBO-VIDP-0005)"
+                  placeholder="ID: SKBO-VIDP-0005"
                   value={flightToCancel}
                   onChange={(event) => setFlightToCancel(event.target.value)}
                   disabled={!data?.simulationId || cancelling}
@@ -447,17 +447,6 @@ export const OperationsPage = () => {
             </div>
           </section>
 
-          <CapacityLegend />
-
-          <section className="panel section">
-            <h3>Indicadores</h3>
-            {data ? (
-              <LiveMetrics data={data} airportLoads={airportLoads} />
-            ) : (
-              <div className="empty-state">Esperando datos de tiempo real.</div>
-            )}
-          </section>
-
           <section className="panel section operations-day-actions">
             <button
               type="button"
@@ -472,6 +461,17 @@ export const OperationsPage = () => {
                   : "Finalizar operaciones del día"}
             </button>
           </section>
+
+          <section className="panel section">
+            <h3>Indicadores</h3>
+            {data ? (
+              <LiveMetrics data={data} airportLoads={airportLoads} />
+            ) : (
+              <div className="empty-state">Esperando datos de tiempo real.</div>
+            )}
+          </section>
+
+          <CapacityLegend />
         </aside>
         ) : (
         <aside className="panel-rail panel-rail-left" aria-label="Panel izquierdo oculto">
