@@ -25,35 +25,85 @@ export function CapacityLegend() {
 
   const summary = useMemo(() => {
     return [
-      { color: "green", label: "Verde", value: thresholds.green },
-      { color: "yellow", label: "Amarillo", value: thresholds.yellow },
-      { color: "red", label: "Rojo", value: thresholds.red },
-      { color: "gray", label: "Gris", value: thresholds.gray },
+      {
+        color: "gray",
+        description: `${thresholds.gray}% o menos`,
+        value: thresholds.gray,
+      },
+      {
+        color: "green",
+        description: `Mayor a ${thresholds.gray}% y menor a ${thresholds.green}%`,
+        value: thresholds.green,
+      },
+      {
+        color: "yellow",
+        description: `${thresholds.green}% o más y menor a ${thresholds.yellow}%`,
+        value: thresholds.yellow,
+      },
+      {
+        color: "red",
+        description: `${thresholds.yellow}% o más`,
+        value: thresholds.red,
+      },
     ];
   }, [thresholds]);
 
   return (
     <section className="panel section">
-      <h3>Colores por capacidad</h3>
-      <div className="legend">
-        <div className="legend-row"><span className="dot green"></span>Mayor a {thresholds.gray}% y menor a {thresholds.green}%</div>
-        <div className="legend-row"><span className="dot yellow"></span>{thresholds.green}% o más y menor a {thresholds.yellow}%</div>
-        <div className="legend-row"><span className="dot red"></span>{thresholds.yellow}% o más</div>
-        <div className="legend-row"><span className="dot gray"></span>{thresholds.gray}% o menos</div>
-      </div>
-      <div style={{ display: "grid", gap: "0.5rem", marginTop: "0.75rem" }}>
+      <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Colores por capacidad</h3>
+      <div style={{ display: "grid", gap: "0.45rem", marginTop: "0.6rem" }}>
         {summary.map((item) => (
-          <label key={item.color} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-            <span style={{ textTransform: "capitalize" }}>{item.label}</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={item.value}
-              onChange={(event) => handleChange(item.color === "gray" ? "gray" : item.color === "green" ? "green" : item.color === "yellow" ? "yellow" : "red", event.target.value)}
-              style={{ width: "4.5rem" }}
-            />
-          </label>
+          <div
+            key={item.color}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              alignItems: "center",
+              gap: "0.65rem",
+              padding: "0.55rem 0.7rem",
+              border: "1px solid #e2e8f0",
+              borderRadius: "0.75rem",
+              background: "#fff",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", color: "#1a202c", fontSize: "0.9rem" }}>
+              <span
+                className={`dot ${item.color}`}
+                style={{ width: "0.8rem", height: "0.8rem", flexShrink: 0 }}
+              />
+              <span>{item.description}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={item.value}
+                onChange={(event) =>
+                  handleChange(
+                    item.color === "gray"
+                      ? "gray"
+                      : item.color === "green"
+                      ? "green"
+                      : item.color === "yellow"
+                      ? "yellow"
+                      : "red",
+                    event.target.value
+                  )
+                }
+                style={{
+                  width: "4.3rem",
+                  padding: "0.35rem 0.5rem",
+                  borderRadius: "0.6rem",
+                  border: "1px solid #cbd5e0",
+                  background: "#f8fafc",
+                  textAlign: "right",
+                  fontSize: "0.9rem",
+                }}
+              />
+              <span style={{ color: "#718096", fontSize: "0.9rem" }}>%</span>
+            </div>
+          </div>
         ))}
       </div>
       <button
@@ -63,7 +113,18 @@ export function CapacityLegend() {
           setThresholds(reset);
           setCapacityThresholds(reset);
         }}
-        style={{ marginTop: "0.75rem", width: "100%" }}
+        style={{
+          marginTop: "0.7rem",
+          width: "100%",
+          borderRadius: "0.75rem",
+          border: "1px solid #cbd5e0",
+          background: "#f7fafc",
+          color: "#2d3748",
+          fontWeight: 700,
+          padding: "0.65rem 0.9rem",
+          cursor: "pointer",
+          fontSize: "0.95rem",
+        }}
       >
         Restaurar por defecto
       </button>
