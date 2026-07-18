@@ -128,7 +128,7 @@ export function ShipmentsTable({
       set.add(flight.origin);
       set.add(flight.destination);
     }
-    return [...set].sort();
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }, [flights, remoteShipments, shipments, useRemoteShipments]);
 
   const filtered = useMemo(() => {

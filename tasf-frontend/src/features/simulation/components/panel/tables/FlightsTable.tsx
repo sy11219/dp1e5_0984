@@ -54,11 +54,14 @@ export function FlightsTable({
     batchSimulationId && (data?.planningWindowMinutes ?? 0) > 2
   );
 
-  const origins = useMemo(() => Array.from(new Set(flights.map((flight) => flight.origin))), [flights]);
-  const destinations = useMemo(
-    () => Array.from(new Set(flights.map((flight) => flight.destination))),
-    [flights]
-  );
+  const airportOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const flight of flights) {
+      set.add(flight.origin);
+      set.add(flight.destination);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [flights]);
 
   const selectedFlight = useMemo(
     () => (selectedFlightId ? flights.find((flight) => flight.id === selectedFlightId) ?? null : null),
@@ -274,9 +277,9 @@ export function FlightsTable({
           Origen:
           <select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
-            {origins.map((origin) => (
-              <option key={origin} value={origin}>
-                {origin}
+            {airportOptions.map((airport) => (
+              <option key={airport} value={airport}>
+                {airport}
               </option>
             ))}
           </select>
@@ -286,9 +289,9 @@ export function FlightsTable({
           Destino:
           <select value={destinationFilter} onChange={(event) => setDestinationFilter(event.target.value)}>
             <option value="Cualquiera">Cualquiera</option>
-            {destinations.map((destination) => (
-              <option key={destination} value={destination}>
-                {destination}
+            {airportOptions.map((airport) => (
+              <option key={airport} value={airport}>
+                {airport}
               </option>
             ))}
           </select>
