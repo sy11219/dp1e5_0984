@@ -734,7 +734,10 @@ export function SimulationPage() {
 
   // ── Derivados de la UI ─────────────────────────────────────────────────────
   const displayData = useMemo(
-    () => data ?? catalogSimulationData(airportCatalog, flightCatalog),
+    () =>
+      data
+        ? { ...data, flights: mergeFlightCatalog(data, flightCatalog) }
+        : catalogSimulationData(airportCatalog, flightCatalog),
     [airportCatalog, data, flightCatalog]
   )
   const airportLoads = useMemo(
@@ -1431,4 +1434,20 @@ function catalogSimulationData(airports: Airport[], flights: Flight[]): Simulati
     simulationEndDateTime: start,
     runtimeMs: 0,
   }
+}
+
+function mergeFlightCatalog(data: SimulationData | null, catalog: Flight[]): Flight[] {
+  if (!data) return catalog
+
+  const merged = new Map<string, Flight>()
+  for (const flight of data.flights ?? []) {
+    merged.set(flight.id, flight)
+  }
+  for (const flight of catalog) {
+    if (!merged.has(flight.id)) {
+      merged.set(flight.id, flight)
+    }
+  }
+
+  return [...merged.values()]
 }
