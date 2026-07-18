@@ -29,7 +29,9 @@ import java.util.concurrent.CountDownLatch;
 public class SimulatorServer {
     private static final int DEFAULT_PORT = 8080;
     private static final String MAP_TILES_HOST = "maptiles.p.rapidapi.com";
-    private static final String MAP_TILES_API_KEY = envString("TASF_MAPTILES_API_KEY", "");
+    private static final String DEFAULT_MAP_TILES_API_KEY = "bc605fd7a8mshd7f1ac12d535806p155339jsndb381c938fcb";
+    private static final String MAP_TILES_API_KEY = envString(
+            "TASF_MAPTILES_API_KEY", DEFAULT_MAP_TILES_API_KEY);
     private static final HttpClient MAP_TILES_HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)

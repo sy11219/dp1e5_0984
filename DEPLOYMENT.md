@@ -69,7 +69,15 @@ git pull
 
 ## 3. Variables de entorno del backend
 
-El backend necesita estas variables:
+El backend necesita estas variables. Crear una sola vez el archivo protegido que
+`systemd` leerá automáticamente en cada arranque:
+
+```bash
+sudo install -d -m 700 /etc/tasf
+sudo nano /etc/tasf/tasf-backend.env
+```
+
+Contenido de `/etc/tasf/tasf-backend.env`:
 
 ```bash
 PORT=8090
@@ -78,7 +86,17 @@ DB_USER=<USUARIO_DB>
 DB_PASSWORD=<PASSWORD_DB>
 ```
 
-No guardar credenciales reales en Git. Deben vivir en el servicio de systemd o en un archivo de entorno protegido.
+Protegerlo después de ingresar los valores reales:
+
+```bash
+sudo chmod 600 /etc/tasf/tasf-backend.env
+```
+
+No guardar credenciales reales en Git. El archivo queda solo en el servidor y se
+mantiene intacto entre actualizaciones del repositorio.
+La clave de MapTiles para los países y ciudades en español ya está incluida como valor
+predeterminado del backend, por lo que no requiere configuración adicional al desplegar.
+`TASF_MAPTILES_API_KEY` sigue disponible únicamente para sobrescribirla si se rota la clave.
 
 Para probar conectividad a la BD:
 
@@ -108,6 +126,7 @@ Environment="PORT=8090"
 Environment="DB_URL=jdbc:postgresql://<HOST>:5432/<DATABASE>?sslmode=require"
 Environment="DB_USER=<USUARIO_DB>"
 Environment="DB_PASSWORD=<PASSWORD_DB>"
+EnvironmentFile=/etc/tasf/tasf-backend.env
 ExecStart=/usr/bin/mvn exec:java
 Restart=always
 RestartSec=5
