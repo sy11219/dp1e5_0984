@@ -703,7 +703,7 @@ export function SimulationPage() {
   // ── Cancelar vuelo futuro ─────────────────────────────────────────────────
   const cancelFlight = async () => {
     const id = flightToCancel.trim()
-    if (!id) { setError("Ingresa el codigo de un vuelo."); return }
+    if (!id) { setError("Ingresa el código de un vuelo."); return }
     if (!data?.simulationId) { setError("Primero inicia una simulación."); return }
 
     // Pausar la animación durante la cancelación
@@ -722,7 +722,7 @@ export function SimulationPage() {
       setSelectedShipment(null)
       setMapFocusTarget(null)
       writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
-      setNotice(`Vuelo ${id} cancelado. Replanificación aplicada sobre el estado actual.`)
+      setNotice(`Vuelo ${id} cancelado. Aplicando replanificación al siguiente batch.`)
       setPlaying(updated.status === "RUNNING")
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo y replanificar.")

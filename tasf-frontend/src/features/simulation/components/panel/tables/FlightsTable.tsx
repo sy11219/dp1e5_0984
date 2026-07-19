@@ -54,6 +54,11 @@ export function FlightsTable({
     batchSimulationId && (data?.planningWindowMinutes ?? 0) > 2
   );
 
+  const cancelledFlightIdsSet = useMemo(() => {
+    console.log("cancelledFlightIdsSet", data?.cancelledFlightIds);
+    return new Set((data?.cancelledFlightIds ?? []).map(id => id.slice(0, -4)));
+  }, [data?.cancelledFlightIds]);
+
   const airportOptions = useMemo(() => {
     const set = new Set<string>();
     for (const flight of flights) {
@@ -340,6 +345,7 @@ export function FlightsTable({
           visibleFlights.map((flight) => {
             const active = activeFlightIds.has(flight.id);
             const isSelected = selectedFlightId === flight.id;
+            const isCancelled = cancelledFlightIdsSet.has(flight.id);
             const remoteResultMatchesFlight = remoteFlightId === flight.id;
             const isLoadingFlightShipments =
               isSelected &&
@@ -398,7 +404,7 @@ export function FlightsTable({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {active ? `${Math.round(flight.utilization * 100)}%` : "No iniciado"}
+                    {isCancelled ? "Cancelado" : active ? `${Math.round(flight.utilization * 100)}%` : "No iniciado"}
                   </span>
                 </div>
                 {isSelected && (
