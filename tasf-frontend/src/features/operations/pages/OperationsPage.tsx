@@ -576,20 +576,24 @@ export const OperationsPage = () => {
             {openRightPanelSection === "shipments" && (
               <div className="collapsible-content">
                 <div className="list-toolbar">
-              <h3>Envíos</h3>
-              <label className="text-sm">
-                Mostrar finalizados hace
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  step={1}
-                  value={shipmentHistoryHours}
-                  onChange={(e) => setShipmentHistoryHours(Math.max(1, Number(e.target.value) || 1))}
-                />
-                h
-              </label>
-            </div>
+                  <h3>Envíos</h3>
+                </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                  Mostrar finalizados hace
+                  <input
+                    type="number"
+                    min={0}
+                    max={24}
+                    step={1}
+                    value={shipmentHistoryHours}
+                    onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
+                    style={{ width: "2rem" }}
+                  />
+                  h
+                </label>
+              </div>
+              <br></br>
             <ShipmentsTable
               shipments={visibleShipments}
               flights={data?.flights || []}

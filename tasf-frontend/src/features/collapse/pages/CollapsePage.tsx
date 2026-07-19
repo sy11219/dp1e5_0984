@@ -119,6 +119,7 @@ export function CollapsePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [realTimeMs, setRealTimeMs] = useState(0);
+  const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [reportOpen, setReportOpen] = useState(false);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
@@ -399,8 +400,17 @@ export function CollapsePage() {
   );
   const activeFlightIds = useMemo(() => new Set(activeFlights.map((flight) => flight.id)), [activeFlights]);
   const visibleShipments = useMemo(
-    () => [...displayData.shipments].sort((a, b) => a.requestMinute - b.requestMinute),
-    [displayData.shipments]
+    () => {
+      const historyMinutes = shipmentHistoryHours * 60
+      return (displayData.shipments ?? [])
+        .filter(
+          (s) =>
+            s.requestMinute <= simMinute &&
+            (!s.planned || simMinute <= s.estimatedArrival + historyMinutes)
+        )
+        .sort((a, b) => a.estimatedArrival - b.estimatedArrival)
+    },
+    [displayData, simMinute, shipmentHistoryHours]
   );
   const mapSelectedFlightId = useMemo(() => {
     if (!selectedFlightId || flightColorFilter === "Todos") return selectedFlightId;
@@ -543,7 +553,25 @@ export function CollapsePage() {
             </section>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "shipments" ? null : "shipments")} aria-expanded={openRightPanelSection === "shipments"}><span>Envíos</span><strong>{openRightPanelSection === "shipments" ? "-" : "+"}</strong></button>
-              {openRightPanelSection === "shipments" && <div className="collapsible-content"><ShipmentsTable shipments={visibleShipments} flights={displayData.flights} data={data} simMinute={simMinute} displayGmtOffset={displayGmtOffset} selectedShipmentId={selectedShipment?.id ?? null} onSelectShipment={focusShipment} onSelectFlight={focusFlight} /></div>}
+              {openRightPanelSection === "shipments" && <div className="collapsible-content"><div className="list-toolbar">
+                  <h3>Envíos</h3>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                  <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                    Mostrar finalizados hace
+                    <input
+                      type="number"
+                      min={0}
+                      max={24}
+                      step={1}
+                      value={shipmentHistoryHours}
+                      onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
+                      style={{ width: "2rem" }}
+                    />
+                    h
+                  </label>
+                </div>
+                <br></br><ShipmentsTable shipments={visibleShipments} flights={displayData.flights} data={data} simMinute={simMinute} displayGmtOffset={displayGmtOffset} selectedShipmentId={selectedShipment?.id ?? null} onSelectShipment={focusShipment} onSelectFlight={focusFlight} /></div>}
             </section>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "airports" ? null : "airports")} aria-expanded={openRightPanelSection === "airports"}><span>Aeropuertos</span><strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong></button>

@@ -55,7 +55,6 @@ export function FlightsTable({
   );
 
   const cancelledFlightIdsSet = useMemo(() => {
-    console.log("cancelledFlightIdsSet", data?.cancelledFlightIds);
     return new Set((data?.cancelledFlightIds ?? []).map(id => id.slice(0, -4)));
   }, [data?.cancelledFlightIds]);
 
