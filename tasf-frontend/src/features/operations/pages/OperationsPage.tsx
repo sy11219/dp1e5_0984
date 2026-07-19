@@ -380,7 +380,7 @@ export const OperationsPage = () => {
       const updated = await cancelRealtimeFlightRequest(data.simulationId, flightToCancel.trim());
       setData(updated);
       setFlightToCancel("");
-      setNotice("Cancelación registrada. Se aplicará en la siguiente ejecución de Tiempo real.");
+      setNotice("Cancelación registrada. Aplicando replanificación al siguiente batch.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo.");
     } finally {
