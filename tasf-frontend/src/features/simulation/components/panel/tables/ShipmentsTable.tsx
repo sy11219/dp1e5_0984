@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
 import type { Flight, Shipment, SimulationData } from "../../../types";
-import { formatSimMinute } from "../../../utils/formatters";
+import { formatFlightMoment } from "../../../utils/formatters";
 import { FlightListModal } from "../FlightListModal";
 
 interface ShipmentsTableProps {
@@ -347,7 +347,7 @@ export function ShipmentsTable({
                     ? "#ffbf00"
                     : "#718096";
             const arrivalLabel = shipment.planned
-              ? formatSimMinute(shipment.estimatedArrival, gmtOffset)
+              ? formatFlightMoment(data, shipment.estimatedArrival, gmtOffset)
               : "pendiente";
             const isSelected = effectiveSelectedShipmentId === shipment.id;
 
@@ -362,7 +362,8 @@ export function ShipmentsTable({
                   <div className="row-main">
                     <strong>{shipment.id}</strong>
                     <span>{`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas`}</span>
-                    <span>{`Pedido: ${formatSimMinute(shipment.requestMinute, gmtOffset)} - Llegada: ${arrivalLabel}`}</span>
+                    <span>{`Pedido: ${formatFlightMoment(data, shipment.requestMinute, gmtOffset)}`}</span>
+                    <span>{`Llegada: ${arrivalLabel}`}</span>
                   </div>
                   <span className="capacity-pill" style={{ background: statusColor, color: "#fff" }}>
                     {shipmentState}
