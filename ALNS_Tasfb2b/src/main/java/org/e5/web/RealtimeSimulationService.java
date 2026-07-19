@@ -212,7 +212,7 @@ public class RealtimeSimulationService {
     public synchronized String pauseRealtime(String id, boolean paused) {
         RealtimeSession session = require(id);
         if (!"TIEMPO_REAL".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es una operacion de tiempo real.");
+            throw new IllegalArgumentException("La sesión indicada no es una operacion de tiempo real.");
         }
         session.setPaused(paused);
         return session.snapshotJson();
@@ -322,7 +322,7 @@ public class RealtimeSimulationService {
             return "{}";
         }
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+            throw new IllegalArgumentException("La sesión indicada no es una simulacion por lotes.");
         }
         if (!session.completed) {
             requireBatchControl(session, clientId, controlToken);
@@ -339,7 +339,7 @@ public class RealtimeSimulationService {
                                                     String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+            throw new IllegalArgumentException("La sesión indicada no es una simulación por lotes.");
         }
         requireBatchControl(session, clientId, controlToken);
         session.setPaused(paused);
@@ -401,9 +401,9 @@ public class RealtimeSimulationService {
         if (session == null) {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         }
-        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
-            throw new IllegalArgumentException("Las cancelaciones no estan disponibles en esta sesion.");
+            throw new IllegalArgumentException("Las cancelaciones no están disponibles en esta sesión.");
         }
         session.cancel(flightId, flightPlanService);
         return session.snapshotJson();
@@ -421,9 +421,9 @@ public class RealtimeSimulationService {
         if (session == null) {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         }
-        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es una simulacion por lotes.");
+            throw new IllegalArgumentException("La sesión indicada no es una simulación por lotes.");
         }
         return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
     }
@@ -432,7 +432,7 @@ public class RealtimeSimulationService {
 
     /**
      * Inicia una ejecucion aislada de colapso. A diferencia de la simulacion
-     * de 5 dias, esta sesion consume los TXT en ventanas de 12 horas hasta
+     * de 5 dias, esta sesión consume los TXT en ventanas de 12 horas hasta
      * hallar el primer incumplimiento.
      */
     public synchronized String startCollapseSimulation(String startDate, int days, String startTime,
@@ -443,9 +443,9 @@ public class RealtimeSimulationService {
         if (current != null) {
             if (!current.completed) {
                 requireBatchControl(current, clientId, controlToken);
-                throw new IllegalStateException("Ya hay un escenario de colapso en ejecucion. Pauselo o cancelalo antes de iniciar otro.");
+                throw new IllegalStateException("Ya hay un escenario de colapso en ejecución. Páusalo o cancélalo antes de iniciar otro.");
             }
-            throw new IllegalStateException("El escenario anterior termino. Cualquier maquina puede limpiarlo antes de iniciar uno nuevo.");
+            throw new IllegalStateException("El escenario anterior terminó. Cualquier máquina puede limpiarlo antes de iniciar uno nuevo.");
         }
 
         int startOffsetMinutes = parseStartTime(startTime);
@@ -476,7 +476,7 @@ public class RealtimeSimulationService {
         }
         if (session == null) return "{}";
         if (!"COLAPSO".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
 
         synchronized (session) {
@@ -491,7 +491,7 @@ public class RealtimeSimulationService {
                                                        String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if (!"COLAPSO".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
         requireBatchControl(session, clientId, controlToken);
         session.setPaused(paused);
@@ -502,7 +502,7 @@ public class RealtimeSimulationService {
     public synchronized String cancelCollapseSimulation(String id, String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if (!"COLAPSO".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
         requireBatchControl(session, clientId, controlToken);
         session.cancelCollapse();
@@ -511,13 +511,13 @@ public class RealtimeSimulationService {
 
     /**
      * Una ejecucion que termino o fue cancelada puede eliminarse desde cualquier
-     * maquina. La sesion activa nunca se limpia por esta ruta.
+     * maquina. La sesión activa nunca se limpia por esta ruta.
      */
     public synchronized String clearCollapseSimulation(String id) {
         RealtimeSession session = sessions.get(id);
         if (session == null) return "{}";
         if (!"COLAPSO".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
         if (!session.completed) {
             throw new IllegalStateException("No se puede limpiar un escenario de colapso que sigue activo.");
@@ -538,9 +538,9 @@ public class RealtimeSimulationService {
         if (session == null) {
             session = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
         }
-        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
         if (!"COLAPSO".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesion indicada no es un escenario de colapso.");
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
         return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
     }
@@ -673,14 +673,14 @@ public class RealtimeSimulationService {
 
     private RealtimeSession require(String id) {
         RealtimeSession session = sessions.get(id);
-        if (session == null) throw new IllegalArgumentException("Sesion no encontrada.");
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
         return session;
     }
 
     private void requireBatchControl(RealtimeSession session, String clientId, String controlToken) {
         if (session == null || !session.isBatchScenario()) return;
         if (session.controlsAllowed(clientId, controlToken)) return;
-        throw new SecurityException("Solo la maquina que inicio la simulacion puede controlar esta sesion.");
+        throw new SecurityException("Solo la máquina que inició la simulación puede controlar esta sesión.");
     }
 
     private static String normalizeClientId(String clientId) {

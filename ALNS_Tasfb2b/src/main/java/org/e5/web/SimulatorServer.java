@@ -182,10 +182,10 @@ public class SimulatorServer {
     private void startRealtimeOnBoot() {
         try {
             realtimeSimulationService.startAtCurrentTime(DEFAULT_REALTIME_DAYS, DEFAULT_REALTIME_TIME_ZONE);
-            System.out.printf("[Tiempo real] Scheduler iniciado en fecha/hora actual (%s) por %d dias.%n",
+            System.out.printf("[Tiempo real] Scheduler iniciado en fecha/hora actual (%s) por %d días.%n",
                     DEFAULT_REALTIME_TIME_ZONE, DEFAULT_REALTIME_DAYS);
         } catch (Exception e) {
-            System.err.printf("[Tiempo real] No se pudo iniciar automaticamente: %s%n", e.getMessage());
+            System.err.printf("[Tiempo real] No se pudo iniciar automáticamente: %s%n", e.getMessage());
         }
     }
 
@@ -215,7 +215,7 @@ public class SimulatorServer {
         int x = Integer.parseInt(matcher.group(2));
         int y = Integer.parseInt(matcher.group(3));
         if (!isValidMapTileCoordinate(zoom, x, y)) {
-            send(exchange, 400, "application/json", "{\"error\":\"Coordenadas de mosaico invalidas\"}");
+            send(exchange, 400, "application/json", "{\"error\":\"Coordenadas de mosaico inválidas\"}");
             return;
         }
 
@@ -231,7 +231,7 @@ public class SimulatorServer {
         try {
             HttpResponse<byte[]> response = MAP_TILES_HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() != 200) {
-                send(exchange, 502, "application/json", "{\"error\":\"No se pudo obtener el mosaico en espanol\"}");
+                send(exchange, 502, "application/json", "{\"error\":\"No se pudo obtener el mosaico en español\"}");
                 return;
             }
 
@@ -271,7 +271,7 @@ public class SimulatorServer {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
-            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulacion ALNS\"}");
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulación ALNS\"}");
         }
     }
 
@@ -326,7 +326,7 @@ public class SimulatorServer {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 Boolean active = readBoolean(ACTIVE, body);
                 if (active == null) {
-                    send(exchange, 400, "application/json", "{\"error\":\"Envie active como true o false\"}");
+                    send(exchange, 400, "application/json", "{\"error\":\"Envíe active como true o false\"}");
                     return;
                 }
                 send(exchange, 200, "application/json", airportStatusService.updateStatus(code, active).toJson());
@@ -464,7 +464,7 @@ public class SimulatorServer {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 e.printStackTrace();
-                send(exchange, 500, "application/json", "{\"error\":\"No se pudieron cargar los envios\"}");
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudieron cargar los envíos\"}");
             }
             return;
         }
@@ -499,7 +499,7 @@ public class SimulatorServer {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
-            send(exchange, 500, "application/json", "{\"error\":\"No se pudo registrar el envio\"}");
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo registrar el envío\"}");
         }
     }
 
@@ -549,7 +549,7 @@ public class SimulatorServer {
             if (pauseMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 Boolean paused = readBoolean(PAUSED, body);
                 if (paused == null) {
-                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    send(exchange, 400, "application/json", "{\"error\":\"Envíe paused como true o false\"}");
                     return;
                 }
                 send(exchange, 200, "application/json",
@@ -632,7 +632,7 @@ public class SimulatorServer {
                 String controlToken = readString(CONTROL_TOKEN, body, "");
                 Boolean paused = readBoolean(PAUSED, body);
                 if (paused == null) {
-                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    send(exchange, 400, "application/json", "{\"error\":\"Envíe paused como true o false\"}");
                     return;
                 }
                 send(exchange, 200, "application/json",
@@ -665,14 +665,14 @@ public class SimulatorServer {
                 return;
             }
 
-            send(exchange, 404, "application/json", "{\"error\":\"Endpoint de simulacion por lotes no encontrado\"}");
+            send(exchange, 404, "application/json", "{\"error\":\"Endpoint de simulación por lotes no encontrado\"}");
         } catch (SecurityException e) {
             send(exchange, 403, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (IllegalArgumentException e) {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
-            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulacion por lotes\"}");
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo ejecutar la simulación por lotes\"}");
         }
     }
 
