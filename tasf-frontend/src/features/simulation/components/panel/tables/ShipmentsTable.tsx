@@ -98,6 +98,7 @@ export function ShipmentsTable({
   const [originAirport, setOriginAirport] = useState(ANY);
   const [destinationAirport, setDestinationAirport] = useState(ANY);
   const [statusFilter, setStatusFilter] = useState(ANY);
+  const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [page, setPage] = useState(1);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [localSelectedShipmentId, setLocalSelectedShipmentId] = useState<string | null>(null);
@@ -132,7 +133,15 @@ export function ShipmentsTable({
   }, [flights, remoteShipments, shipments, useRemoteShipments]);
 
   const filtered = useMemo(() => {
-    let result = [...shipments].sort((a, b) => compareShipmentsByNextDelivery(a, b, simMinute));
+    const historyMinutes = shipmentHistoryHours * 60;
+    
+    let result = shipments.filter(
+      (shipment) =>
+        shipment.requestMinute <= simMinute &&
+        (!shipment.planned || simMinute <= shipment.estimatedArrival + historyMinutes)
+    );
+
+    result = result.sort((a, b) => compareShipmentsByNextDelivery(a, b, simMinute));
 
     if (search.trim()) {
       const query = search.toLowerCase();
@@ -164,7 +173,7 @@ export function ShipmentsTable({
     }
 
     return result;
-  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute, flightById]);
+  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute, flightById, shipmentHistoryHours]);
 
   useEffect(() => {
     if (!useRemoteShipments || !simulationId) {
@@ -222,11 +231,13 @@ export function ShipmentsTable({
   const totalItems = useRemoteShipments ? remoteTotal : filtered.length;
   const canGoBack = currentPage > 1;
   const canGoForward = currentPage < totalPages;
+  
   const hasActiveFilters =
     Boolean(search.trim()) ||
     originAirport !== ANY ||
     destinationAirport !== ANY ||
-    statusFilter !== ANY;
+    statusFilter !== ANY ||
+    shipmentHistoryHours !== 1;
 
   const toggleSelectShipment = (shipment: Shipment) => {
     const nextSelected = effectiveSelectedShipmentId === shipment.id ? null : shipment.id;
@@ -251,6 +262,7 @@ export function ShipmentsTable({
     setOriginAirport(ANY);
     setDestinationAirport(ANY);
     setStatusFilter(ANY);
+    setShipmentHistoryHours(1);
     setPage(1);
   };
 
@@ -267,6 +279,25 @@ export function ShipmentsTable({
           }}
           style={{ width: "100%" }}
         />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+          Mostrar finalizados hace
+          <input
+            type="number"
+            min={0}
+            max={24}
+            step={1}
+            value={shipmentHistoryHours}
+            onChange={(e) => {
+              setShipmentHistoryHours(Number(e.target.value));
+              setPage(1);
+            }}
+            style={{ width: "2rem" }}
+          />
+          h
+        </label>
       </div>
 
       <div className="filters" style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" }}>

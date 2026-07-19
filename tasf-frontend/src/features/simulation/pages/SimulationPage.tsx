@@ -250,7 +250,6 @@ export function SimulationPage() {
   const [loading, setLoading]         = useState(false)   // cargando primer lote
   const [loadingAirports, setLoadingAirports] = useState(false)
   const [loadingFlights, setLoadingFlights] = useState(false)
-  const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [fetching, setFetching]       = useState(false)   // cargando lote intermedio
   const [cancelling, setCancelling]   = useState(false)
   const [error, setError]             = useState("")
@@ -779,17 +778,8 @@ export function SimulationPage() {
     return capacityStatus(load / airport.maxCapacity) === airportColorFilter ? selectedAirport : null
   }, [airportColorFilter, airportLoads, displayData.airports, selectedAirport])
   const visibleShipments = useMemo(
-    () => {
-      const historyMinutes = shipmentHistoryHours * 60
-      return (displayData.shipments ?? [])
-        .filter(
-          (s) =>
-            s.requestMinute <= simMinute &&
-            (!s.planned || simMinute <= s.estimatedArrival + historyMinutes)
-        )
-        .sort((a, b) => a.estimatedArrival - b.estimatedArrival)
-    },
-    [displayData, simMinute, shipmentHistoryHours]
+    () => [...(displayData.shipments ?? [])].sort((a, b) => a.requestMinute - b.requestMinute),
+    [displayData.shipments]
   );
   const controlsBusy = loading || fetching || cancelling
   const ownsCurrentSimulation = ownsBatchSimulation(data)
@@ -1236,22 +1226,6 @@ export function SimulationPage() {
                 <div className="list-toolbar">
                   <h3>Envíos</h3>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-                  <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-                    Mostrar finalizados hace
-                    <input
-                      type="number"
-                      min={0}
-                      max={24}
-                      step={1}
-                      value={shipmentHistoryHours}
-                      onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
-                      style={{ width: "2rem" }}
-                    />
-                    h
-                  </label>
-                </div>
-                <br></br>
                 {loadingFlights && <div className="empty-state">Cargando envíos...</div>}
                 <ShipmentsTable
                   shipments={visibleShipments}

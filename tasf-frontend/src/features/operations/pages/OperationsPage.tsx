@@ -112,7 +112,6 @@ export const OperationsPage = () => {
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [openRightPanelSection, setOpenRightPanelSection] = useState<RightPanelSection | null>(null);
-  const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
   const [operationDayToggling, setOperationDayToggling] = useState(false);
   const [operationSummaryOpen, setOperationSummaryOpen] = useState(false);
   const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos");
@@ -263,15 +262,8 @@ export const OperationsPage = () => {
     [activeFlights]
   )
   const visibleShipments = useMemo(
-    () => {
-      const historyMinutes = shipmentHistoryHours * 60;
-      return (data?.shipments ?? []).filter(
-        (shipment) =>
-          shipment.requestMinute <= operationalMinute &&
-          (!shipment.planned || operationalMinute <= shipment.estimatedArrival + historyMinutes)
-      );
-    },
-    [data, operationalMinute, shipmentHistoryHours]
+    () => [...(data.shipments ?? [])].sort((a, b) => a.requestMinute - b.requestMinute),
+    [data.shipments]
   );
   const displayGmtOffset = assignedAirportTime?.gmtOffset;
   const operationsClosed = data?.status === "PAUSED";
@@ -578,22 +570,6 @@ export const OperationsPage = () => {
                 <div className="list-toolbar">
                   <h3>Envíos</h3>
                 </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
-                <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
-                  Mostrar finalizados hace
-                  <input
-                    type="number"
-                    min={0}
-                    max={24}
-                    step={1}
-                    value={shipmentHistoryHours}
-                    onChange={(e) => setShipmentHistoryHours(Number(e.target.value))}
-                    style={{ width: "2rem" }}
-                  />
-                  h
-                </label>
-              </div>
-              <br></br>
             <ShipmentsTable
               shipments={visibleShipments}
               flights={data?.flights || []}
