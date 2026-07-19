@@ -11,6 +11,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -186,10 +187,10 @@ public class FlightPlanParser {
              PreparedStatement statement = connection.prepareStatement(sql)) {
             try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
-                    ZonedDateTime departure = result.getTimestamp("departure_time_utc")
+                    ZonedDateTime departure = result.getObject("departure_time_utc", OffsetDateTime.class)
                             .toInstant()
                             .atZone(ZoneOffset.UTC);
-                    ZonedDateTime arrival = result.getTimestamp("arrival_time_utc")
+                    ZonedDateTime arrival = result.getObject("arrival_time_utc", OffsetDateTime.class)
                             .toInstant()
                             .atZone(ZoneOffset.UTC);
 

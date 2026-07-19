@@ -12,7 +12,6 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -96,6 +95,14 @@ public class ShipmentParser {
         return parseAll("data/envios", simulationStartDate, maxSimulationDays);
     }
 
+    public List<Shipment> parseAll(
+            String simulationStartDate,
+            int maxSimulationDays,
+            ZoneId simulationZone
+    ) throws IOException {
+        return parseAll("data/envios", simulationStartDate, maxSimulationDays, simulationZone);
+    }
+
     public List<Shipment> parseAllFromDatabase(String simulationStartDate, int maxSimulationDays) throws IOException {
         return parseAllFromDatabase(simulationStartDate, maxSimulationDays, ZoneOffset.UTC);
     }
@@ -144,10 +151,10 @@ public class ShipmentParser {
 
                 try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
-                        Timestamp registeredTimestamp = result.getTimestamp("registered_at");
-                        if (registeredTimestamp == null) continue;
+                        OffsetDateTime registeredAt = result.getObject("registered_at", OffsetDateTime.class);
+                        if (registeredAt == null) continue;
 
-                        Instant registeredInstant = registeredTimestamp.toInstant();
+                        Instant registeredInstant = registeredAt.toInstant();
                         int requestMinute = (int) Duration.between(startInstant, registeredInstant).toMinutes();
                         if (requestMinute < 0 || requestMinute >= maxSimulationMinutes) continue;
 
@@ -172,10 +179,10 @@ public class ShipmentParser {
             }
         } catch (IllegalStateException e) {
             System.err.printf("[ShipmentParser] %s. Usando carpeta local data/envios.%n", e.getMessage());
-            return parseAll("data/envios", simulationStartDate, maxSimulationDays);
+            return parseAll("data/envios", simulationStartDate, maxSimulationDays, zone);
         } catch (SQLException e) {
             System.err.printf("[ShipmentParser] No se pudo conectar a la base de datos (%s). Usando carpeta local data/envios.%n", e.getMessage());
-            return parseAll("data/envios", simulationStartDate, maxSimulationDays);
+            return parseAll("data/envios", simulationStartDate, maxSimulationDays, zone);
         }
 
         System.out.printf("[ShipmentParser] Cargados %d envios desde BD.%n", shipments.size());
@@ -192,6 +199,15 @@ public class ShipmentParser {
      * @throws IOException Si hay error de lectura
      */
     public List<Shipment> parseAll(String folderPath, String simulationStartDate, int maxSimulationDays) throws IOException {
+        return parseAll(folderPath, simulationStartDate, maxSimulationDays, ZoneOffset.UTC);
+    }
+
+    public List<Shipment> parseAll(
+            String folderPath,
+            String simulationStartDate,
+            int maxSimulationDays,
+            ZoneId simulationZone
+    ) throws IOException {
         List<Shipment> allShipments = new ArrayList<>();
 
         File folder = new File(folderPath);
@@ -214,7 +230,12 @@ public class ShipmentParser {
             if (!fm.matches()) continue;
 
             String airportCode = fm.group(1).toUpperCase();
-            List<Shipment> shipments = parseFile(file.getAbsolutePath(), airportCode, simulationStartDate, maxSimulationDays);
+            List<Shipment> shipments = parseFile(
+                    file.getAbsolutePath(),
+                    airportCode,
+                    simulationStartDate,
+                    maxSimulationDays,
+                    simulationZone);
             allShipments.addAll(shipments);
             fileCount++;
 
@@ -239,6 +260,16 @@ public class ShipmentParser {
      */
     public List<Shipment> parseFile(String filePath, String originCode,
                                      String simulationStartDate, int maxSimulationDays) throws IOException {
+        return parseFile(filePath, originCode, simulationStartDate, maxSimulationDays, ZoneOffset.UTC);
+    }
+
+    public List<Shipment> parseFile(
+            String filePath,
+            String originCode,
+            String simulationStartDate,
+            int maxSimulationDays,
+            ZoneId simulationZone
+    ) throws IOException {
         List<Shipment> shipments = new ArrayList<>();
         LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
         String earliestRelevantDate = startDate.minusDays(1).format(RAW_DATE);
@@ -270,7 +301,14 @@ public class ShipmentParser {
                 String clientId     = m.group(7);
 
                 // Convertir fecha/hora a minutos desde el inicio de simulación
-                int requestMinute = dateTimeToSimMinutes(date, hourStr, minuteStr, simulationStartDate, originCode, airportMap);
+                int requestMinute = dateTimeToSimMinutes(
+                        date,
+                        hourStr,
+                        minuteStr,
+                        simulationStartDate,
+                        originCode,
+                        airportMap,
+                        simulationZone);
 
                 // Filtrar envíos fuera del rango de simulación
                 int maxSimulationMinutes = maxSimulationDays * 1440;
@@ -383,6 +421,30 @@ public class ShipmentParser {
         }
     }
 
+    private int dateTimeToSimMinutes(String date, String hourStr, String minuteStr,
+                                     String simulationStartDate,
+                                     String originCode,
+                                     Map<String, Airport> airportMap,
+                                     ZoneId simulationZone) {
+        try {
+            ZoneId zone = simulationZone == null ? ZoneOffset.UTC : simulationZone;
+            ZoneOffset eventOffset = originOffset(originCode);
+            Instant simulationStart = LocalDate.parse(simulationStartDate, RAW_DATE)
+                    .atStartOfDay(zone)
+                    .toInstant();
+            Instant eventInstant = LocalDate.parse(date, RAW_DATE)
+                    .atTime(Integer.parseInt(hourStr), Integer.parseInt(minuteStr))
+                    .atOffset(eventOffset)
+                    .toInstant();
+
+            return Math.toIntExact(Duration.between(simulationStart, eventInstant).toMinutes());
+        } catch (Exception e) {
+            System.err.printf("[ShipmentParser] Error convirtiendo fecha %s %s:%s -> 0%n",
+                    date, hourStr, minuteStr);
+            return 0;
+        }
+    }
+
     /**
      * Calcula el número de días desde una época arbitraria (1/1/1900) para una fecha dada.
      * Se usa para calcular diferencias de días entre dos fechas.
@@ -466,10 +528,10 @@ public class ShipmentParser {
 
                 try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
-                        Timestamp registeredTimestamp = result.getTimestamp("registered_at");
-                        if (registeredTimestamp == null) continue;
+                        OffsetDateTime registeredAt = result.getObject("registered_at", OffsetDateTime.class);
+                        if (registeredAt == null) continue;
 
-                        Instant registeredInstant = registeredTimestamp.toInstant();
+                        Instant registeredInstant = registeredAt.toInstant();
                         int requestMinute = (int) Duration.between(absoluteStartInstant, registeredInstant).toMinutes();
 
                         if (requestMinute < startMinute || requestMinute >= endMinute) continue;
@@ -541,7 +603,14 @@ public class ShipmentParser {
                     if (date.compareTo(earliestRelevantDate) < 0) continue;
                     if (date.compareTo(latestExclusiveDate) >= 0 && ASSUME_SORTED_TXT_SHIPMENTS) break;
 
-                    int requestMinute = dateTimeToSimMinutes(date, m.group(3), m.group(4), simulationStartDate, airportCode, airportMap);
+                    int requestMinute = dateTimeToSimMinutes(
+                            date,
+                            m.group(3),
+                            m.group(4),
+                            simulationStartDate,
+                            airportCode,
+                            airportMap,
+                            simulationZone);
 
                     if (requestMinute >= startMinute && requestMinute < endMinute) {
                         allShipments.add(new Shipment(

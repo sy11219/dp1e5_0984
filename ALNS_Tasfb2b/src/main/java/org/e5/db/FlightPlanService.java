@@ -192,8 +192,8 @@ public class FlightPlanService {
             Instant baseInstant = null;
             boolean first = true;
             while (result.next()) {
-                Instant departure = result.getTimestamp("departure_time_utc").toInstant();
-                Instant arrival = result.getTimestamp("arrival_time_utc").toInstant();
+                Instant departure = instant(result, "departure_time_utc");
+                Instant arrival = instant(result, "arrival_time_utc");
                 if (baseInstant == null) {
                     LocalDate baseDate = departure.atZone(ZoneOffset.UTC).toLocalDate();
                     baseInstant = baseDate.atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -218,8 +218,8 @@ public class FlightPlanService {
                 prop(json, "origin_airport_id", result.getString("origin_airport_id")).append(",");
                 prop(json, "destination", result.getString("destination_code")).append(",");
                 prop(json, "destination_airport_id", result.getString("destination_airport_id")).append(",");
-                prop(json, "departure_time_local", result.getTimestamp("departure_time_local").toLocalDateTime().toString()).append(",");
-                prop(json, "arrival_time_local", result.getTimestamp("arrival_time_local").toLocalDateTime().toString()).append(",");
+                prop(json, "departure_time_local", localDateTime(result, "departure_time_local").toString()).append(",");
+                prop(json, "arrival_time_local", localDateTime(result, "arrival_time_local").toString()).append(",");
                 prop(json, "departure_time_utc", departure.toString()).append(",");
                 prop(json, "arrival_time_utc", arrival.toString()).append(",");
                 prop(json, "capacity", capacity).append(",");
@@ -265,7 +265,7 @@ public class FlightPlanService {
                 if (!result.next()) {
                     throw new IllegalArgumentException("Vuelo no encontrado en BD: " + flightCode);
                 }
-                Instant departure = result.getTimestamp("departure_time_utc").toInstant();
+                Instant departure = instant(result, "departure_time_utc");
                 LocalDate baseDate = departure.atZone(ZoneOffset.UTC).toLocalDate();
                 Instant baseInstant = baseDate.atStartOfDay().toInstant(ZoneOffset.UTC);
                 return flightJson(result, baseInstant);
@@ -274,8 +274,8 @@ public class FlightPlanService {
     }
 
     private String flightJson(ResultSet result, Instant baseInstant) throws SQLException {
-        Instant departure = result.getTimestamp("departure_time_utc").toInstant();
-        Instant arrival = result.getTimestamp("arrival_time_utc").toInstant();
+        Instant departure = instant(result, "departure_time_utc");
+        Instant arrival = instant(result, "arrival_time_utc");
         int absoluteDeparture = minutesBetween(baseInstant, departure);
         int absoluteArrival = minutesBetween(baseInstant, arrival);
         int dayOffset = Math.floorDiv(absoluteDeparture, 1440);
@@ -291,8 +291,8 @@ public class FlightPlanService {
         prop(json, "origin_airport_id", result.getString("origin_airport_id")).append(",");
         prop(json, "destination", result.getString("destination_code")).append(",");
         prop(json, "destination_airport_id", result.getString("destination_airport_id")).append(",");
-        prop(json, "departure_time_local", result.getTimestamp("departure_time_local").toLocalDateTime().toString()).append(",");
-        prop(json, "arrival_time_local", result.getTimestamp("arrival_time_local").toLocalDateTime().toString()).append(",");
+        prop(json, "departure_time_local", localDateTime(result, "departure_time_local").toString()).append(",");
+        prop(json, "arrival_time_local", localDateTime(result, "arrival_time_local").toString()).append(",");
         prop(json, "departure_time_utc", departure.toString()).append(",");
         prop(json, "arrival_time_utc", arrival.toString()).append(",");
         prop(json, "capacity", capacity).append(",");
@@ -517,6 +517,14 @@ public class FlightPlanService {
 
     private int minutesBetween(Instant baseInstant, Instant value) {
         return Math.toIntExact(Duration.between(baseInstant, value).toMinutes());
+    }
+
+    private Instant instant(ResultSet result, String column) throws SQLException {
+        return result.getObject(column, OffsetDateTime.class).toInstant();
+    }
+
+    private LocalDateTime localDateTime(ResultSet result, String column) throws SQLException {
+        return result.getObject(column, LocalDateTime.class);
     }
 
     private StringBuilder prop(StringBuilder json, String name, String value) {

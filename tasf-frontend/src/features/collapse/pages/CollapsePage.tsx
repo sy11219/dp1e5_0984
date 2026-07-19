@@ -27,7 +27,6 @@ import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "
 import { capacityStatus, computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../../simulation/utils/calculations";
 import { DEFAULT_START_TIME } from "../../simulation/utils/constants";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
-import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
 
 const COLLAPSE_START_DATE = "2026-01-02";
 const COLLAPSE_MAX_DAYS = 1100;
@@ -106,7 +105,6 @@ function catalogSimulationData(airports: Airport[], flights: Flight[]): Simulati
 }
 
 export function CollapsePage() {
-  const assignedAirportTime = useAssignedAirportTime();
   const [initialMapFocus] = useState(() => readMapFocus(MAP_FOCUS_KEY));
   const [data, setData] = useState<SimulationData | null>(null);
   const [airportCatalog, setAirportCatalog] = useState<Airport[]>([]);
@@ -464,10 +462,8 @@ export function CollapsePage() {
   const owner = ownsCollapseSimulation(data);
   const terminal = isTerminal(data);
   const busy = loading || fetching;
-  const displayGmtOffset = assignedAirportTime?.gmtOffset;
-  const displayAirportLabel = assignedAirportTime
-    ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
-    : undefined;
+  const displayGmtOffset = undefined;
+  const displayAirportLabel = "hora local de esta PC";
   const terminalTitle = data?.status === "COLLAPSED"
     ? "⚠️ COLAPSO DEL SISTEMA"
     : data?.status === "CANCELLED"
@@ -547,7 +543,7 @@ export function CollapsePage() {
             </section>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "airports" ? null : "airports")} aria-expanded={openRightPanelSection === "airports"}><span>Aeropuertos</span><strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong></button>
-              {openRightPanelSection === "airports" && <div className="collapsible-content">{loadingCatalog && <div className="empty-state">Cargando aeropuertos...</div>}{displayData.airports.length ? <AirportsTable airports={displayData.airports} loads={airportLoads} flights={displayData.flights} shipments={visibleShipments} simMinute={simMinute} selectedAirport={selectedAirport} displayGmtOffset={displayGmtOffset} onSelectAirport={focusAirport} colorFilter={airportColorFilter} onColorFilterChange={setAirportColorFilter} /> : <div className="empty-state">Sin datos.</div>}</div>}
+              {openRightPanelSection === "airports" && <div className="collapsible-content">{loadingCatalog && <div className="empty-state">Cargando aeropuertos...</div>}{displayData.airports.length ? <AirportsTable airports={displayData.airports} loads={airportLoads} flights={displayData.flights} shipments={visibleShipments} simMinute={simMinute} data={displayData} selectedAirport={selectedAirport} displayGmtOffset={displayGmtOffset} onSelectAirport={focusAirport} colorFilter={airportColorFilter} onColorFilterChange={setAirportColorFilter} /> : <div className="empty-state">Sin datos.</div>}</div>}
             </section>
           </aside>
         ) : (

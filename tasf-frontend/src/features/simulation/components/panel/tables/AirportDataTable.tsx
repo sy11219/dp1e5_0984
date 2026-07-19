@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { AirportFlight, AirportShipment } from "../../../utils/airportRelations";
 import { Button } from "@/components/ui/button";
-import { formatSimMinute } from "../../../utils/formatters";
+import type { SimulationData } from "../../../types";
+import { formatFlightMoment, formatSimMinute } from "../../../utils/formatters";
 
 type ViewType = "incoming" | "outgoing" | "shipments";
 
@@ -10,6 +11,7 @@ type Props = {
   flights: AirportFlight[];
   shipments: AirportShipment[];
   airportCode: string;
+  data?: SimulationData | null;
   displayGmtOffset?: number;
 };
 
@@ -20,8 +22,10 @@ function roleLabel(role: AirportShipment["role"]) {
   return role === "origin" ? "Origen" : role === "destination" ? "Destino" : "Escala";
 }
 
-export function AirportDataTable({ viewType, flights, shipments, airportCode, displayGmtOffset }: Props) {
+export function AirportDataTable({ viewType, flights, shipments, airportCode, data, displayGmtOffset }: Props) {
   const [page, setPage] = useState(1);
+  const formatMoment = (minute: number) =>
+    data ? formatFlightMoment(data, minute, displayGmtOffset) : formatSimMinute(minute, displayGmtOffset ?? 0);
 
   // Resetear página cuando cambian los datos
   useEffect(() => {
@@ -57,7 +61,7 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, di
                   <td><strong>{flight.id}</strong></td>
                   <td>{counterpart}</td>
                   <td className="text-right">
-                    {formatSimMinute(flight.absoluteArrivalMinute, displayGmtOffset ?? 0)}
+                    {formatMoment(flight.absoluteArrivalMinute)}
                   </td>
                   <td className="text-right">{load}</td>
                 </tr>
@@ -99,7 +103,7 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, di
                   <td><strong>{flight.id}</strong></td>
                   <td>{counterpart}</td>
                   <td className="text-right">
-                    {formatSimMinute(flight.absoluteDepartureMinute, displayGmtOffset ?? 0)}
+                    {formatMoment(flight.absoluteDepartureMinute)}
                   </td>
                   <td className="text-right">{load}</td>
                 </tr>

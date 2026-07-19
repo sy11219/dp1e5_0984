@@ -27,7 +27,6 @@ import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../util
 import { capacityStatus, computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../utils/calculations"
 import { SimulationResultModal } from "../components/general/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
-import { useAssignedAirportTime } from "../utils/assignedAirportTime"
 
 const BATCH_SIMULATION_PAUSED_KEY = "tasf.simulation5d.paused"
 const BATCH_SIMULATION_STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
@@ -239,7 +238,6 @@ function simulationStartControls(data: SimulationData | null) {
  *   – Se reanuda la animación desde el tick actual.
  */
 export function SimulationPage() {
-  const assignedAirportTime = useAssignedAirportTime()
   const [initialMapFocus] = useState(() => readMapFocus(SIMULATION_MAP_FOCUS_KEY))
   const [startDate, setStartDate]     = useState(DEFAULT_START_DATE)
   const [startTime, setStartTime]     = useState(DEFAULT_START_TIME)
@@ -714,7 +712,8 @@ export function SimulationPage() {
     setNotice("")
 
     try {
-      const updated = await cancelBatchFlightRequest(data.simulationId, id)
+      const cancellationInput = resolveCancellationInput(id, data, simMinute)
+      const updated = await cancelBatchFlightRequest(data.simulationId, cancellationInput)
       setFlightToCancel("")
       setData(updated)
       setSelectedAirport(null)
@@ -736,7 +735,7 @@ export function SimulationPage() {
   const displayData = useMemo(
     () =>
       data
-        ? { ...data, flights: mergeFlightCatalog(data, flightCatalog) }
+        ? data
         : catalogSimulationData(airportCatalog, flightCatalog),
     [airportCatalog, data, flightCatalog]
   )
@@ -799,10 +798,8 @@ export function SimulationPage() {
   const storedSummaryOpen = showReport || stopSummaryOpen
   const canShowSimulationActions = canControlSimulation || simulationCompleted || storedSummaryAvailable
   const showSimulationFinalActions = simulationCompleted || storedSummaryAvailable
-  const displayGmtOffset = assignedAirportTime?.gmtOffset
-  const displayAirportLabel = assignedAirportTime
-    ? `Hora local ${assignedAirportTime.code} - ${assignedAirportTime.city || "aeropuerto"}`
-    : undefined
+  const displayGmtOffset = undefined
+  const displayAirportLabel = "hora local de esta PC"
 
   const clearMapSelection = useCallback((options?: { resetView?: boolean }) => {
     setSelectedAirport(null)
@@ -1261,6 +1258,7 @@ export function SimulationPage() {
                 flights={displayData.flights}
                 shipments={visibleShipments}
                 simMinute={simMinute}
+                data={displayData}
                 selectedAirport={selectedAirport}
                 displayGmtOffset={displayGmtOffset}
                 onSelectAirport={focusAirport}
@@ -1403,6 +1401,20 @@ function SimulationControls({
   )
 }
 
+function resolveCancellationInput(rawId: string, data: SimulationData | null, currentMinute: number): string {
+  const normalized = rawId.trim().toLowerCase()
+  if (!data || !normalized || rawId.includes("@")) return rawId
+
+  const matchingFlight = [...(data.flights ?? [])]
+    .filter((flight) => flight.id.toLowerCase() === normalized)
+    .sort((a, b) => a.absoluteDepartureMinute - b.absoluteDepartureMinute)
+    .find((flight) => flight.absoluteDepartureMinute - currentMinute >= 60)
+
+  return matchingFlight
+    ? `${matchingFlight.id}@${matchingFlight.absoluteDepartureMinute}`
+    : rawId
+}
+
 function catalogSimulationData(airports: Airport[], flights: Flight[]): SimulationData {
   const start = `${DEFAULT_START_DATE}T${DEFAULT_START_TIME}:00`
   return {
@@ -1436,18 +1448,3 @@ function catalogSimulationData(airports: Airport[], flights: Flight[]): Simulati
   }
 }
 
-function mergeFlightCatalog(data: SimulationData | null, catalog: Flight[]): Flight[] {
-  if (!data) return catalog
-
-  const merged = new Map<string, Flight>()
-  for (const flight of data.flights ?? []) {
-    merged.set(flight.id, flight)
-  }
-  for (const flight of catalog) {
-    if (!merged.has(flight.id)) {
-      merged.set(flight.id, flight)
-    }
-  }
-
-  return [...merged.values()]
-}

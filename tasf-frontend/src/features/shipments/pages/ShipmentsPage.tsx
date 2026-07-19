@@ -15,14 +15,23 @@ import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTi
 
 const PAGE_SIZE = 12;
 
-function currentDateTimeLocalValue() {
+function currentDateTimeLocalValue(gmtOffset?: number) {
   const now = new Date();
+  if (typeof gmtOffset === "number") {
+    const shifted = new Date(now.getTime() + gmtOffset * 60 * 60 * 1000);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(
+      shifted.getUTCDate()
+    )}T${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:${pad(
+      shifted.getUTCSeconds()
+    )}`;
+  }
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 19);
 }
 
-function currentDateValue() {
-  return currentDateTimeLocalValue().slice(0, 10);
+function currentDateValue(gmtOffset?: number) {
+  return currentDateTimeLocalValue(gmtOffset).slice(0, 10);
 }
 
 function formatShipmentDate(value: string) {
@@ -33,11 +42,15 @@ function formatShipmentDate(value: string) {
   return value.replace("T", " ").replace("Z", " UTC");
 }
 
-function emptyForm(originAirportCode = "", destinationAirportCode = ""): ShipmentCreatePayload {
+function emptyForm(
+  originAirportCode = "",
+  destinationAirportCode = "",
+  gmtOffset?: number
+): ShipmentCreatePayload {
   return {
     originAirportCode,
     destinationAirportCode,
-    departureDate: currentDateTimeLocalValue(),
+    departureDate: currentDateTimeLocalValue(gmtOffset),
     baggageCount: 1,
     clientId: "",
   };
@@ -62,7 +75,10 @@ export function ShipmentsPage() {
   const [modalError, setModalError] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [listDate] = useState(currentDateValue);
+  const listDate = useMemo(
+    () => currentDateValue(assignedAirportTime?.gmtOffset),
+    [assignedAirportTime?.gmtOffset]
+  );
 
   const loadPageData = async () => {
     setLoading(true);
@@ -139,7 +155,7 @@ export function ShipmentsPage() {
     setCreated(null);
     setCreatedBatch(null);
     setModalError("");
-    setForm(emptyForm(assignedAirportTime.code, defaultDestination));
+    setForm(emptyForm(assignedAirportTime.code, defaultDestination, assignedAirportTime.gmtOffset));
   };
 
   const openBatchCreator = () => {
@@ -176,7 +192,7 @@ export function ShipmentsPage() {
         ...form,
         originAirportCode: (assignedAirportTime?.code || form.originAirportCode).toUpperCase(),
         destinationAirportCode: form.destinationAirportCode.toUpperCase(),
-        departureDate: currentDateTimeLocalValue(),
+        departureDate: currentDateTimeLocalValue(assignedAirportTime?.gmtOffset),
         clientId: form.clientId,
       });
       setCreated(createdShipment);

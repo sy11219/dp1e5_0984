@@ -41,9 +41,9 @@ export function FlightListModal({
       <div className="modal-content" onClick={(event) => event.stopPropagation()}>
         <h3>Ruta del envio {shipment.id}</h3>
         <p className="route-modal-summary">
-          {`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas - pedido ${formatSimMinute(
-            shipment.requestMinute
-          )}`}
+          {`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas - pedido ${
+            data ? formatFlightMoment(data, shipment.requestMinute) : formatSimMinute(shipment.requestMinute)
+          }`}
         </p>
 
         {initialWait !== undefined && (
@@ -79,8 +79,8 @@ export function FlightListModal({
                   <div>ID: {leg.flightId}</div>
                   <div>Salida: {departure}</div>
                   <div>Llegada: {arrival}</div>
-                  {leg.flight && (
-                    <div>{`Carga: ${leg.flight.assignedLoad}/${leg.flight.maxCapacity} maletas`}</div>
+                  {leg.assignedLoad !== undefined && leg.maxCapacity !== undefined && (
+                    <div>{`Carga: ${leg.assignedLoad}/${leg.maxCapacity} maletas`}</div>
                   )}
                   {onSelectFlight && (
                     <button

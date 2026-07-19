@@ -7,6 +7,8 @@ export type ShipmentRouteLeg = {
   destination: string;
   absoluteDepartureMinute?: number;
   absoluteArrivalMinute?: number;
+  assignedLoad?: number;
+  maxCapacity?: number;
   waitBeforeMinutes?: number;
   transferAirport?: string;
 };
@@ -24,6 +26,32 @@ export function resolveShipmentRoute(
   flights: Flight[]
 ): ShipmentRouteLeg[] {
   if (!shipment || !shipment.flightIds.length) return [];
+
+  if (shipment.flightLegs?.length) {
+    let previousArrival: number | null = null;
+    let previousDestination: string | null = null;
+
+    return shipment.flightLegs.map((leg) => {
+      const waitBeforeMinutes =
+        previousArrival !== null
+          ? Math.max(0, leg.absoluteDepartureMinute - previousArrival)
+          : undefined;
+      const resolved: ShipmentRouteLeg = {
+        flightId: leg.flightId,
+        origin: leg.origin,
+        destination: leg.destination,
+        absoluteDepartureMinute: leg.absoluteDepartureMinute,
+        absoluteArrivalMinute: leg.absoluteArrivalMinute,
+        assignedLoad: leg.assignedLoad,
+        maxCapacity: leg.maxCapacity,
+        waitBeforeMinutes,
+        transferAirport: previousDestination ?? undefined,
+      };
+      previousArrival = leg.absoluteArrivalMinute;
+      previousDestination = leg.destination;
+      return resolved;
+    });
+  }
 
   const flightsById = new Map<string, Flight[]>();
   for (const flight of flights) {
@@ -70,6 +98,8 @@ export function resolveShipmentRoute(
       destination: flight?.destination ?? parsed.destination,
       absoluteDepartureMinute: flight?.absoluteDepartureMinute,
       absoluteArrivalMinute: flight?.absoluteArrivalMinute,
+      assignedLoad: flight?.assignedLoad,
+      maxCapacity: flight?.maxCapacity,
       waitBeforeMinutes,
       transferAirport: previousDestination ?? undefined,
     };

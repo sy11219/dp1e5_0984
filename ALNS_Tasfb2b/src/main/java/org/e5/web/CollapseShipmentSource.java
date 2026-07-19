@@ -7,9 +7,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,12 +35,19 @@ final class CollapseShipmentSource implements AutoCloseable {
             "^(\\d+)-(\\d{8})-(\\d{2})-(\\d{2})-([A-Z]{4})-(\\d{3})-(\\d{7})\\s*$");
 
     private final LocalDate simulationStartDate;
+    private final ZoneId simulationZone;
     private final Map<String, Airport> airportMap;
     private final int maxMinute;
     private final List<Cursor> cursors = new ArrayList<>();
 
-    CollapseShipmentSource(String startDate, int maxMinute, Map<String, Airport> airportMap) throws IOException {
+    CollapseShipmentSource(
+            String startDate,
+            int maxMinute,
+            Map<String, Airport> airportMap,
+            ZoneId simulationZone
+    ) throws IOException {
         this.simulationStartDate = LocalDate.parse(startDate, RAW_DATE);
+        this.simulationZone = simulationZone == null ? ZoneOffset.UTC : simulationZone;
         this.maxMinute = maxMinute;
         this.airportMap = airportMap;
 
@@ -133,14 +143,14 @@ final class CollapseShipmentSource implements AutoCloseable {
         }
 
         private int requestMinute(String date, String hour, String minute) {
-            LocalDate shipmentDate = LocalDate.parse(date, RAW_DATE);
-            long days = ChronoUnit.DAYS.between(simulationStartDate, shipmentDate);
             Airport origin = airportMap.get(originCode);
             int gmtOffset = origin == null ? 0 : origin.getGmtOffset();
-            return Math.toIntExact(days * 1_440L
-                    + Integer.parseInt(hour) * 60L
-                    + Integer.parseInt(minute)
-                    - gmtOffset * 60L);
+            Instant simulationStart = simulationStartDate.atStartOfDay(simulationZone).toInstant();
+            Instant shipmentInstant = LocalDate.parse(date, RAW_DATE)
+                    .atTime(Integer.parseInt(hour), Integer.parseInt(minute))
+                    .atOffset(ZoneOffset.ofHours(gmtOffset))
+                    .toInstant();
+            return Math.toIntExact(Duration.between(simulationStart, shipmentInstant).toMinutes());
         }
 
         void close() {

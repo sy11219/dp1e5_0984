@@ -11,9 +11,12 @@ import org.e5.planner.ALNS;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,7 +33,12 @@ public class SimulationService {
     private final RuntimeCatalogService catalogService = new RuntimeCatalogService();
 
     public String runAlns(String startDate, int days) throws Exception {
+        return runAlns(startDate, days, ZoneId.systemDefault().getId());
+    }
+
+    public String runAlns(String startDate, int days, String timeZone) throws Exception {
         validate(startDate, days);
+        ZoneId simulationZone = resolveZone(timeZone);
 
         LocalDateTime realStartedAt = LocalDateTime.now(SERVER_ZONE);
         long startedNanos = System.nanoTime();
@@ -40,10 +48,10 @@ public class SimulationService {
                 catalogService.loadRuntimeCatalog(startDate, flightDays);
         List<Airport> airports = catalog.airports();
         Map<String, Airport> airportMap = catalog.airportMap();
-        List<Flight> flights = catalog.flights();
+        List<Flight> flights = alignFlightsToSimulationZone(catalog.flights(), startDate, simulationZone);
 
         ShipmentParser shipmentParser = new ShipmentParser(airportMap);
-        List<Shipment> shipments = shipmentParser.parseAll(startDate, days);
+        List<Shipment> shipments = shipmentParser.parseAll(startDate, days, simulationZone);
 
         ALNS alns = new ALNS(
                 Math.min(180, Math.max(80, shipments.size() / 10)),
@@ -63,7 +71,7 @@ public class SimulationService {
         LocalDateTime realFinishedAt = LocalDateTime.now(SERVER_ZONE);
 
         return toJson(startDate, days, airports, flights, shipments, routes, alns,
-                realStartedAt, realFinishedAt, runtimeMs);
+                realStartedAt, realFinishedAt, runtimeMs, simulationZone);
     }
 
     private void validate(String startDate, int days) {
@@ -76,6 +84,54 @@ public class SimulationService {
         //}
     }
 
+    private List<Flight> alignFlightsToSimulationZone(
+            List<Flight> flights,
+            String startDate,
+            ZoneId simulationZone
+    ) {
+        LocalDate date = LocalDate.parse(startDate, RAW_DATE);
+        ZonedDateTime localStart = date.atStartOfDay(simulationZone);
+        ZonedDateTime utcStart = date.atStartOfDay(ZoneOffset.UTC);
+        List<Flight> aligned = new ArrayList<>(flights.size());
+
+        for (Flight flight : flights) {
+            ZonedDateTime departureUtc = utcStart.plusMinutes(flight.absoluteDepartureMinute());
+            ZonedDateTime arrivalUtc = utcStart.plusMinutes(flight.absoluteArrivalMinute());
+            int localDeparture = Math.toIntExact(Duration.between(
+                    localStart.toInstant(),
+                    departureUtc.toInstant()
+            ).toMinutes());
+            int localArrival = Math.toIntExact(Duration.between(
+                    localStart.toInstant(),
+                    arrivalUtc.toInstant()
+            ).toMinutes());
+            int dayOffset = Math.floorDiv(localDeparture, 1440);
+            int departureMinute = Math.floorMod(localDeparture, 1440);
+            int arrivalMinute = localArrival - dayOffset * 1440;
+
+            aligned.add(new Flight(
+                    flight.getFlightId(),
+                    flight.getOriginCode(),
+                    flight.getDestCode(),
+                    departureMinute,
+                    arrivalMinute,
+                    flight.getMaxCapacity(),
+                    dayOffset
+            ));
+        }
+
+        return aligned;
+    }
+
+    private ZoneId resolveZone(String timeZone) {
+        if (timeZone == null || timeZone.isBlank()) return ZoneId.systemDefault();
+        try {
+            return ZoneId.of(timeZone.trim());
+        } catch (Exception ignored) {
+            return ZoneId.systemDefault();
+        }
+    }
+
     private String toJson(String startDate, int days,
                           List<Airport> airports,
                           List<Flight> flights,
@@ -84,11 +140,13 @@ public class SimulationService {
                           ALNS alns,
                           LocalDateTime realStartedAt,
                           LocalDateTime realFinishedAt,
-                          long runtimeMs) {
+                          long runtimeMs,
+                          ZoneId simulationZone) {
         Json json = new Json();
         LocalDate simStartDate = LocalDate.parse(startDate, RAW_DATE);
-        String simStart = simStartDate.atStartOfDay().format(ISO_DATE_TIME);
-        String simEnd = simStartDate.plusDays(days).atStartOfDay().format(ISO_DATE_TIME);
+        ZonedDateTime simulationStart = simStartDate.atStartOfDay(simulationZone);
+        String simStart = simulationStart.toInstant().toString();
+        String simEnd = simulationStart.plusDays(days).toInstant().toString();
 
         Map<String, AirportLoad> airportLoads = buildAirportLoads(airports, shipments);
         List<Flight> usedFlights = flights.stream()

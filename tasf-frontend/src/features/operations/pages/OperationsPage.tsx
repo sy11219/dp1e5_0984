@@ -31,8 +31,6 @@ import {
 type ColorFilter = "Todos" | CapacityStatus;
 type RightPanelSection = "flights" | "shipments" | "airports";
 
-import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTime";
-
 const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
 const REALTIME_STATUS_POLL_MS = 5_000;
 
@@ -92,7 +90,6 @@ function LiveMetrics({
 }
 
 export const OperationsPage = () => {
-  const assignedAirportTime = useAssignedAirportTime();
   const [initialMapFocus] = useState(() => readMapFocus(OPERATIONS_MAP_FOCUS_KEY));
   const [data, setData] = useState<SimulationData | null>(null);
   const [, setLoading] = useState(true);
@@ -262,10 +259,10 @@ export const OperationsPage = () => {
     [activeFlights]
   )
   const visibleShipments = useMemo(
-    () => [...(data.shipments ?? [])].sort((a, b) => a.requestMinute - b.requestMinute),
-    [data.shipments]
+    () => [...(data?.shipments ?? [])].sort((a, b) => a.requestMinute - b.requestMinute),
+    [data?.shipments]
   );
-  const displayGmtOffset = assignedAirportTime?.gmtOffset;
+  const displayGmtOffset = undefined;
   const operationsClosed = data?.status === "PAUSED";
   const operationRealTimeMs = useMemo(
     () => elapsedOperationTimeMs(data, now.getTime()),
@@ -604,6 +601,7 @@ export const OperationsPage = () => {
                 flights={data.flights}
                 shipments={visibleShipments}
                 simMinute={operationalMinute}
+                data={data}
                 selectedAirport={selectedAirport}
                 displayGmtOffset={displayGmtOffset}
                 onSelectAirport={focusAirport}

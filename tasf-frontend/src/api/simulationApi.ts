@@ -463,12 +463,6 @@ export type ShipmentCreatePayload = {
   clientId: string;
 };
 
-function toUtcIsoIfLocalDateTime(value: string): string {
-  if (!value || /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return value;
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : value;
-}
-
 export type ShipmentRecord = {
   shipment_code: string;
   origin_airport_code: string;
@@ -503,16 +497,14 @@ export type ShipmentBatchResult = {
 export async function createShipmentRequest(
   payload: ShipmentCreatePayload
 ): Promise<ShipmentRecord> {
-  const response = await api.post<ShipmentRecord>("/shipments", {
-    ...payload,
-    departureDate: toUtcIsoIfLocalDateTime(payload.departureDate),
-  });
+  const response = await api.post<ShipmentRecord>("/shipments", payload);
   return response.data;
 }
 
 export async function getShipmentsRequest(date?: string): Promise<ShipmentListRecord[]> {
   const params = new URLSearchParams();
   if (date) params.set("date", date.replaceAll("-", ""));
+  params.set("timeZone", clientTimeZone());
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const response = await api.get<ShipmentListRecord[]>(`/shipments${suffix}`);
   return response.data;

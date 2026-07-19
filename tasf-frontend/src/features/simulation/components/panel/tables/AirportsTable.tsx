@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import type { Airport, AirportLoads, CapacityStatus, Flight, Shipment } from "../../../types";
+import type { Airport, AirportLoads, CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
 import { getFlightsForAirport, getNextFlightByAirport, getShipmentsForAirport } from "../../../utils/airportRelations";
@@ -11,6 +11,7 @@ interface AirportsTableProps {
   flights: Flight[];
   shipments: Shipment[];
   simMinute: number;
+  data?: SimulationData | null;
   selectedAirport?: string | null;
   displayGmtOffset?: number;
   onSelectAirport?: (code: string) => void;
@@ -27,6 +28,7 @@ export function AirportsTable({
   flights,
   shipments,
   simMinute,
+  data,
   selectedAirport: selectedAirportProp,
   displayGmtOffset,
   onSelectAirport,
@@ -161,6 +163,7 @@ export function AirportsTable({
             flights={expandedFlights}
             shipments={expandedShipments}
             airportCode={expandedAirportCode}
+            data={data}
             displayGmtOffset={displayGmtOffset}
           />
         </div>

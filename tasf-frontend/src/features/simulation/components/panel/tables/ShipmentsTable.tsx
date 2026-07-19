@@ -107,7 +107,7 @@ export function ShipmentsTable({
   const [remoteTotalPages, setRemoteTotalPages] = useState(1);
   const [remoteLoading, setRemoteLoading] = useState(false);
   const [remoteError, setRemoteError] = useState("");
-  const gmtOffset = displayGmtOffset ?? 0;
+  const gmtOffset = displayGmtOffset;
   const simulationId = data?.simulationId;
   const useRemoteShipments = Boolean(simulationId) && (data?.planningWindowMinutes ?? 0) > 2;
   const isSelectionControlled = selectedShipmentId !== undefined;

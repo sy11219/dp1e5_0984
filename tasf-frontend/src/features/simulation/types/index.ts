@@ -105,6 +105,21 @@ export interface Shipment {
   estimatedArrival: number;
   delayMinutes: number;
   flightIds: string[];
+  flightLegs?: ShipmentFlightLeg[];
+}
+
+export interface ShipmentFlightLeg {
+  flightId: string;
+  origin: string;
+  destination: string;
+  dayOffset: number;
+  departureMinute: number;
+  arrivalMinute: number;
+  absoluteDepartureMinute: number;
+  absoluteArrivalMinute: number;
+  assignedLoad: number;
+  maxCapacity: number;
+  utilization: number;
 }
 
 export interface CollapseInfo {

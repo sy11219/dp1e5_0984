@@ -597,7 +597,7 @@ public class RealtimeSimulationService {
             // Escenario original: carga completa (5 días)
             int shipmentDaysToLoad = startOffsetMinutes > 0 ? days + 1 : days;
             shipments = "SIMULACION_LOTES".equals(scenario)
-                    ? shipmentParser.parseAll("data/envios", startDate, shipmentDaysToLoad)
+                    ? shipmentParser.parseAll("data/envios", startDate, shipmentDaysToLoad, sessionZone)
                     : shipmentParser.parseAllFromDatabase(startDate, shipmentDaysToLoad, sessionZone);
         } else {
             // Escenario largo (> 5 días): carga inicial limitada a 5 días
@@ -802,7 +802,7 @@ public class RealtimeSimulationService {
                     ? this.maxTick + MAX_DELIVERY_DEADLINE_MINUTES
                     : this.maxTick;
             this.collapseShipmentSource = isCollapseScenario()
-                    ? new CollapseShipmentSource(startDate, this.maxTick, airportMap)
+                    ? new CollapseShipmentSource(startDate, this.maxTick, airportMap, originZone)
                     : null;
             this.visualWindowStartedAtMs = System.currentTimeMillis();
             this.visualWindowStartTick = startOffsetMinutes;
@@ -1636,12 +1636,13 @@ public class RealtimeSimulationService {
          */
         synchronized void cancel(String flightId, FlightPlanService flightPlanService) {
             Flight requested = findFlight(flightId);
+            boolean exactOccurrenceRequested = findFlightByCancellationKey(flightId) != null;
             Flight toCancel = resolveCancellationFlight(flightId);
             if (toCancel == null) {
                 if (!hasCancellationCode(flightId)) {
                     throw new IllegalArgumentException("Vuelo no encontrado: " + normalizeFlightInput(flightId));
                 }
-                if (isBatchScenario()) {
+                if (isBatchScenario() || exactOccurrenceRequested) {
                     throw new IllegalArgumentException(
                             "No hay una salida futura cancelable para el vuelo: " + normalizeFlightInput(flightId));
                 }
@@ -1666,6 +1667,16 @@ public class RealtimeSimulationService {
         }
 
         private Flight resolveCancellationFlight(String input) {
+            Flight exact = findFlightByCancellationKey(input);
+            if (exact != null) {
+                if (exact.absoluteDepartureMinute() - tick >= 60
+                        && !isCancelled(exact)
+                        && !isPendingCancellation(exact)) {
+                    return exact;
+                }
+                return null;
+            }
+
             Flight requested = findFlight(input);
             if (requested != null
                     && requested.absoluteDepartureMinute() - tick >= 60
@@ -1706,7 +1717,17 @@ public class RealtimeSimulationService {
 
         private boolean hasCancellationCode(String input) {
             if (input == null || input.isBlank()) return false;
+            if (findFlightByCancellationKey(input) != null) return true;
             return flights.stream().anyMatch(f -> sameCancellationCode(f, input));
+        }
+
+        private Flight findFlightByCancellationKey(String input) {
+            if (input == null || input.isBlank() || !input.contains("@")) return null;
+            String normalized = input.trim();
+            return flights.stream()
+                    .filter(f -> cancellationKey(f).equalsIgnoreCase(normalized))
+                    .findFirst()
+                    .orElse(null);
         }
 
         private String normalizeFlightInput(String input) {
@@ -2660,6 +2681,29 @@ public class RealtimeSimulationService {
                 List<Flight> rf = route.getFlights();
                 for (int i = 0; i < rf.size(); i++) {
                     json.value(rf.get(i).getFlightId());
+                    if (i < rf.size() - 1) json.comma();
+                }
+            }
+            json.arrayEnd().comma();
+            json.name("flightLegs").arrayStart();
+            if (route != null) {
+                List<Flight> rf = route.getFlights();
+                for (int i = 0; i < rf.size(); i++) {
+                    Flight f = rf.get(i);
+                    double util = ratio(f.getAssignedLoad(), f.getMaxCapacity());
+                    json.objStart();
+                    json.prop("flightId", f.getFlightId()).comma();
+                    json.prop("origin", f.getOriginCode()).comma();
+                    json.prop("destination", f.getDestCode()).comma();
+                    json.prop("dayOffset", f.getDayOffset()).comma();
+                    json.prop("departureMinute", f.getDepartureMinute()).comma();
+                    json.prop("arrivalMinute", f.getArrivalMinute()).comma();
+                    json.prop("absoluteDepartureMinute", f.absoluteDepartureMinute()).comma();
+                    json.prop("absoluteArrivalMinute", f.absoluteArrivalMinute()).comma();
+                    json.prop("assignedLoad", f.getAssignedLoad()).comma();
+                    json.prop("maxCapacity", f.getMaxCapacity()).comma();
+                    json.prop("utilization", util);
+                    json.objEnd();
                     if (i < rf.size() - 1) json.comma();
                 }
             }

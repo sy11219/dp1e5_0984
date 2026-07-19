@@ -261,12 +261,13 @@ public class SimulatorServer {
             return;
         }
 
-        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-        try {
-            String startDate = readString(START_DATE, body, "20260102");
-            int days = readInt(DAYS, body, 5);
-            String result = simulationService.runAlns(startDate, days);
-            send(exchange, 200, "application/json", result);
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            try {
+                String startDate = readString(START_DATE, body, "20260102");
+                int days = readInt(DAYS, body, 5);
+                String timeZone = readString(TIME_ZONE, body, "");
+                String result = simulationService.runAlns(startDate, days, timeZone);
+                send(exchange, 200, "application/json", result);
         } catch (IllegalArgumentException e) {
             send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
         } catch (Exception e) {
@@ -458,8 +459,10 @@ public class SimulatorServer {
         if ("GET".equalsIgnoreCase(exchange.getRequestMethod())
                 && ("/api/shipments".equals(path) || "/api/shipments/".equals(path))) {
             try {
-                String date = queryParams(exchange).get("date");
-                send(exchange, 200, "application/json", shipmentService.listShipmentsForDate(date));
+                Map<String, String> query = queryParams(exchange);
+                String date = query.get("date");
+                String timeZone = query.getOrDefault("timeZone", "");
+                send(exchange, 200, "application/json", shipmentService.listShipmentsForDate(date, timeZone));
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
