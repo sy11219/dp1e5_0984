@@ -197,6 +197,7 @@ export function ShipmentsTable({
       origin: originAirport !== ANY ? originAirport : undefined,
       destination: destinationAirport !== ANY ? destinationAirport : undefined,
       status: statusFilter !== ANY ? statusFilter : undefined,
+      historyMinutes: (shipmentHistoryHours ?? 0) * 60,
     }, data?.scenario)
       .then((response) => {
         if (cancelled) return;

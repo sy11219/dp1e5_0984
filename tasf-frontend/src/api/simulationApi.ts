@@ -196,6 +196,7 @@ export async function getBatchShipmentsPageRequest(
     origin?: string;
     destination?: string;
     status?: string;
+    historyMinutes?: number;
   },
   scenario?: string
 ): Promise<ShipmentPage> {
@@ -207,6 +208,7 @@ export async function getBatchShipmentsPageRequest(
   if (params.origin?.trim()) query.set("origin", params.origin.trim());
   if (params.destination?.trim()) query.set("destination", params.destination.trim());
   if (params.status?.trim()) query.set("status", params.status.trim());
+  if (params.historyMinutes !== undefined) query.set("historyMinutes", String(params.historyMinutes));
 
   const basePath = scenario === "Colapso"
     ? `/collapse/${simulationId}/shipments`

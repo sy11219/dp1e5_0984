@@ -416,7 +416,7 @@ public class RealtimeSimulationService {
     public String batchShipments(String id, int page, int pageSize,
                                  String search, String origin,
                                  String destination, String status,
-                                 int currentMinute) {
+                                 int currentMinute, int historyMinutes) {
         RealtimeSession session = sessions.get(id);
         if (session == null) {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
@@ -425,7 +425,7 @@ public class RealtimeSimulationService {
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesión indicada no es una simulación por lotes.");
         }
-        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
+        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute, historyMinutes);
     }
 
     // ── Escenario de colapso ───────────────────────────────────────────────
@@ -533,7 +533,7 @@ public class RealtimeSimulationService {
     public String collapseShipments(String id, int page, int pageSize,
                                     String search, String origin,
                                     String destination, String status,
-                                    int currentMinute) {
+                                    int currentMinute, int historyMinute) {
         RealtimeSession session = sessions.get(id);
         if (session == null) {
             session = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
@@ -542,7 +542,7 @@ public class RealtimeSimulationService {
         if (!"COLAPSO".equals(session.scenario)) {
             throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
-        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute);
+        return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute, historyMinute);
     }
 
     private static int parseStartTime(String startTime) {
@@ -2004,7 +2004,7 @@ public class RealtimeSimulationService {
         synchronized String shipmentsPageJson(int page, int pageSize,
                                                String search, String origin,
                                                String destination, String statusFilter,
-                                               int currentMinute) {
+                                               int currentMinute, int historyMinutes) {
             int safePageSize = Math.max(1, Math.min(100, pageSize));
             int safePage = Math.max(1, page);
             int referenceMinute = currentMinute >= 0 ? currentMinute : tick;
@@ -2023,7 +2023,8 @@ public class RealtimeSimulationService {
                         normalizedOrigin,
                         normalizedDestination,
                         normalizedStatus,
-                        referenceMinute)) {
+                        referenceMinute,
+                        historyMinutes)) {
                     continue;
                 }
                 filtered.add(shipment);
@@ -2109,7 +2110,10 @@ public class RealtimeSimulationService {
                                                String origin,
                                                String destination,
                                                String statusFilter,
-                                               int referenceMinute) {
+                                               int referenceMinute, int historyMinutes) {
+            if (!matchesShipmentHistoryWindow(shipment, referenceMinute, historyMinutes)) {
+                return false;
+            }
             if (!matchesShipmentAirportFilters(shipment, origin, destination)) {
                 return false;
             }
@@ -2133,6 +2137,16 @@ public class RealtimeSimulationService {
                 }
             }
             return false;
+        }
+
+        private boolean matchesShipmentHistoryWindow(Shipment shipment, int referenceMinute, int historyMinutes) {
+            if (shipment.getRequestMinute() > referenceMinute) {
+                return false;
+            }
+            if (!shipment.isPlanned()) {
+                return true;
+            }
+            return referenceMinute <= shipment.getEstimatedArrival() + historyMinutes;
         }
 
         private boolean matchesShipmentAirportFilters(Shipment shipment, String origin, String destination) {
