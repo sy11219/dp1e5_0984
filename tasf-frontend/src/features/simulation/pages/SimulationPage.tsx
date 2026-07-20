@@ -815,6 +815,8 @@ export function SimulationPage() {
     if (selectedAirport === code) {
       clearMapSelection({ resetView: true })
     } else {
+      setRightPanelOpen(true)
+      setOpenRightPanelSection("airports")
       setSelectedAirport(code)
       setSelectedFlightId(null)
       setSelectedShipment(null)

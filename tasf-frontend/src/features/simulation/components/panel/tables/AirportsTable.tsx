@@ -21,6 +21,7 @@ interface AirportsTableProps {
 
 type ViewType = "incoming" | "outgoing" | "shipments";
 type ColorFilter = "Todos" | CapacityStatus;
+const PAGE_SIZE_AIRPORTS = 10;
 
 export function AirportsTable({
   airports,
@@ -41,6 +42,7 @@ export function AirportsTable({
   const [localSelectedAirport, setLocalSelectedAirport] = useState<string | null>(null);
   const [expandedAirportCode, setExpandedAirportCode] = useState<string | null>(null);
   const [expandedView, setExpandedView] = useState<ViewType | null>(null);
+  const [page, setPage] = useState(1);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const colorFilter = colorFilterProp ?? localColorFilter;
@@ -65,6 +67,10 @@ export function AirportsTable({
   const expandedShipments = useMemo(
     () => expandedAirportCode ? getShipmentsForAirport(shipments, flights, expandedAirportCode) : [],
     [expandedAirportCode, flights, shipments]
+  );
+  const expandedAirportGmtOffset = useMemo(
+    () => airports.find((airport) => airport.code === expandedAirportCode)?.gmtOffset,
+    [airports, expandedAirportCode]
   );
 
   const filtered = useMemo(() => {
@@ -107,10 +113,24 @@ export function AirportsTable({
       return (aTime - bTime) * direction;
     });
 
-    return result;
-  }, [airports, colorFilter, continentFilter, loads, nextFlightByAirport, search, sortBy, sortOrder]);
+    if (selectedAirportProp) {
+      const selectedIndex = result.findIndex((airport) => airport.code === selectedAirportProp);
+      if (selectedIndex > 0) {
+        const [selected] = result.splice(selectedIndex, 1);
+        result.unshift(selected);
+      }
+    }
 
-  const visible = filtered.slice(0, 10);
+    return result;
+  }, [airports, colorFilter, continentFilter, loads, nextFlightByAirport, search, selectedAirportProp, sortBy, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE_AIRPORTS));
+  const currentPage = Math.min(page, totalPages);
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE_AIRPORTS, currentPage * PAGE_SIZE_AIRPORTS);
+
+  useEffect(() => {
+    setPage(1);
+  }, [colorFilter, continentFilter, search, selectedAirportProp, sortBy, sortOrder]);
 
   useEffect(() => {
     if (!expandedView) return;
@@ -165,6 +185,7 @@ export function AirportsTable({
             airportCode={expandedAirportCode}
             data={data}
             displayGmtOffset={displayGmtOffset}
+            airportGmtOffset={expandedAirportGmtOffset}
           />
         </div>
       ) : (
@@ -302,7 +323,7 @@ export function AirportsTable({
                             setExpandedView("shipments");
                           }}
                         >
-                          Envíos
+                          Envíos del almacén
                         </button>
                         <button
                           type="button"
@@ -318,6 +339,31 @@ export function AirportsTable({
               })
             )}
           </div>
+          {filtered.length > PAGE_SIZE_AIRPORTS && (
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-sm text-muted-foreground">
+                {`${(currentPage - 1) * PAGE_SIZE_AIRPORTS + 1}-${Math.min(currentPage * PAGE_SIZE_AIRPORTS, filtered.length)} de ${filtered.length}`}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="table-action-button table-action-button-ghost"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  className="table-action-button table-action-button-ghost"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
