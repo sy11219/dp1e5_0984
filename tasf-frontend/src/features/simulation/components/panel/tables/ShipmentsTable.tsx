@@ -412,13 +412,6 @@ export function ShipmentsTable({
                     </button>
                     <button
                       type="button"
-                      className="table-action-button"
-                      onClick={() => openShipmentRoute(shipment)}
-                    >
-                      Ver escalas
-                    </button>
-                    <button
-                      type="button"
                       className="table-action-button table-action-button-ghost"
                       onClick={() => clearSelectedShipment(shipment)}
                     >

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
 import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
@@ -47,6 +47,7 @@ export function FlightsTable({
   const [remoteFlightShipments, setRemoteFlightShipments] = useState<Shipment[]>([]);
   const [remoteFlightShipmentsLoading, setRemoteFlightShipmentsLoading] = useState(false);
   const [remoteFlightShipmentsError, setRemoteFlightShipmentsError] = useState("");
+  const selectedFlightRowRef = useRef<HTMLDivElement | null>(null);
   const colorFilter = colorFilterProp ?? localColorFilter;
   const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
   const batchSimulationId = data?.simulationId;
@@ -206,6 +207,16 @@ export function FlightsTable({
     const selected = filteredAndSortedFlights.find((flight) => flight.id === selectedFlightId);
     return selected ? [selected, ...base.slice(0, 9)] : base;
   }, [filteredAndSortedFlights, selectedFlightId]);
+
+  useEffect(() => {
+    if (!selectedFlightId) return;
+
+    const selectedRow = selectedFlightRowRef.current;
+    if (selectedRow) {
+      selectedRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedFlightId, visibleFlights]);
+
   const flightMomentData = data ?? null;
 
   if (viewMode === "flight-shipments" && selectedFlightShipments) {
@@ -366,6 +377,7 @@ export function FlightsTable({
             return (
               <Fragment key={flight.id}>
                 <div
+                  ref={isSelected ? selectedFlightRowRef : undefined}
                   className={[
                     "row",
                     !active ? "row-inactive" : "",

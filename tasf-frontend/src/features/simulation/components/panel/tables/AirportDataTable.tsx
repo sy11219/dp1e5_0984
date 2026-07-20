@@ -17,8 +17,12 @@ type Props = {
 };
 
 const PAGE_SIZE_FLIGHTS = 15;
-const PAGE_SIZE_SHIPMENTS = 50;
+const PAGE_SIZE_SHIPMENTS = 15;
+const AIRPORT_TABLE_MAX_HEIGHT = "clamp(140px, calc(100dvh - 500px), 300px)";
+const SHIPMENTS_TABLE_HEIGHT = "180px";
 type ShipmentRoleFilter = "incoming" | "outgoing" | "all";
+type SuitcaseSort = "asc" | "desc";
+type ShipmentSortField = "suitcases" | "requestMinute";
 
 function roleLabel(role: AirportShipment["role"]) {
   return role === "origin" ? "Origen" : role === "destination" ? "Destino" : "Escala";
@@ -27,6 +31,10 @@ function roleLabel(role: AirportShipment["role"]) {
 export function AirportDataTable({ viewType, flights, shipments, airportCode, data, displayGmtOffset, airportGmtOffset }: Props) {
   const [page, setPage] = useState(1);
   const [shipmentRoleFilter, setShipmentRoleFilter] = useState<ShipmentRoleFilter>("incoming");
+  const [originFilter, setOriginFilter] = useState("all");
+  const [destinationFilter, setDestinationFilter] = useState("all");
+  const [shipmentSortField, setShipmentSortField] = useState<ShipmentSortField>("suitcases");
+  const [suitcaseSort, setSuitcaseSort] = useState<SuitcaseSort>("asc");
   const formatMoment = (minute: number) =>
     data ? formatFlightMoment(data, minute, displayGmtOffset) : formatSimMinute(minute, displayGmtOffset ?? 0);
   const formatAirportMoment = (minute: number) =>
@@ -35,7 +43,7 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
   // Resetear página cuando cambian los datos
   useEffect(() => {
     setPage(1);
-  }, [viewType, flights.length, shipments.length, shipmentRoleFilter]);
+  }, [viewType, flights.length, shipments.length, shipmentRoleFilter, originFilter, destinationFilter, shipmentSortField, suitcaseSort]);
 
   // ── Vista: Vuelos Entrantes ──────────────────────────────────────────────
   if (viewType === "incoming") {
@@ -50,7 +58,7 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
     return (
       <div className="rounded-lg border bg-card p-4">
         <h4 className="text-lg font-medium mb-2">Llegadas ({total})</h4>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-scroll" style={{ maxHeight: AIRPORT_TABLE_MAX_HEIGHT }}>
           <table className="compact-table w-full" style={{ minWidth: 760 }}>
             <thead className="bg-muted/50">
               <tr>
@@ -92,8 +100,8 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
     return (
       <div className="rounded-lg border bg-card p-4">
         <h4 className="text-lg font-medium mb-2">Salidas ({total})</h4>
-        <div className="overflow-x-auto">
-          <table className="compact-table w-full">
+        <div className="overflow-x-auto overflow-y-scroll" style={{ maxHeight: AIRPORT_TABLE_MAX_HEIGHT }}>
+          <table className="compact-table w-full" style={{ minWidth: 760 }}>
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-left">Vuelo</th>
@@ -123,11 +131,23 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
 
   // ── Vista: Envíos ────────────────────────────────────────────────────────
   if (viewType === "shipments") {
-    const filteredShipments = shipmentRoleFilter === "incoming"
+    const shipmentsByRole = shipmentRoleFilter === "incoming"
       ? shipments.filter(({ role }) => role === "destination")
       : shipmentRoleFilter === "outgoing"
         ? shipments.filter(({ role }) => role === "origin")
         : shipments;
+    const airportFilterValues = Array.from(new Set(
+      shipmentsByRole.map(({ shipment }) => shipmentRoleFilter === "incoming" ? shipment.origin : shipment.destination),
+    )).sort();
+    const filteredShipments = shipmentsByRole
+      .filter(({ shipment }) => shipmentRoleFilter !== "incoming" || originFilter === "all" || shipment.origin === originFilter)
+      .filter(({ shipment }) => shipmentRoleFilter !== "outgoing" || destinationFilter === "all" || shipment.destination === destinationFilter)
+      .sort((first, second) => {
+        const difference = shipmentSortField === "suitcases"
+          ? first.shipment.suitcases - second.shipment.suitcases
+          : first.shipment.requestMinute - second.shipment.requestMinute;
+        return suitcaseSort === "asc" ? difference : -difference;
+      });
     const total = filteredShipments.length;
     const visible = filteredShipments.slice((page - 1) * PAGE_SIZE_SHIPMENTS, page * PAGE_SIZE_SHIPMENTS);
 
@@ -139,6 +159,15 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
             total={total}
             value={shipmentRoleFilter}
             onChange={setShipmentRoleFilter}
+            airportFilterValues={airportFilterValues}
+            originFilter={originFilter}
+            onOriginFilterChange={setOriginFilter}
+            destinationFilter={destinationFilter}
+            onDestinationFilterChange={setDestinationFilter}
+            shipmentSortField={shipmentSortField}
+            onShipmentSortFieldChange={setShipmentSortField}
+            suitcaseSort={suitcaseSort}
+            onSuitcaseSortChange={setSuitcaseSort}
           />
           <div className="empty-state">
             {shipmentRoleFilter === "incoming"
@@ -158,9 +187,18 @@ export function AirportDataTable({ viewType, flights, shipments, airportCode, da
           total={total}
           value={shipmentRoleFilter}
           onChange={setShipmentRoleFilter}
+          airportFilterValues={airportFilterValues}
+          originFilter={originFilter}
+          onOriginFilterChange={setOriginFilter}
+          destinationFilter={destinationFilter}
+          onDestinationFilterChange={setDestinationFilter}
+          shipmentSortField={shipmentSortField}
+          onShipmentSortFieldChange={setShipmentSortField}
+          suitcaseSort={suitcaseSort}
+          onSuitcaseSortChange={setSuitcaseSort}
         />
-        <div className="overflow-x-auto">
-          <table className="compact-table w-full">
+        <div className="overflow-x-auto overflow-y-scroll" style={{ height: SHIPMENTS_TABLE_HEIGHT }}>
+          <table className="compact-table w-full" style={{ minWidth: 760 }}>
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-left" style={{ paddingRight: 24 }}>ID</th>
@@ -199,14 +237,32 @@ function ShipmentFilterHeader({
   total,
   value,
   onChange,
+  airportFilterValues,
+  originFilter,
+  onOriginFilterChange,
+  destinationFilter,
+  onDestinationFilterChange,
+  shipmentSortField,
+  onShipmentSortFieldChange,
+  suitcaseSort,
+  onSuitcaseSortChange,
 }: {
   airportCode: string;
   total: number;
   value: ShipmentRoleFilter;
   onChange: (value: ShipmentRoleFilter) => void;
+  airportFilterValues: string[];
+  originFilter: string;
+  onOriginFilterChange: (value: string) => void;
+  destinationFilter: string;
+  onDestinationFilterChange: (value: string) => void;
+  shipmentSortField: ShipmentSortField;
+  onShipmentSortFieldChange: (value: ShipmentSortField) => void;
+  suitcaseSort: SuitcaseSort;
+  onSuitcaseSortChange: (value: SuitcaseSort) => void;
 }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", alignItems: "center", marginBottom: 8 }}>
+    <div style={{ display: "grid", gap: "0.75rem", marginBottom: 8 }}>
       <div>
         <h4 className="text-lg font-medium" style={{ margin: 0 }}>
           Envíos planificados del almacén {airportCode} ({total})
@@ -219,15 +275,49 @@ function ShipmentFilterHeader({
               : "Mostrando envíos de origen, destino y escala."}
         </span>
       </div>
-      <label className="text-sm" style={{ display: "grid", gap: 4, minWidth: 130 }}>
-        Vista
-        <select value={value} onChange={(event) => onChange(event.target.value as ShipmentRoleFilter)}>
-          <option value="incoming">Entrantes</option>
-          <option value="outgoing">Salientes</option>
-          <option value="all">Todos</option>
-        </select>
-      </label>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "end", flexWrap: "wrap" }}>
+        <label className="text-sm" style={{ display: "grid", gap: 4, minWidth: 120, flex: "1 1 120px" }}>
+          Vista
+          <select value={value} onChange={(event) => onChange(event.target.value as ShipmentRoleFilter)}>
+            <option value="incoming">Entrantes</option>
+            <option value="outgoing">Salientes</option>
+            <option value="all">Todos</option>
+          </select>
+        </label>
+        {value === "incoming" && (
+          <AirportFilter label="Origen" value={originFilter} options={airportFilterValues} onChange={onOriginFilterChange} />
+        )}
+        {value === "outgoing" && (
+          <AirportFilter label="Destino" value={destinationFilter} options={airportFilterValues} onChange={onDestinationFilterChange} />
+        )}
+        <label className="text-sm" style={{ display: "grid", gap: 4, minWidth: 120, flex: "1 1 120px" }}>
+          Ordenar por
+          <select value={shipmentSortField} onChange={(event) => onShipmentSortFieldChange(event.target.value as ShipmentSortField)}>
+            <option value="suitcases">Maletas</option>
+            <option value="requestMinute">Fecha y hora</option>
+          </select>
+        </label>
+        <label className="text-sm" style={{ display: "grid", gap: 4, minWidth: 120, flex: "1 1 120px" }}>
+          Dirección
+          <select value={suitcaseSort} onChange={(event) => onSuitcaseSortChange(event.target.value as SuitcaseSort)}>
+            <option value="asc">Ascendente</option>
+            <option value="desc">Descendente</option>
+          </select>
+        </label>
+      </div>
     </div>
+  );
+}
+
+function AirportFilter({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="text-sm" style={{ display: "grid", gap: 4, minWidth: 120, flex: "1 1 120px" }}>
+      {label}
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="all">Todos</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
   );
 }
 

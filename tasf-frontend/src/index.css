@@ -475,8 +475,14 @@ select {
   padding-right: 2px;
 }
 
+.side-panel {
+  overflow-y: hidden;
+}
+
 .right-panel {
   font-size: 11px;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
 .right-panel h3 {
