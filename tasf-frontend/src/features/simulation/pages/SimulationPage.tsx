@@ -878,28 +878,6 @@ export function SimulationPage() {
     reset()
   }
 
-  const handlePause = async () => {
-    if (!data?.simulationId || !ownsBatchSimulation(data)) return
-    setBatchSimulationPaused(true)
-    setPlaying(false)
-    stopAnimation()
-    animatingRef.current = false
-    try {
-      const updated = await pauseBatchSimulationRequest(data.simulationId, true)
-      setData(updated)
-      syncSharedVisualWindow(updated)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo pausar la simulación.")
-    }
-  }
-
-  const handleRestart = async () => {
-    setBatchSimulationPaused(false)
-    setPlaying(false)
-    animatingRef.current = false
-    await runSimulation()
-  }
-
   const handleStop = () => {
     if (!data) return
 
@@ -1104,9 +1082,7 @@ export function SimulationPage() {
                   </button>
                 </div>
               ) : canControlSimulation ? (
-                <div className="segmented">
-                  <button onClick={handlePause} disabled={!data?.simulationId || controlsBusy || !playing}>Pausar</button>
-                  <button onClick={handleRestart} disabled={!data?.simulationId || controlsBusy}>Reiniciar</button>
+                <div className="simulation-final-actions" style={{ display: "flex", justifyContent: "center" }}>
                   <button className="danger" onClick={handleStop} disabled={!data?.simulationId || controlsBusy}>Cancelar</button>
                 </div>
               ) : null}

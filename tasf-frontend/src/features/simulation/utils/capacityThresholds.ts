@@ -7,8 +7,8 @@ export type CapacityThresholds = {
 
 export const DEFAULT_CAPACITY_THRESHOLDS: CapacityThresholds = {
   gray: 0,
-  green: 50,
-  yellow: 80,
+  green: 30,
+  yellow: 60,
   red: 100,
 };
 

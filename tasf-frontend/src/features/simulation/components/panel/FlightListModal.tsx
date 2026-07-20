@@ -86,7 +86,7 @@ export function FlightListModal({
                     <button
                       type="button"
                       className="route-focus-button"
-                      onClick={() => onSelectFlight(leg.flightId)}
+                      onClick={() => {onSelectFlight(leg.flightId); onClose();}}
                     >
                       Enfocar vuelo
                     </button>

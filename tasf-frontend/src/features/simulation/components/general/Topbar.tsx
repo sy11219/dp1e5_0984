@@ -164,7 +164,7 @@ export function SimulationStatusCards({
         <StackedStatusCard
           items={[
             {
-              label: "Tiempo real transcurrido",
+              label: "Hora actual real",
               value: realNow,
             },
             {

@@ -18,7 +18,6 @@ import { CapacityLegend } from "../../simulation/components/panel/CapacityLegend
 import { FlightsTable } from "../../simulation/components/panel/tables/FlightsTable";
 import { GlobalIndicators } from "../../simulation/components/panel/GlobalIndicators";
 import { ShipmentsTable } from "../../simulation/components/panel/tables/ShipmentsTable";
-import { Metrics } from "../../simulation/components/general/Metrics";
 import { SimulationResultModal } from "../../simulation/components/general/SimulationResultModal";
 import { SimulationStatusCards } from "../../simulation/components/general/Topbar";
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
@@ -323,37 +322,6 @@ export function CollapsePage() {
     }
   };
 
-  const handleRestart = async () => {
-    if (!data?.simulationId || !ownsCollapseSimulation(data)) return;
-    const currentSimulationId = data.simulationId;
-    setFetching(true);
-    setError("");
-    setNotice("");
-    setPlaying(false);
-    stopAnimation();
-    reset();
-    try {
-      const cancelled = await cancelCollapseSimulationRequest(currentSimulationId);
-      updateSession(cancelled, { animate: false });
-      await clearCollapseSimulationRequest(currentSimulationId);
-      latestDataRef.current = null;
-      setData(null);
-
-      const initial = await startCollapseSimulationRequest(startDate, COLLAPSE_MAX_DAYS, startTime);
-      updateSession(initial, { animate: false });
-      setSelectedAirport(null);
-      setSelectedFlightId(null);
-      setSelectedShipment(null);
-      setMapFocusTarget(null);
-      writeMapFocus(MAP_FOCUS_KEY, null);
-      await advanceOwnedSession(initial);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No se pudo reiniciar el escenario de colapso.");
-    } finally {
-      setFetching(false);
-    }
-  };
-
   const handleClear = async () => {
     if (!data?.simulationId || !isTerminal(data)) return;
     setFetching(true);
@@ -505,18 +473,12 @@ export function CollapsePage() {
                     <button type="button" className="danger" onClick={() => void handleClear()} disabled={busy}>Limpiar escenario</button>
                   </div>
                 ) : owner ? (
-                  <div className="segmented">
-                    <button type="button" onClick={() => void handlePause(true)} disabled={busy || !playing}>Pausar</button>
-                    <button type="button" onClick={() => void handleRestart()} disabled={busy}>Reiniciar</button>
+                  <div className="simulation-final-actions">
                     <button type="button" className="danger" onClick={() => void handleCancel()} disabled={busy}>Cancelar</button>
                   </div>
                 ) : null}
               </section>
             )}
-            <section className="panel section">
-              <h3>Indicadores</h3>
-              {data ? <Metrics data={data} /> : <div className="empty-state">Inicia el escenario para ver métricas.</div>}
-            </section>
             <CapacityLegend />
           </aside>
         ) : (
