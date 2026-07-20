@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { SimulationData } from "../../types";
 import { formatDateOnly, formatFlightMoment, formatTimeOnly } from "../../utils/formatters";
 import { formatRealTime } from "../../utils/timeUtils";
@@ -51,7 +52,8 @@ function StackedStatusCard({ items }: StackedStatusCardProps) {
 
 function formatDateTime(value: string | Date | undefined, gmtOffset?: number): string {
   if (!value) return "--";
-  return `${formatDateOnly(value, gmtOffset)} ${formatTimeOnly(value, gmtOffset)}`;
+  const effectiveOffset = typeof gmtOffset === "number" ? gmtOffset : -5;
+  return `${formatDateOnly(value, effectiveOffset)} ${formatTimeOnly(value, effectiveOffset)}`;
 }
 
 function formatElapsedSimulation(minutes: number): string {
@@ -120,10 +122,18 @@ export function SimulationStatusCards({
   variant = "simulation",
 }: SimulationStatusCardsProps) {
   const collapse = variant === "collapse";
-  const simulatedNow = data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--";
-  const simulatedStart = formatDateTime(data?.simulationStartDateTime, displayGmtOffset);
-  const realNow = formatDateTime(new Date(), displayGmtOffset);
-  const realStart = formatDateTime(data?.realStartedAt, displayGmtOffset);
+  const effectiveOffset = typeof displayGmtOffset === "number" ? displayGmtOffset : -5;
+  const [realNowValue, setRealNowValue] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRealNowValue(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const simulatedNow = data ? formatFlightMoment(data, simMinute, effectiveOffset) : "--";
+  const simulatedStart = formatDateTime(data?.simulationStartDateTime, effectiveOffset);
+  const realNow = formatDateTime(realNowValue, effectiveOffset);
+  const realStart = formatDateTime(data?.realStartedAt, effectiveOffset);
 
   return (
     <>

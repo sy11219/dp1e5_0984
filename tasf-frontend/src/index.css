@@ -973,14 +973,42 @@ select {
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .metric {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 12px;
   background: #fbfcfe;
+  min-width: 0;
+}
+
+.metric-label {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.metric-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  flex-shrink: 0;
 }
 
 .metric span {
@@ -1000,7 +1028,10 @@ select {
 }
 
 .global-indicators {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 10px;
+  width: min(100%, 720px);
 }
 
 .traffic-metric {
@@ -1125,11 +1156,13 @@ select {
 }
 
 .map-global-indicators-overlay {
-  width: min(190px, calc(100vw - 88px));
+  width: min(380px, calc(100vw - 88px));
+  max-width: 100%;
 }
 
 .map-global-indicators-overlay .panel {
   width: 100%;
+  min-width: 340px;
   border-color: rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
@@ -1144,11 +1177,13 @@ select {
 
 .map-global-indicators-overlay .global-indicators {
   gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .map-global-indicators-overlay .traffic-metric {
   padding: 6px 7px;
   border-left-width: 4px;
+  min-width: 0;
 }
 
 .map-global-indicators-overlay .traffic-metric span {

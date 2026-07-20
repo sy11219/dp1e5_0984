@@ -17,7 +17,6 @@ import { CapacityLegend } from "../components/panel/CapacityLegend"
 import { FlightsTable } from "../components/panel/tables/FlightsTable"
 import { GlobalIndicators } from "../components/panel/GlobalIndicators"
 import { ShipmentsTable } from "../components/panel/tables/ShipmentsTable"
-import { Metrics } from "../components/general/Metrics"
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage"
 import { SimulationStatusCards } from "../components/general/Topbar"
 import { DraggableMapOverlay } from "../components/general/DraggableMapOverlay"
@@ -798,8 +797,8 @@ export function SimulationPage() {
   const storedSummaryOpen = showReport || stopSummaryOpen
   const canShowSimulationActions = canControlSimulation || simulationCompleted || storedSummaryAvailable
   const showSimulationFinalActions = simulationCompleted || storedSummaryAvailable
-  const displayGmtOffset = undefined
-  const displayAirportLabel = "hora local de esta PC"
+  const displayGmtOffset = -5
+  const displayAirportLabel = "hora local de Perú"
 
   const clearMapSelection = useCallback((options?: { resetView?: boolean }) => {
     setSelectedAirport(null)
@@ -1111,14 +1110,6 @@ export function SimulationPage() {
               ) : null}
             </section>
           )}
-          <section className="panel section">
-            <h3>Indicadores</h3>
-            {data ? (
-              <Metrics data={data} />
-            ) : (
-              <div className="empty-state">Ejecuta el simulador para ver métricas.</div>
-            )}
-          </section>
           <CapacityLegend />
         </aside>
         ) : (
