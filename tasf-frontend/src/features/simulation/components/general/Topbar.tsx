@@ -116,13 +116,14 @@ interface SimulationStatusCardsProps extends Pick<TopbarProps, "data" | "simMinu
 export function SimulationStatusCards({
   data,
   simMinute,
-  durationMs,
   displayGmtOffset,
   variant = "simulation",
 }: SimulationStatusCardsProps) {
-  const minutesFromStart = data ? simMinute - (data.startOffsetMinutes ?? 0) : 0;
-  const simulationDurationMs = durationMs ?? data?.runtimeMs ?? 0;
   const collapse = variant === "collapse";
+  const simulatedNow = data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--";
+  const simulatedStart = formatDateTime(data?.simulationStartDateTime, displayGmtOffset);
+  const realNow = formatDateTime(new Date(), displayGmtOffset);
+  const realStart = formatDateTime(data?.realStartedAt, displayGmtOffset);
 
   return (
     <>
@@ -130,35 +131,35 @@ export function SimulationStatusCards({
         <StackedStatusCard
           items={collapse ? [
             {
-              label: "Fecha y hora de inicio",
-              value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
+              label: "Tiempo de colapso transcurrido",
+              value: simulatedNow,
             },
             {
-              label: "Fecha y hora en colapso",
-              value: data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--",
+              label: "Fecha y hora de inicio del colapso",
+              value: simulatedStart,
             },
           ] : [
             {
-              label: "Fecha y hora de inicio",
-              value: formatDateTime(data?.simulationStartDateTime, displayGmtOffset),
+              label: "Tiempo simulado transcurrido",
+              value: simulatedNow,
             },
             {
-              label: "Fecha y hora en simulación",
-              value: data ? formatFlightMoment(data, simMinute, displayGmtOffset) : "--",
+              label: "Fecha y hora de inicio simulada",
+              value: simulatedStart,
             },
           ]}
         />
       </DraggableMapOverlay>
-      <DraggableMapOverlay initialX={18} initialY={92} className="map-status-overlay">
+      <DraggableMapOverlay initialX={214} initialY={18} className="map-status-overlay">
         <StackedStatusCard
           items={[
             {
-              label: collapse ? "Duración del colapso" : "Duración de la simulación",
-              value: data ? formatRealTime(simulationDurationMs) : "--",
+              label: "Tiempo real transcurrido",
+              value: realNow,
             },
             {
-              label: collapse ? "Tiempo transcurrido en colapso" : "Tiempo transcurrido en simulación",
-              value: data ? formatElapsedSimulation(minutesFromStart) : "--",
+              label: "Fecha y hora de inicio real",
+              value: realStart,
             },
           ]}
         />
