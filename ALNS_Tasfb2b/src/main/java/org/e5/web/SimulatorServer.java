@@ -657,7 +657,10 @@ public class SimulatorServer {
                                 query.getOrDefault("destination", ""),
                                 query.getOrDefault("status", ""),
                                 queryInt(query, "currentMinute", -1),
-                                queryInt(query, "historyMinutes", Integer.MAX_VALUE)));
+                                queryInt(query, "historyMinutes", Integer.MAX_VALUE),
+                                queryInt(query, "departureWithinMinutes", -1),
+                                query.getOrDefault("sortBy", ""),
+                                query.getOrDefault("sortOrder", "")));
                 return;
             }
 
@@ -768,7 +771,10 @@ public class SimulatorServer {
                                 query.getOrDefault("destination", ""),
                                 query.getOrDefault("status", ""),
                                 queryInt(query, "currentMinute", -1),
-                                queryInt(query, "historyMinutes", Integer.MAX_VALUE)));
+                                queryInt(query, "historyMinutes", Integer.MAX_VALUE),
+                                queryInt(query, "departureWithinMinutes", -1),
+                                query.getOrDefault("sortBy", ""),
+                                query.getOrDefault("sortOrder", "")));
                 return;
             }
 

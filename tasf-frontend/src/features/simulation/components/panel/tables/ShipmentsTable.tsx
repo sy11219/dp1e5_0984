@@ -19,6 +19,8 @@ const ANY = "Cualquiera";
 const PAGE_SIZE = 25;
 
 type ShipmentState = "Entregado" | "En curso" | "Planeado" | "Sin ruta";
+type ShipmentSortBy = "delivery" | "registration" | "departure";
+type SortOrder = "asc" | "desc";
 
 function getShipmentStatus(
   shipment: Shipment,
@@ -84,6 +86,35 @@ function compareShipmentsByNextDelivery(a: Shipment, b: Shipment, simMinute: num
   return a.requestMinute - b.requestMinute || a.id.localeCompare(b.id);
 }
 
+function firstDepartureMinute(shipment: Shipment, flightById: Map<string, Flight>): number {
+  if (shipment.flightLegs?.length) {
+    return Math.min(...shipment.flightLegs.map((leg) => leg.absoluteDepartureMinute));
+  }
+
+  const departures = shipment.flightIds
+    .map((id) => flightById.get(id)?.absoluteDepartureMinute)
+    .filter((minute): minute is number => typeof minute === "number");
+  return departures.length ? Math.min(...departures) : Number.POSITIVE_INFINITY;
+}
+
+function compareShipments(
+  a: Shipment,
+  b: Shipment,
+  simMinute: number,
+  flightById: Map<string, Flight>,
+  sortBy: ShipmentSortBy,
+  sortOrder: SortOrder
+): number {
+  if (sortBy === "delivery") return compareShipmentsByNextDelivery(a, b, simMinute);
+
+  const direction = sortOrder === "asc" ? 1 : -1;
+  const aValue = sortBy === "registration" ? a.requestMinute : firstDepartureMinute(a, flightById);
+  const bValue = sortBy === "registration" ? b.requestMinute : firstDepartureMinute(b, flightById);
+
+  if (aValue !== bValue) return (aValue - bValue) * direction;
+  return a.id.localeCompare(b.id);
+}
+
 export function ShipmentsTable({
   shipments,
   flights,
@@ -99,6 +130,9 @@ export function ShipmentsTable({
   const [destinationAirport, setDestinationAirport] = useState(ANY);
   const [statusFilter, setStatusFilter] = useState(ANY);
   const [shipmentHistoryHours, setShipmentHistoryHours] = useState(1);
+  const [departureWithinHours, setDepartureWithinHours] = useState("");
+  const [sortBy, setSortBy] = useState<ShipmentSortBy>("delivery");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [page, setPage] = useState(1);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [localSelectedShipmentId, setLocalSelectedShipmentId] = useState<string | null>(null);
@@ -141,7 +175,7 @@ export function ShipmentsTable({
         (!shipment.planned || simMinute <= shipment.estimatedArrival + historyMinutes)
     );
 
-    result = result.sort((a, b) => compareShipmentsByNextDelivery(a, b, simMinute));
+    result = result.sort((a, b) => compareShipments(a, b, simMinute, flightById, sortBy, sortOrder));
 
     if (search.trim()) {
       const query = search.toLowerCase();
@@ -172,8 +206,24 @@ export function ShipmentsTable({
       });
     }
 
+    const departureHours = Number(departureWithinHours);
+    if (statusFilter === "planned" && Number.isFinite(departureHours) && departureWithinHours !== "") {
+      const maxDepartureMinute = simMinute + Math.max(0, departureHours) * 60;
+      result = result.filter((shipment) => {
+        const departureMinute = firstDepartureMinute(shipment, flightById);
+        return departureMinute >= simMinute && departureMinute <= maxDepartureMinute;
+      });
+    }
+
     return result;
-  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute, flightById, shipmentHistoryHours]);
+  }, [shipments, search, originAirport, destinationAirport, statusFilter, simMinute, flightById, shipmentHistoryHours, departureWithinHours, sortBy, sortOrder]);
+
+  useEffect(() => {
+    if (statusFilter !== "planned" && departureWithinHours) {
+      setDepartureWithinHours("");
+      setPage(1);
+    }
+  }, [departureWithinHours, statusFilter]);
 
   useEffect(() => {
     if (!useRemoteShipments || !simulationId) {
@@ -198,6 +248,11 @@ export function ShipmentsTable({
       destination: destinationAirport !== ANY ? destinationAirport : undefined,
       status: statusFilter !== ANY ? statusFilter : undefined,
       historyMinutes: (shipmentHistoryHours ?? 0) * 60,
+      departureWithinMinutes: statusFilter === "planned" && departureWithinHours !== ""
+        ? Math.max(0, Number(departureWithinHours)) * 60
+        : undefined,
+      sortBy,
+      sortOrder,
     }, data?.scenario)
       .then((response) => {
         if (cancelled) return;
@@ -220,7 +275,7 @@ export function ShipmentsTable({
     return () => {
       cancelled = true;
     };
-  }, [data?.scenario, destinationAirport, originAirport, page, remoteSortMinute, search, simulationId, statusFilter, useRemoteShipments]);
+  }, [data?.scenario, departureWithinHours, destinationAirport, originAirport, page, remoteSortMinute, search, shipmentHistoryHours, simulationId, sortBy, sortOrder, statusFilter, useRemoteShipments]);
 
   const totalPages = useRemoteShipments
     ? remoteTotalPages
@@ -238,7 +293,10 @@ export function ShipmentsTable({
     originAirport !== ANY ||
     destinationAirport !== ANY ||
     statusFilter !== ANY ||
-    shipmentHistoryHours !== 1;
+    shipmentHistoryHours !== 1 ||
+    departureWithinHours !== "" ||
+    sortBy !== "delivery" ||
+    (sortBy !== "delivery" && sortOrder !== "asc");
 
   const toggleSelectShipment = (shipment: Shipment) => {
     const nextSelected = effectiveSelectedShipmentId === shipment.id ? null : shipment.id;
@@ -264,6 +322,9 @@ export function ShipmentsTable({
     setDestinationAirport(ANY);
     setStatusFilter(ANY);
     setShipmentHistoryHours(1);
+    setDepartureWithinHours("");
+    setSortBy("delivery");
+    setSortOrder("asc");
     setPage(1);
   };
 
@@ -338,6 +399,7 @@ export function ShipmentsTable({
             value={statusFilter}
             onChange={(event) => {
               setStatusFilter(event.target.value);
+              if (event.target.value !== "planned") setDepartureWithinHours("");
               setPage(1);
             }}
           >
@@ -346,6 +408,51 @@ export function ShipmentsTable({
             <option value="delivered">Entregado</option>
             <option value="planned">Planeado</option>
             <option value="unplanned">Sin ruta</option>
+          </select>
+        </label>
+        <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          Sale en hasta
+          <input
+            type="number"
+            min={0}
+            max={240}
+            step={1}
+            value={departureWithinHours}
+            onChange={(event) => {
+              setDepartureWithinHours(event.target.value);
+              setPage(1);
+            }}
+            disabled={statusFilter !== "planned"}
+            style={{ width: "3.5rem" }}
+          />
+          h
+        </label>
+        <label className="text-sm">
+          Ordenar por:
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value as ShipmentSortBy);
+              setPage(1);
+            }}
+          >
+            <option value="delivery">Entrega</option>
+            <option value="registration">Registro</option>
+            <option value="departure">Salida</option>
+          </select>
+        </label>
+        <label className="text-sm">
+          Dirección:
+          <select
+            value={sortOrder}
+            onChange={(event) => {
+              setSortOrder(event.target.value as SortOrder);
+              setPage(1);
+            }}
+            disabled={sortBy === "delivery"}
+          >
+            <option value="asc">Ascendente</option>
+            <option value="desc">Descendente</option>
           </select>
         </label>
         {hasActiveFilters && (
