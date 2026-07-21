@@ -2,7 +2,7 @@
 
 ## Descripción general
 **TasfB2BSoft** ha sido desarrollado con el propósito de resolver la problemática logística de la empresa TasfB2B: tiempos de entrega ajustados, capacidad limitada y falta de visibilidad integral.  
-La plataforma integra los escenarios de **simulación de 5 días** y **operaciones día a día**, ofreciendo a gerentes técnicos y comerciales una visión clara y accionable de toda la red logística.
+La plataforma integra los escenarios de **simulación de 5 días**, **operaciones día a día** y **simulación hasta el colapso**, ofreciendo a gerentes técnicos y comerciales una visión clara y accionable de toda la red logística.
 
 ## Escenarios principales
 
@@ -27,7 +27,10 @@ El sistema permite:
 ### 2. Operaciones día a día
 - **Asignación dinámica de vuelos y envíos**: refleja la actividad operativa minuto a minuto, con un consumo periódico de datos.  
 - **Cancelaciones en tiempo real**: permite la cancelación de vuelos y replanificación de envíos durante la operación en tiempo real.
-- **Visualización de vuelos en tiempo real**: los vuelos en el mapa se mueven en tiempo real. 
+- **Visualización de vuelos en tiempo real**: los vuelos en el mapa se mueven en tiempo real.
+
+### 3. Simulación hasta el colapso
+- **Simulación continua**: se ejecuta una misma simulación desde la fecha ingresada hasta el colapso de las operaciones, es decir, la fecha en la que ya no se pueda cumplir con las restricciones asignadas.
 
 ## Stack tecnológico
 
@@ -69,6 +72,9 @@ Para acceder el escenario, ingresar a la página correspondiente (Tiempo real). 
 
 ### Operaciones día a día
 Para acceder el escenario, ingresar a la página correspondiente (Simulación). Adentro, completar los datos de fecha y hora de inicio de la simulación, y presionar "Ejecutar simulación". El algoritmo planificador calculará las asignaciones del primer batch de datos y a continuación se procederán a cargas los envíos en su panel respectivo. Este escenario utiliza los datos históricos cargados en el sistema. El usuario creador de la simulación puede pausarla, reiniciarla o cancelarla, con los botones respectivos del panel izquierdo. El sistema está diseñado para que esta misma simulación se transmita a otros usuarios que accedan al sistema, hasta que esta termine o sea cancelada.
+
+### Simulación hasta el colapso
+Para acceder el escenario, ingresar a la página correspondiente (Colapso). Adentro, completar los datos de fecha y hora de inicio de la simulación, y presionar "Ejecutar colapso". Se ejecutará una simulación similar a la de 5 días, con la diferencia de que esta se ejecutará continuamente hasta que se alcancen las condiciones de colapso. Una vez ocurra esto, aparecerá un reporte en pantalla con las estadísticas de la última planificación, y la razón del colapso.
 
 ### Agregar datos
 Los usuarios pueden agregar datos y modificar datos de Aeropuertos, Planes de Vuelo y Envíos en las páginas correspondientes. Solo se pueden agregar envíos con origen en el aeropuerto asignado según la zona horaria.
