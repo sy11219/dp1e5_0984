@@ -1256,7 +1256,7 @@ public class RealtimeSimulationService {
                             .add(shipment);
                 }
                 if (!loaded.isEmpty()) {
-                    System.out.printf("[Colapso] Ventana TXT %d-%d: %d envios consumidos%n",
+                    System.out.printf("[Colapso] Ventana TXT %d-%d: %d envíos consumidos%n",
                             startMinute, endMinute, loaded.size());
                 }
             } catch (IOException e) {
@@ -1337,7 +1337,7 @@ public class RealtimeSimulationService {
                 }
             }
             if (requeued > 0) {
-                System.out.printf("[Lote] %d envios sin ruta quedan en backlog de planificacion%n", requeued);
+                System.out.printf("[Lote] %d envíos sin ruta quedan en backlog de planificación%n", requeued);
             }
         }
 
@@ -1582,7 +1582,7 @@ public class RealtimeSimulationService {
             try {
                 latest = new ShipmentParser(airportMap).parseAllFromDatabase(startDate, days, originZone);
             } catch (IOException e) {
-                System.err.printf("[Tiempo real] No se pudieron refrescar envios desde BD: %s%n", e.getMessage());
+                System.err.printf("[Tiempo real] No se pudieron refrescar envíos desde BD: %s%n", e.getMessage());
                 return;
             }
 
@@ -1615,7 +1615,7 @@ public class RealtimeSimulationService {
             }
 
             if (added > 0) {
-                System.out.printf("[Tiempo real] +%d envios nuevos desde BD (%d en cola inmediata)%n",
+                System.out.printf("[Tiempo real] +%d envíos nuevos desde BD (%d en cola inmediata)%n",
                         added, queuedLate);
             }
         }

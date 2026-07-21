@@ -410,23 +410,27 @@ export function ShipmentsTable({
             <option value="unplanned">Sin ruta</option>
           </select>
         </label>
-        <label className="text-sm" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          Sale en hasta
-          <input
-            type="number"
-            min={0}
-            max={240}
-            step={1}
-            value={departureWithinHours}
-            onChange={(event) => {
-              setDepartureWithinHours(event.target.value);
-              setPage(1);
-            }}
-            disabled={statusFilter !== "planned"}
-            style={{ width: "3.5rem" }}
-          />
-          h
-        </label>
+        {statusFilter === "planned" && (
+          <label
+            className="text-sm"
+            style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+          >
+            Sale en hasta
+            <input
+              type="number"
+              min={0}
+              max={240}
+              step={1}
+              value={departureWithinHours}
+              onChange={(event) => {
+                setDepartureWithinHours(event.target.value);
+                setPage(1);
+              }}
+              style={{ width: "4.5rem" }}
+            />
+            h
+          </label>
+        )}
         <label className="text-sm">
           Ordenar por:
           <select
@@ -441,20 +445,21 @@ export function ShipmentsTable({
             <option value="departure">Salida</option>
           </select>
         </label>
-        <label className="text-sm">
-          Dirección:
-          <select
-            value={sortOrder}
-            onChange={(event) => {
-              setSortOrder(event.target.value as SortOrder);
-              setPage(1);
-            }}
-            disabled={sortBy === "delivery"}
-          >
-            <option value="asc">Ascendente</option>
-            <option value="desc">Descendente</option>
-          </select>
-        </label>
+        {sortBy !== "delivery" && (
+          <label className="text-sm">
+            Dirección:
+            <select
+              value={sortOrder}
+              onChange={(event) => {
+                setSortOrder(event.target.value as SortOrder);
+                setPage(1);
+              }}
+            >
+              <option value="asc">Ascendente</option>
+              <option value="desc">Descendente</option>
+            </select>
+          </label>
+        )}
         {hasActiveFilters && (
           <button type="button" onClick={clearFilters}>
             Limpiar filtros
