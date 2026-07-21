@@ -261,6 +261,27 @@ public class RealtimeSimulationService {
         }
     }
 
+    /** Invalida la copia en memoria para que las nuevas sesiones lean la BD. */
+    public void invalidateSharedCatalog() {
+        catalogService.invalidate();
+    }
+
+    /**
+     * Reconstruye solo la sesión de TIEMPO_REAL con el catálogo compartido
+     * vigente. Las sesiones de lotes y colapso no se tocan.
+     */
+    public synchronized String restartRealtimeAtCurrentTime(int days, String timeZone) throws Exception {
+        RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        if (current != null) {
+            current.completed = true;
+            current.closeResources();
+            sessions.remove(current.id);
+        }
+        sharedRealtimeSessionId = null;
+        catalogService.invalidate();
+        return startAtCurrentTime(days, timeZone);
+    }
+
     /**
      * Inicia una sesión de simulación por lotes.
      * El ALNS se ejecuta una vez por lote de BATCH_MINUTES minutos simulados.
@@ -585,6 +606,7 @@ public class RealtimeSimulationService {
         List<Airport> airports = catalog.airports();
         Map<String, Airport> airportMap = catalog.airportMap();
         List<Flight> flights = alignFlightsToSessionZone(catalog.flights(), startDate, sessionZone);
+
         flights.sort(Comparator
                 .comparingInt(Flight::absoluteDepartureMinute)
                 .thenComparing(Flight::getFlightId));
@@ -1039,7 +1061,7 @@ public class RealtimeSimulationService {
          *      El frontend compara visualStartedAt + Sa para pedir el siguiente lote.
          */
         synchronized void syncRegisteredShipmentsFromDatabase() {
-            refreshRealtimeShipmentsFromDatabase();
+            refreshRealtimeShipmentsFromDatabase(true);
         }
 
         synchronized void advanceBatch(int steps) {
@@ -1465,7 +1487,7 @@ public class RealtimeSimulationService {
 
         synchronized void advance(int steps) {
             if (completed || paused) return;
-            refreshRealtimeShipmentsFromDatabase();
+            refreshRealtimeShipmentsFromDatabase(false);
             executeRealtimeCycleIfDue(true);
             int visualStart = tick;
             for (int i = 0; i < steps && !completed; i++) step();
@@ -1487,11 +1509,11 @@ public class RealtimeSimulationService {
             return true;
         }
 
-        private void refreshRealtimeShipmentsFromDatabase() {
+        private void refreshRealtimeShipmentsFromDatabase(boolean force) {
             if (isBatchScenario()) return;
 
             long now = System.currentTimeMillis();
-            if (lastRealtimeShipmentRefreshMs > 0
+            if (!force && lastRealtimeShipmentRefreshMs > 0
                     && now - lastRealtimeShipmentRefreshMs < REALTIME_SHIPMENT_REFRESH_MS) {
                 return;
             }

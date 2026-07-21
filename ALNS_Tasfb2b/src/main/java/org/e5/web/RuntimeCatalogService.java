@@ -24,6 +24,12 @@ public class RuntimeCatalogService {
     private CatalogSnapshot cachedBase;
     private long cachedAtMs;
 
+    /** Fuerza a que la próxima sesión lea el catálogo compartido actualizado. */
+    public synchronized void invalidate() {
+        cachedBase = null;
+        cachedAtMs = 0L;
+    }
+
     public synchronized RuntimeCatalog loadRuntimeCatalog(String startDate, int simulationDays) throws Exception {
         CatalogSnapshot base = loadBaseCatalog(startDate);
 

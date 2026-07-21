@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  createFlightPlanBatchRequest,
   createFlightPlanRequest,
   getAirportsRequest,
   getFlightPlansRequest,
+  type FlightPlanBatchResult,
   updateFlightPlanRequest,
   type FlightPlanRecord,
   type FlightPlanUpdatePayload,
@@ -14,6 +16,12 @@ import { flightScheduleStatusLabel } from "../../simulation/utils/statusLabels";
 
 const PAGE_SIZE = 12;
 type EditorMode = "create" | "edit";
+
+function todayInputValue() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
 
 function formatDateTime(value: string) {
   if (!value) return "--";
@@ -78,6 +86,10 @@ export function FlightsPage() {
   const [selectedFlight, setSelectedFlight] = useState<FlightPlanRecord | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [form, setForm] = useState<FlightPlanUpdatePayload | null>(null);
+  const [batchFile, setBatchFile] = useState<File | null>(null);
+  const [batchScheduleDate, setBatchScheduleDate] = useState(todayInputValue);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchResult, setBatchResult] = useState<FlightPlanBatchResult | null>(null);
 
   const loadFlights = async () => {
     setLoading(true);
@@ -182,6 +194,21 @@ export function FlightsPage() {
     setModalError("");
   };
 
+  const openBatchCreator = () => {
+    setBatchFile(null);
+    setBatchScheduleDate(todayInputValue());
+    setBatchResult(null);
+    setModalError("");
+    setBatchOpen(true);
+  };
+
+  const closeBatchCreator = () => {
+    if (saving) return;
+    setBatchOpen(false);
+    setBatchFile(null);
+    setModalError("");
+  };
+
   const updateForm = <K extends keyof FlightPlanUpdatePayload>(
     key: K,
     value: FlightPlanUpdatePayload[K]
@@ -225,6 +252,31 @@ export function FlightsPage() {
     }
   };
 
+  const saveFlightBatch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!batchFile) {
+      setModalError("Selecciona un archivo de texto.");
+      return;
+    }
+
+    setSaving(true);
+    setModalError("");
+    try {
+      const result = await createFlightPlanBatchRequest(
+        await batchFile.text(),
+        batchScheduleDate
+      );
+      setBatchResult(result);
+      setBatchOpen(false);
+      setBatchFile(null);
+      await loadFlights();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "No se pudieron importar los vuelos.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="app-shell">
       <Navbar />
@@ -233,19 +285,30 @@ export function FlightsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Vuelos</h1>
-            <p>Listado completo de planes de vuelo leídos desde la base de datos.</p>
+            <p>Planes de vuelo compartidos por operaciones, simulación de 5 días y colapso.</p>
           </div>
-          <button
-            className="primary"
-            onClick={openCreator}
-            disabled={loading || !airportOptions.length || !assignedAirportTime}
-            title={!assignedAirportTime ? "Asigna un aeropuerto por defecto para crear vuelos." : undefined}
-          >
-            Nuevo
-          </button>
+          <div className="toolbar-actions">
+            <button className="ghost" onClick={openBatchCreator} disabled={loading || !airportOptions.length}>
+              Cargar archivo
+            </button>
+            <button
+              className="primary"
+              onClick={openCreator}
+              disabled={loading || !airportOptions.length || !assignedAirportTime}
+              title={!assignedAirportTime ? "Asigna un aeropuerto por defecto para crear vuelos." : undefined}
+            >
+              Nuevo
+            </button>
+          </div>
         </section>
 
         {error && <div className="error">{error}</div>}
+        {batchResult && (
+          <div className="success">
+            {`Vuelos importados: ${batchResult.inserted} de ${batchResult.parsed} líneas válidas.`}
+            {batchResult.skipped ? ` Omitidos por duplicado: ${batchResult.skipped}.` : ""}
+          </div>
+        )}
 
         <section className="dashboard-grid">
           <div className="panel section metric-panel">
@@ -480,6 +543,61 @@ export function FlightsPage() {
                 </button>
                 <button className="primary" type="submit" disabled={saving}>
                   {saving ? "Guardando..." : editorMode === "create" ? "Crear vuelo" : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {batchOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeBatchCreator}>
+          <div
+            className="airport-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="flight-batch-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <h2 id="flight-batch-title">Importar planes de vuelo</h2>
+                <span>Formato: ORIG-DEST-HO:MO-HD:MD-####</span>
+              </div>
+              <button className="icon-button" type="button" onClick={closeBatchCreator} disabled={saving}>x</button>
+            </div>
+
+            <form className="airport-form" onSubmit={saveFlightBatch}>
+              <div className="empty-state">
+                Las horas se interpretan en los husos locales de origen y destino. Los planes quedan disponibles en los tres escenarios.
+              </div>
+              <div className="field">
+                <label>Fecha de referencia</label>
+                <input
+                  type="date"
+                  value={batchScheduleDate}
+                  onChange={(event) => setBatchScheduleDate(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>Archivo de texto</label>
+                <input
+                  type="file"
+                  accept=".txt,text/plain"
+                  onChange={(event) => setBatchFile(event.target.files?.[0] ?? null)}
+                  required
+                />
+              </div>
+
+              {modalError && <div className="error modal-error">{modalError}</div>}
+
+              <div className="modal-actions">
+                <button className="ghost" type="button" onClick={closeBatchCreator} disabled={saving}>
+                  Cancelar
+                </button>
+                <button className="primary" type="submit" disabled={saving}>
+                  {saving ? "Importando..." : "Importar vuelos"}
                 </button>
               </div>
             </form>

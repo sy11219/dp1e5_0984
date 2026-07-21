@@ -232,7 +232,7 @@ export function AirportsPage() {
         <section className="dashboard-heading">
           <div>
             <h1>Aeropuertos</h1>
-            <p>Catálogo completo leído desde la base de datos al iniciar la aplicación.</p>
+            <p>Catálogo compartido por operaciones, simulación de 5 días y colapso.</p>
           </div>
           <div className="toolbar-actions">
             <button

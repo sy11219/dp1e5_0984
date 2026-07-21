@@ -4,7 +4,9 @@ import type { Airport } from "../types";
 const STORAGE_KEY = "tasf.assignedAirportTime";
 const CHANGE_EVENT = "tasf.assignedAirportTime.change";
 
-export type AssignedAirportTime = Pick<Airport, "code" | "city" | "gmtOffset">;
+export type AssignedAirportTime = Pick<Airport, "code" | "city" | "gmtOffset"> & {
+  timeZone?: string;
+};
 
 const TIME_ZONE_AIRPORT_CODES: Record<string, string[]> = {
   "America/Lima": ["SPIM", "SPJC"],
@@ -33,6 +35,7 @@ export function readAssignedAirportTime(): AssignedAirportTime | null {
     code: parsed.code,
     city: parsed.city || "",
     gmtOffset: parsed.gmtOffset,
+    timeZone: parsed.timeZone,
   };
 }
 
@@ -96,10 +99,20 @@ export function assignManualAirportTime(airport: AssignedAirportTime): AssignedA
     code: airport.code,
     city: airport.city || "",
     gmtOffset: airport.gmtOffset ?? 0,
+    timeZone: airport.timeZone || airportTimeZone(airport.code),
     source: "manual",
   };
   writeAssignedAirportTime(assigned);
   return assigned;
+}
+
+function airportTimeZone(code: string): string | undefined {
+  return {
+    SPIM: "America/Lima",
+    SABE: "America/Argentina/Buenos_Aires",
+    EKCH: "Europe/Copenhagen",
+    VIDP: "Asia/Kolkata",
+  }[code.toUpperCase()];
 }
 
 function getSystemTimeZone(): string {

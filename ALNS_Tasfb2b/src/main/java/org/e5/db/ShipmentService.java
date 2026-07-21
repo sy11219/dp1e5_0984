@@ -4,6 +4,7 @@ import org.e5.model.Airport;
 import org.e5.model.Shipment;
 import org.e5.parser.AirportParser;
 import org.e5.parser.ShipmentParser;
+import org.e5.util.AirportTimeZones;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -33,7 +34,7 @@ import java.util.regex.Pattern;
 public class ShipmentService {
     private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final Pattern SHIPMENT_LINE = Pattern.compile(
-            "^(\\d{1,9})-(\\d{8})-(\\d{2})-(\\d{2})-([A-Za-z]{4})-(\\d{3})-(\\d{7})$"
+            "^(?:(\\d{1,9})-)?(\\d{8})-(\\d{2})-(\\d{2})-([A-Za-z]{4})-(\\d{3})-(\\d{7})$"
     );
     private static final Pattern TZ_PATTERN = Pattern.compile("(?:UTC|GMT)?([+-])(\\d{1,2})(?::(\\d{2}))?");
 
@@ -56,7 +57,7 @@ public class ShipmentService {
                 throw new IllegalArgumentException("Aeropuerto destino no encontrado: " + destinationCode);
             }
 
-            OffsetDateTime registeredAtUtc = parseDateTimeAtOrigin(request.departureDate(), origin.offset());
+            OffsetDateTime registeredAtUtc = parseDateTimeAtOrigin(request.departureDate(), origin.zone());
             OffsetDateTime maxDeliveryAt = registeredAtUtc.plusDays(deadlineDays(origin, destination));
             String shipmentCode = nextShipmentCode(connection, originCode);
 
@@ -134,9 +135,12 @@ public class ShipmentService {
                         throw new IllegalArgumentException("Linea " + (index + 1) + " invalida: " + line);
                     }
 
-                    String shipmentCode = originCode + "-" + normalizeShipmentId(matcher.group(1));
+                    String externalShipmentId = matcher.group(1);
+                    String shipmentCode = externalShipmentId == null
+                            ? nextShipmentCode(connection, originCode)
+                            : originCode + "-" + normalizeShipmentId(externalShipmentId);
                     OffsetDateTime registeredAtUtc = parseShipmentLineDate(
-                            matcher.group(2), matcher.group(3), matcher.group(4), index + 1, origin.offset());
+                            matcher.group(2), matcher.group(3), matcher.group(4), index + 1, origin.zone());
                     String destinationCode = normalizeAirportCode(matcher.group(5));
                     int baggageCount = Integer.parseInt(matcher.group(6));
                     if (baggageCount <= 0) {
@@ -271,11 +275,12 @@ public class ShipmentService {
                 if (!result.next()) {
                     return null;
                 }
+                String airportCode = result.getString("code");
                 return new AirportRef(
                         (UUID) result.getObject("id"),
-                        result.getString("code"),
+                        airportCode,
                         result.getString("continent"),
-                        parseTimezone(result.getString("timezone"))
+                        AirportTimeZones.resolve(airportCode, result.getString("timezone"))
                 );
             }
         }
@@ -395,7 +400,7 @@ public class ShipmentService {
         }
     }
 
-    private OffsetDateTime parseDateTimeAtOrigin(String value, ZoneOffset originOffset) {
+    private OffsetDateTime parseDateTimeAtOrigin(String value, ZoneId originZone) {
         String normalized = value.trim();
         if (normalized.endsWith("Z")) {
             return Instant.parse(normalized).atOffset(ZoneOffset.UTC);
@@ -403,16 +408,19 @@ public class ShipmentService {
         if (normalized.matches(".*[+-]\\d{2}:?\\d{2}$")) {
             return OffsetDateTime.parse(normalized).withOffsetSameInstant(ZoneOffset.UTC);
         }
-        return LocalDateTime.parse(normalized).atOffset(originOffset).withOffsetSameInstant(ZoneOffset.UTC);
+        return LocalDateTime.parse(normalized)
+                .atZone(originZone)
+                .toOffsetDateTime()
+                .withOffsetSameInstant(ZoneOffset.UTC);
     }
 
     private OffsetDateTime parseShipmentLineDate(String date, String hour, String minute,
-                                                 int lineNumber, ZoneOffset originOffset) {
+                                                 int lineNumber, ZoneId originZone) {
         try {
             return LocalDateTime.parse(
                     date.substring(0, 4) + "-" + date.substring(4, 6) + "-" + date.substring(6, 8)
                             + "T" + hour + ":" + minute
-            ).atOffset(originOffset).withOffsetSameInstant(ZoneOffset.UTC);
+            ).atZone(originZone).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Linea " + lineNumber + ": fecha de salida invalida.");
         }
@@ -548,5 +556,5 @@ public class ShipmentService {
         }
     }
 
-    private record AirportRef(UUID id, String code, String continent, ZoneOffset offset) {}
+    private record AirportRef(UUID id, String code, String continent, ZoneId zone) {}
 }

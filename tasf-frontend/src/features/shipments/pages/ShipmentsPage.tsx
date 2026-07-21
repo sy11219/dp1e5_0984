@@ -15,8 +15,26 @@ import { useAssignedAirportTime } from "../../simulation/utils/assignedAirportTi
 
 const PAGE_SIZE = 12;
 
-function currentDateTimeLocalValue(gmtOffset?: number) {
+function currentDateTimeLocalValue(gmtOffset?: number, timeZone?: string) {
   const now = new Date();
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(now);
+      const value = (type: string) => parts.find((part) => part.type === type)?.value || "00";
+      return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}:${value("second")}`;
+    } catch {
+      // Si el navegador no reconoce el huso, se conserva el offset disponible.
+    }
+  }
   if (typeof gmtOffset === "number") {
     const shifted = new Date(now.getTime() + gmtOffset * 60 * 60 * 1000);
     const pad = (value: number) => String(value).padStart(2, "0");
@@ -30,8 +48,8 @@ function currentDateTimeLocalValue(gmtOffset?: number) {
   return local.toISOString().slice(0, 19);
 }
 
-function currentDateValue(gmtOffset?: number) {
-  return currentDateTimeLocalValue(gmtOffset).slice(0, 10);
+function currentDateValue(gmtOffset?: number, timeZone?: string) {
+  return currentDateTimeLocalValue(gmtOffset, timeZone).slice(0, 10);
 }
 
 function formatShipmentDate(value: string) {
@@ -45,12 +63,13 @@ function formatShipmentDate(value: string) {
 function emptyForm(
   originAirportCode = "",
   destinationAirportCode = "",
-  gmtOffset?: number
+  gmtOffset?: number,
+  timeZone?: string
 ): ShipmentCreatePayload {
   return {
     originAirportCode,
     destinationAirportCode,
-    departureDate: currentDateTimeLocalValue(gmtOffset),
+    departureDate: currentDateTimeLocalValue(gmtOffset, timeZone),
     baggageCount: 1,
     clientId: "",
   };
@@ -76,8 +95,8 @@ export function ShipmentsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const listDate = useMemo(
-    () => currentDateValue(assignedAirportTime?.gmtOffset),
-    [assignedAirportTime?.gmtOffset]
+    () => currentDateValue(assignedAirportTime?.gmtOffset, assignedAirportTime?.timeZone),
+    [assignedAirportTime?.gmtOffset, assignedAirportTime?.timeZone]
   );
 
   const loadPageData = useCallback(async () => {
@@ -155,7 +174,12 @@ export function ShipmentsPage() {
     setCreated(null);
     setCreatedBatch(null);
     setModalError("");
-    setForm(emptyForm(assignedAirportTime.code, defaultDestination, assignedAirportTime.gmtOffset));
+    setForm(emptyForm(
+      assignedAirportTime.code,
+      defaultDestination,
+      assignedAirportTime.gmtOffset,
+      assignedAirportTime.timeZone
+    ));
   };
 
   const openBatchCreator = () => {
@@ -192,7 +216,10 @@ export function ShipmentsPage() {
         ...form,
         originAirportCode: (assignedAirportTime?.code || form.originAirportCode).toUpperCase(),
         destinationAirportCode: form.destinationAirportCode.toUpperCase(),
-        departureDate: currentDateTimeLocalValue(assignedAirportTime?.gmtOffset),
+        departureDate: currentDateTimeLocalValue(
+          assignedAirportTime?.gmtOffset,
+          assignedAirportTime?.timeZone
+        ),
         clientId: form.clientId,
       });
       setCreated(createdShipment);
@@ -478,6 +505,9 @@ export function ShipmentsPage() {
                 {`Origen: ${assignedAirportTime?.code || batchForm.originAirportCode} - ${
                   assignedAirportTime?.city || "aeropuerto asignado"
                 }`}
+              </div>
+              <div className="empty-state">
+                Formato por línea: ID-opcional-aaaammdd-hh-mm-dest-###-IdCliente. La fecha y hora deben corresponder al huso de este origen.
               </div>
               <div className="field">
                 <label>Archivo de texto</label>

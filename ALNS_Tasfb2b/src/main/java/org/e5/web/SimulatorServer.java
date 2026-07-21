@@ -71,6 +71,7 @@ public class SimulatorServer {
     private static final Pattern DEPARTURE_TIME_UTC = Pattern.compile("\"departureTimeUtc\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern ARRIVAL_TIME_UTC = Pattern.compile("\"arrivalTimeUtc\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern CAPACITY = Pattern.compile("\"capacity\"\\s*:\\s*(\\d+)");
+    private static final Pattern SCHEDULE_DATE = Pattern.compile("\"scheduleDate\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern FLIGHT_STATUS_FIELD = Pattern.compile("\"status\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern DEPARTURE_DATE = Pattern.compile("\"departureDate\"\\s*:\\s*\"([^\"]*)\"");
     private static final Pattern BAGGAGE_COUNT = Pattern.compile("\"baggageCount\"\\s*:\\s*(\\d+)");
@@ -301,6 +302,7 @@ public class SimulatorServer {
                     );
                     send(exchange, 201, "application/json",
                             airportStatusService.createAirport(readRequiredString(CODE, body, "code"), update));
+                    realtimeSimulationService.invalidateSharedCatalog();
                     return;
                 }
 
@@ -330,7 +332,9 @@ public class SimulatorServer {
                     send(exchange, 400, "application/json", "{\"error\":\"Envíe active como true o false\"}");
                     return;
                 }
-                send(exchange, 200, "application/json", airportStatusService.updateStatus(code, active).toJson());
+                String response = airportStatusService.updateStatus(code, active).toJson();
+                realtimeSimulationService.invalidateSharedCatalog();
+                send(exchange, 200, "application/json", response);
                 return;
             }
 
@@ -365,6 +369,7 @@ public class SimulatorServer {
                 );
                 send(exchange, 200, "application/json",
                         airportStatusService.updateAirport(airportMatcher.group(1), update));
+                realtimeSimulationService.invalidateSharedCatalog();
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
@@ -400,7 +405,9 @@ public class SimulatorServer {
                             readRequiredInt(CAPACITY, body, "capacity"),
                             "SCHEDULED"
                     );
-                    send(exchange, 201, "application/json", flightPlanService.createFlight(update));
+                    String response = flightPlanService.createFlight(update);
+                    realtimeSimulationService.invalidateSharedCatalog();
+                    send(exchange, 201, "application/json", response);
                     return;
                 }
 
@@ -410,6 +417,30 @@ public class SimulatorServer {
             } catch (Exception e) {
                 e.printStackTrace();
                 send(exchange, 500, "application/json", "{\"error\":\"No se pudo procesar el vuelo\"}");
+            }
+            return;
+        }
+
+        if ("/api/flights/batch".equals(path)) {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                send(exchange, 405, "application/json", "{\"error\":\"Use POST\"}");
+                return;
+            }
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            try {
+                FlightPlanService.FlightPlanBatchCreateRequest request =
+                        new FlightPlanService.FlightPlanBatchCreateRequest(
+                                readString(SCHEDULE_DATE, body, ""),
+                                readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
+                        );
+                String response = flightPlanService.createFlightsBatch(request);
+                realtimeSimulationService.invalidateSharedCatalog();
+                send(exchange, 201, "application/json", response);
+            } catch (IllegalArgumentException e) {
+                send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
+            } catch (Exception e) {
+                e.printStackTrace();
+                send(exchange, 500, "application/json", "{\"error\":\"No se pudo importar los vuelos\"}");
             }
             return;
         }
@@ -433,8 +464,9 @@ public class SimulatorServer {
                         readRequiredInt(CAPACITY, body, "capacity"),
                         readRequiredString(FLIGHT_STATUS_FIELD, body, "status")
                 );
-                send(exchange, 200, "application/json",
-                        flightPlanService.updateFlight(flightMatcher.group(1), update));
+                String response = flightPlanService.updateFlight(flightMatcher.group(1), update);
+                realtimeSimulationService.invalidateSharedCatalog();
+                send(exchange, 200, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
@@ -484,7 +516,11 @@ public class SimulatorServer {
                         readRequiredString(ORIGIN_AIRPORT_CODE, body, "originAirportCode"),
                         readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
                 );
-                send(exchange, 201, "application/json", shipmentService.createShipmentsBatch(request));
+                String response = shipmentService.createShipmentsBatch(request);
+                // Solo sincroniza la sesion de TIEMPO_REAL vigente; los otros
+                // escenarios mantienen sus fuentes de datos originales.
+                realtimeSimulationService.syncRegisteredShipmentsFromDatabase();
+                send(exchange, 201, "application/json", response);
                 return;
             }
 
@@ -514,6 +550,14 @@ public class SimulatorServer {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 
         try {
+            if ("/api/realtime/restart".equals(path) && "POST".equalsIgnoreCase(method)) {
+                int days = readInt(DAYS, body, DEFAULT_REALTIME_DAYS);
+                String timeZone = readString(TIME_ZONE, body, "");
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.restartRealtimeAtCurrentTime(days, timeZone));
+                return;
+            }
+
             if ("/api/realtime/start".equals(path) && "POST".equalsIgnoreCase(method)) {
                 String startDate = readString(START_DATE, body, "");
                 String startTime = readString(START_TIME, body, "00:00");

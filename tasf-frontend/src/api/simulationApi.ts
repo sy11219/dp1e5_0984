@@ -363,6 +363,31 @@ export async function cancelRealtimeFlightRequest(
   return response.data;
 }
 
+export type FlightPlanBatchResult = {
+  parsed: number;
+  inserted: number;
+  skipped: number;
+};
+
+export async function createFlightPlanBatchRequest(
+  fileContent: string,
+  scheduleDate: string
+): Promise<FlightPlanBatchResult> {
+  const response = await api.post<FlightPlanBatchResult>("/flights/batch", {
+    fileContentBase64: toBase64(fileContent),
+    scheduleDate: scheduleDate.replaceAll("-", ""),
+  });
+  return response.data;
+}
+
+export async function restartRealtimeSessionRequest(days = SIMULATION_DAYS): Promise<SimulationData> {
+  const response = await api.post<SimulationData>("/realtime/restart", {
+    days,
+    timeZone: clientTimeZone(),
+  });
+  return response.data;
+}
+
 export type AirportOperationalStatus = {
   code: string;
   status: "ACTIVE" | "INACTIVE" | string;

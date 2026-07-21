@@ -4,6 +4,7 @@ import {
   cancelRealtimeFlightRequest,
   getCurrentRealtimeSessionRequest,
   pauseRealtimeSessionRequest,
+  restartRealtimeSessionRequest,
   startRealtimeSessionRequest,
 } from "../../../api/simulationApi";
 import { Navbar } from "../../../shared/components/Navbar/Navbar";
@@ -109,6 +110,7 @@ export const OperationsPage = () => {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [openRightPanelSection, setOpenRightPanelSection] = useState<RightPanelSection | null>(null);
   const [operationDayToggling, setOperationDayToggling] = useState(false);
+  const [restartingOperationDay, setRestartingOperationDay] = useState(false);
   const [operationSummaryOpen, setOperationSummaryOpen] = useState(false);
   const [flightColorFilter, setFlightColorFilter] = useState<ColorFilter>("Todos");
   const [operationSummaryData, setOperationSummaryData] = useState<SimulationData | null>(null);
@@ -353,6 +355,23 @@ export const OperationsPage = () => {
     }
   };
 
+  const restartOperationDay = async () => {
+    if (restartingOperationDay) return;
+    setRestartingOperationDay(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await restartRealtimeSessionRequest(data?.days);
+      setData(updated);
+      restoreMapFocus(updated);
+      setNotice("Nueva jornada iniciada con el catálogo vigente.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo reiniciar las operaciones.");
+    } finally {
+      setRestartingOperationDay(false);
+    }
+  };
+
   const toggleRightPanelSection = (section: RightPanelSection) => {
     setOpenRightPanelSection((current) => current === section ? null : section);
   };
@@ -445,6 +464,15 @@ export const OperationsPage = () => {
                 : operationsClosed
                   ? "Abrir operaciones del día"
                   : "Finalizar operaciones del día"}
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={restartOperationDay}
+              disabled={restartingOperationDay}
+              title="Inicia una nueva jornada de operaciones con los datos vigentes del catálogo"
+            >
+              {restartingOperationDay ? "Iniciando jornada..." : "Iniciar nueva jornada"}
             </button>
           </section>
 
