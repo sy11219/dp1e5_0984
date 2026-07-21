@@ -151,7 +151,7 @@ export function FlightsPage() {
       .filter((flight) => status === "ALL" || statusValue(flight) === status)
       .sort(
         (a, b) =>
-          a.departure_time_utc.localeCompare(b.departure_time_utc) ||
+          b.departure_time_utc.localeCompare(a.departure_time_utc) ||
           a.flight_code.localeCompare(b.flight_code)
       );
   }, [assignedAirportTime?.code, flights, search, status]);

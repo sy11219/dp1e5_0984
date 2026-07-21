@@ -17,14 +17,13 @@ import { SimulationResultModal } from "../../simulation/components/general/Simul
 import { OperationsStatusCards } from "../../simulation/components/general/Topbar";
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
-import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
+import type { Shipment, SimulationData } from "../../simulation/types";
 import { capacityStatus, computeActiveFlights, computeAirportLoadMetrics } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import type { CapacityStatus } from "../../simulation/types";
 import {
   formatClock,
   formatDateOnly,
-  percent,
 } from "../../simulation/utils/formatters";
 
 // Color filter type
@@ -40,53 +39,6 @@ function elapsedOperationTimeMs(data: SimulationData | null, fallbackNow = Date.
   if (!Number.isFinite(startedAt)) return 0;
   const finishedAt = data.realFinishedAt ? Date.parse(data.realFinishedAt) : Number.NaN;
   return Math.max(0, (Number.isFinite(finishedAt) ? finishedAt : fallbackNow) - startedAt);
-}
-
-function LiveMetrics({
-  data,
-  airportLoads,
-}: {
-  data: SimulationData;
-  airportLoads: AirportLoads;
-}) {
-  const activeAirports = Object.values(airportLoads).filter((load) => load > 0).length;
-  const plannedPct = percent(data.metrics.plannedShipments, data.metrics.shipments);
-  const onTimePct = percent(data.metrics.onTimeShipments, data.metrics.shipments);
-
-  return (
-    <div className="metrics">
-      <div className="metric">
-        <span>Pedidos con ruta</span>
-        <strong>{data.metrics.plannedShipments}</strong>
-        <span>{`${plannedPct}% del total`}</span>
-      </div>
-      <div className="metric">
-        <span>En cola</span>
-        <strong>{data.metrics.queuedShipments || 0}</strong>
-        <span>pendientes de asignación</span>
-      </div>
-      <div className="metric">
-        <span>Maletas asignadas</span>
-        <strong>{data.metrics.plannedBags}</strong>
-        <span>{`de ${data.metrics.totalBags}`}</span>
-      </div>
-      <div className="metric">
-        <span>A tiempo</span>
-        <strong>{`${onTimePct}%`}</strong>
-        <span>{`${data.metrics.onTimeShipments} pedidos`}</span>
-      </div>
-      <div className="metric">
-        <span>Vuelos con carga</span>
-        <strong>{data.metrics.usedFlights}</strong>
-        <span>operando equipaje</span>
-      </div>
-      <div className="metric">
-        <span>Aeropuertos activos</span>
-        <strong>{activeAirports}</strong>
-        <span>con carga actual</span>
-      </div>
-    </div>
-  );
 }
 
 export const OperationsPage = () => {
@@ -474,15 +426,6 @@ export const OperationsPage = () => {
             >
               {restartingOperationDay ? "Iniciando jornada..." : "Iniciar nueva jornada"}
             </button>
-          </section>
-
-          <section className="panel section">
-            <h3>Indicadores</h3>
-            {data ? (
-              <LiveMetrics data={data} airportLoads={airportLoads} />
-            ) : (
-              <div className="empty-state">Esperando datos de tiempo real.</div>
-            )}
           </section>
 
           <CapacityLegend />

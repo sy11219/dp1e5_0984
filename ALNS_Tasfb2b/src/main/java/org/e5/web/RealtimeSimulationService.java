@@ -261,9 +261,29 @@ public class RealtimeSimulationService {
         }
     }
 
-    /** Invalida la copia en memoria para que las nuevas sesiones lean la BD. */
-    public void invalidateSharedCatalog() {
+    /**
+     * Invalida el catálogo base y agrega inmediatamente los nuevos elementos a la
+     * sesión vigente de tiempo real. Las sesiones de simulación por lotes y
+     * colapso conservan su estado y se actualizarán normalmente al iniciar una
+     * nueva ejecución.
+     */
+    public synchronized void invalidateSharedCatalog() {
         catalogService.invalidate();
+
+        RealtimeSession current = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        if (current == null || current.completed) return;
+
+        try {
+            RuntimeCatalogService.RuntimeCatalog catalog =
+                    catalogService.loadRuntimeCatalog(current.startDate, current.days + 2);
+            List<Flight> refreshedFlights = alignFlightsToSessionZone(
+                    catalog.flights(), current.startDate, current.originZone);
+            current.mergeNewCatalogEntries(catalog.airports(), refreshedFlights);
+        } catch (Exception e) {
+            // La escritura ya se realizó en la BD. La siguiente sesión volverá a
+            // leer el catálogo; no se debe convertir una importación exitosa en 500.
+            System.err.printf("[Tiempo real] No se pudo sincronizar el catálogo activo: %s%n", e.getMessage());
+        }
     }
 
     /**
@@ -423,7 +443,7 @@ public class RealtimeSimulationService {
             session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
         }
         if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
-        if (!"SIMULACION_LOTES".equals(session.scenario)) {
+        if (!"SIMULACION_LOTES".equals(session.scenario) && !"TIEMPO_REAL".equals(session.scenario)) {
             throw new IllegalArgumentException("Las cancelaciones no están disponibles en esta sesión.");
         }
         session.cancel(flightId, flightPlanService);
@@ -842,6 +862,45 @@ public class RealtimeSimulationService {
                     .plusMinutes(startOffsetMinutes);
             this.simulationStartInstant = simulationStart.toInstant().toString();
             this.simulationEndInstant = simulationStart.plusDays(days).toInstant().toString();
+
+        }
+
+        /**
+         * Conserva el estado y las asignaciones ya calculadas, agregando al
+         * runtime solamente vuelos y aeropuertos que no existían al abrir la
+         * jornada. Así una carga por lote se ve de inmediato en mapa y panel.
+         */
+        synchronized void mergeNewCatalogEntries(List<Airport> refreshedAirports, List<Flight> refreshedFlights) {
+            for (Airport airport : refreshedAirports) {
+                if (airportMap.containsKey(airport.getCode())) continue;
+                airports.add(airport);
+                airportMap.put(airport.getCode(), airport);
+            }
+
+            Set<String> existingOccurrences = new HashSet<>();
+            for (Flight flight : flights) {
+                existingOccurrences.add(flightOccurrenceKey(flight));
+            }
+
+            int addedFlights = 0;
+            for (Flight flight : refreshedFlights) {
+                if (!existingOccurrences.add(flightOccurrenceKey(flight))) continue;
+                flights.add(flight);
+                flightById.putIfAbsent(flight.getFlightId(), flight);
+                addedFlights++;
+            }
+
+            if (addedFlights > 0) {
+                flights.sort(Comparator
+                        .comparingInt(Flight::absoluteDepartureMinute)
+                        .thenComparing(Flight::getFlightId));
+                System.out.printf("[Tiempo real] +%d vuelos nuevos sincronizados en la sesión activa.%n",
+                        addedFlights);
+            }
+        }
+
+        private String flightOccurrenceKey(Flight flight) {
+            return flight.getFlightId() + "@" + flight.absoluteDepartureMinute();
         }
 
         private boolean isBatchScenario() {

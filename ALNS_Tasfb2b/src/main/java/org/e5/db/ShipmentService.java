@@ -1,12 +1,7 @@
 package org.e5.db;
 
-import org.e5.model.Airport;
-import org.e5.model.Shipment;
-import org.e5.parser.AirportParser;
-import org.e5.parser.ShipmentParser;
 import org.e5.util.AirportTimeZones;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -22,7 +17,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Locale;
@@ -36,7 +30,6 @@ public class ShipmentService {
     private static final Pattern SHIPMENT_LINE = Pattern.compile(
             "^(?:(\\d{1,9})-)?(\\d{8})-(\\d{2})-(\\d{2})-([A-Za-z]{4})-(\\d{3})-(\\d{7})$"
     );
-    private static final Pattern TZ_PATTERN = Pattern.compile("(?:UTC|GMT)?([+-])(\\d{1,2})(?::(\\d{2}))?");
 
     public String createShipment(ShipmentCreateRequest request) throws SQLException {
         validateRequest(request);
@@ -195,33 +188,61 @@ public class ShipmentService {
         return batchJson(parsed, inserted, skipped);
     }
 
-    public String listShipmentsForDate(String rawDate) throws IOException {
+    public String listShipmentsForDate(String rawDate) throws SQLException {
         return listShipmentsForDate(rawDate, "");
     }
 
-    public String listShipmentsForDate(String rawDate, String clientTimeZone) throws IOException {
+    /**
+     * Lista exclusivamente los envíos registrados en BD. Los TXT del repositorio
+     * pertenecen a los escenarios de simulación y no deben aparecer en Shipments.
+     */
+    public String listShipmentsForDate(String rawDate, String clientTimeZone) throws SQLException {
         ZoneId clientZone = resolveZone(clientTimeZone);
         String date = normalizeRawDate(rawDate, clientZone);
         LocalDate listDate = LocalDate.parse(date, RAW_DATE);
-        String parserStartDate = listDate.minusDays(1).format(RAW_DATE);
-        boolean onlyFuture = listDate.equals(LocalDate.now(clientZone));
-        Instant now = Instant.now();
-        Map<String, Airport> airportMap = loadAirportMap();
-        ShipmentParser parser = new ShipmentParser(airportMap);
-
         List<ListedShipment> shipments = new ArrayList<>();
-        for (Shipment shipment : parser.parseAll("data/envios", parserStartDate, 3)) {
-            ListedShipment listedShipment = ListedShipment.from(shipment, "TXT", airportMap);
-            if (listedShipment.isOnDate(listDate) && (!onlyFuture || !listedShipment.isBefore(now))) {
-                shipments.add(listedShipment);
-            }
-        }
 
-        if (hasDatabaseConfig()) {
-            for (Shipment shipment : parser.parseAllFromDatabase(parserStartDate, 3, ZoneOffset.UTC)) {
-                ListedShipment listedShipment = ListedShipment.from(shipment, "BD", airportMap);
-                if (listedShipment.isOnDate(listDate) && (!onlyFuture || !listedShipment.isBefore(now))) {
-                    shipments.add(listedShipment);
+        Instant queryStart = listDate.minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant queryEnd = listDate.plusDays(2).atStartOfDay(ZoneOffset.UTC).toInstant();
+        try (Connection connection = openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT s.shipment_code,
+                            oa.code AS origin_code,
+                            oa.timezone AS origin_timezone,
+                            da.code AS destination_code,
+                            s.baggage_count,
+                            s.registered_at
+                     FROM shipments s
+                     JOIN airports oa ON oa.id = s.origin_airport_id
+                     JOIN airports da ON da.id = s.destination_airport_id
+                     WHERE s.registered_at >= ?
+                       AND s.registered_at < ?
+                       AND (s.status IS NULL OR UPPER(s.status) <> 'CANCELED')
+                     ORDER BY s.registered_at, s.shipment_code
+                     """)) {
+            statement.setObject(1, OffsetDateTime.ofInstant(queryStart, ZoneOffset.UTC));
+            statement.setObject(2, OffsetDateTime.ofInstant(queryEnd, ZoneOffset.UTC));
+
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    OffsetDateTime registeredAt = result.getObject("registered_at", OffsetDateTime.class);
+                    if (registeredAt == null) continue;
+
+                    String originCode = result.getString("origin_code");
+                    ZoneId originZone = AirportTimeZones.resolve(
+                            originCode, result.getString("origin_timezone"));
+                    OffsetDateTime localTime = registeredAt.toInstant().atZone(originZone).toOffsetDateTime();
+                    if (!localTime.toLocalDate().equals(listDate)) {
+                        continue;
+                    }
+                    shipments.add(new ListedShipment(
+                            result.getString("shipment_code"),
+                            originCode,
+                            result.getString("destination_code"),
+                            result.getInt("baggage_count"),
+                            localTime.format(DateTimeFormatter.ofPattern("yyyyMMdd HH:mm")),
+                            "BD"
+                    ));
                 }
             }
         }
@@ -286,20 +307,6 @@ public class ShipmentService {
         }
     }
 
-    private Map<String, Airport> loadAirportMap() throws IOException {
-        try {
-            Map<String, Airport> airportMap = new LinkedHashMap<>();
-            for (Airport airport : new AirportParser().parse()) {
-                airportMap.put(airport.getCode(), airport);
-            }
-            return airportMap;
-        } catch (IOException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IOException("No se pudieron cargar aeropuertos para listar envios.", e);
-        }
-    }
-
     private String normalizeRawDate(String rawDate, ZoneId clientZone) {
         if (rawDate == null || rawDate.isBlank()) {
             return LocalDate.now(clientZone).format(RAW_DATE);
@@ -321,15 +328,6 @@ public class ShipmentService {
         } catch (Exception ignored) {
             return ZoneId.systemDefault();
         }
-    }
-
-    private boolean hasDatabaseConfig() {
-        return hasEnv("DB_URL") && hasEnv("DB_USER") && hasEnv("DB_PASSWORD");
-    }
-
-    private boolean hasEnv(String name) {
-        String value = System.getenv(name);
-        return value != null && !value.isBlank();
     }
 
     private void validateRequest(ShipmentCreateRequest request) {
@@ -426,21 +424,6 @@ public class ShipmentService {
         }
     }
 
-    private ZoneOffset parseTimezone(String value) {
-        if (value == null || value.isBlank()) {
-            return ZoneOffset.UTC;
-        }
-        String normalized = value.trim().toUpperCase(Locale.ROOT);
-        Matcher matcher = TZ_PATTERN.matcher(normalized);
-        if (!matcher.matches()) {
-            return ZoneOffset.UTC;
-        }
-        int sign = matcher.group(1).equals("-") ? -1 : 1;
-        int hours = Integer.parseInt(matcher.group(2));
-        int minutes = matcher.group(3) == null ? 0 : Integer.parseInt(matcher.group(3));
-        return ZoneOffset.ofTotalSeconds(sign * ((hours * 60 + minutes) * 60));
-    }
-
     private int deadlineDays(AirportRef origin, AirportRef destination) {
         return origin.continent().equalsIgnoreCase(destination.continent()) ? 1 : 2;
     }
@@ -513,48 +496,8 @@ public class ShipmentService {
             String destinationAirportCode,
             int baggageCount,
             String shipmentDate,
-            String source,
-            OffsetDateTime localDateTime
-    ) {
-        private static ListedShipment from(
-                Shipment shipment,
-                String source,
-                Map<String, Airport> airportMap
-        ) {
-            OffsetDateTime shipmentTime = localShipmentTime(shipment, airportMap);
-            String shipmentDate = shipmentTime.format(DateTimeFormatter.ofPattern("yyyyMMdd HH:mm"));
-            return new ListedShipment(
-                    shipment.getShipmentId(),
-                    shipment.getOriginCode(),
-                    shipment.getDestCode(),
-                    shipment.getSuitcaseCount(),
-                    shipmentDate,
-                    source,
-                    shipmentTime
-            );
-        }
-
-        private boolean isOnDate(LocalDate date) {
-            return localDateTime.toLocalDate().equals(date);
-        }
-
-        private boolean isBefore(Instant instant) {
-            return localDateTime.toInstant().isBefore(instant);
-        }
-
-        private static OffsetDateTime localShipmentTime(Shipment shipment, Map<String, Airport> airportMap) {
-            LocalDateTime rawLocalTime = LocalDateTime.parse(
-                    shipment.getRawDate().substring(0, 4)
-                            + "-" + shipment.getRawDate().substring(4, 6)
-                            + "-" + shipment.getRawDate().substring(6, 8)
-                            + "T" + shipment.getRawHour()
-                            + ":" + shipment.getRawMinuteStr()
-            );
-            Airport origin = airportMap.get(shipment.getOriginCode());
-            int offset = origin == null ? 0 : origin.getGmtOffset();
-            return rawLocalTime.atOffset(ZoneOffset.ofHours(offset));
-        }
-    }
+            String source
+    ) {}
 
     private record AirportRef(UUID id, String code, String continent, ZoneId zone) {}
 }

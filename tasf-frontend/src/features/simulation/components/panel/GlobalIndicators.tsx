@@ -148,13 +148,13 @@ export function GlobalIndicators({
       <h3>Indicadores globales</h3>
       <div className="metrics global-indicators">
         <TrafficMetric
-          label="Ocupación de la flota"
+          label="Flota"
           numerator={assignedBags}
           denominator={fleetCapacity}
           icon={Plane}
         />
         <TrafficMetric
-          label="Ocupación de aeropuertos"
+          label="Aeropuertos"
           numerator={airportBags}
           denominator={airportCapacity}
           icon={Building2}
