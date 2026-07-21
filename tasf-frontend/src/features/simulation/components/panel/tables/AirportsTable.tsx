@@ -127,6 +127,8 @@ export function AirportsTable({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE_AIRPORTS));
   const currentPage = Math.min(page, totalPages);
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE_AIRPORTS, currentPage * PAGE_SIZE_AIRPORTS);
+  const canGoBack = currentPage > 1;
+  const canGoForward = currentPage < totalPages;
 
   useEffect(() => {
     setPage(1);
@@ -339,29 +341,17 @@ export function AirportsTable({
               })
             )}
           </div>
-          {filtered.length > PAGE_SIZE_AIRPORTS && (
-            <div className="flex items-center justify-between mt-3">
-              <span className="text-sm text-muted-foreground">
-                {`${(currentPage - 1) * PAGE_SIZE_AIRPORTS + 1}-${Math.min(currentPage * PAGE_SIZE_AIRPORTS, filtered.length)} de ${filtered.length}`}
+          {filtered.length > 0 && (
+            <div className="segmented" style={{ marginTop: "0.75rem", justifyContent: "space-between" }}>
+              <button type="button" disabled={!canGoBack} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Anterior
+              </button>
+              <span className="text-sm">
+                {currentPage}/{totalPages} - {filtered.length} aeropuertos
               </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="table-action-button table-action-button-ghost"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  Anterior
-                </button>
-                <button
-                  type="button"
-                  className="table-action-button table-action-button-ghost"
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  Siguiente
-                </button>
-              </div>
+              <button type="button" disabled={!canGoForward} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+                Siguiente
+              </button>
             </div>
           )}
         </>

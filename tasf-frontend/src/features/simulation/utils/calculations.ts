@@ -48,18 +48,7 @@ export function computeAirportLoads(
   data: SimulationData | null,
   minute: number
 ): AirportLoads {
-  if (!data) return {};
-
-  const loads: AirportLoads = {};
-  for (const airport of data.airports) {
-    loads[airport.code] = 0;
-  }
-
-  for (const event of getOrderedAirportEvents(data.airportEvents)) {
-    if (event.minute > minute) break;
-    loads[event.airport] = Math.max(0, (loads[event.airport] || 0) + event.delta);
-  }
-  return loads;
+  return computeAirportLoadMetrics(data, minute).loads;
 }
 
 function airportEventPriority(event: AirportEvent): number {
@@ -108,25 +97,56 @@ export function computeAirportPeakLoads(
   data: SimulationData | null,
   minute: number
 ): AirportLoads {
-  if (!data) return {};
+  return computeAirportLoadMetrics(data, minute).peakLoads;
+}
+
+export interface AirportLoadMetrics {
+  loads: AirportLoads;
+  peakLoads: AirportLoads;
+}
+
+export function computeAirportLoadMetrics(
+  data: SimulationData | null,
+  minute: number,
+  peakStartMinute = 0
+): AirportLoadMetrics {
+  if (!data) return { loads: {}, peakLoads: {} };
 
   const loads: AirportLoads = {};
   const peaks: AirportLoads = {};
   for (const airport of data.airports) {
     loads[airport.code] = 0;
-    peaks[airport.code] = 0;
+    peaks[airport.code] = data.snapshotLimited
+      ? Math.max(0, airport.historicalPeakLoad ?? 0)
+      : 0;
   }
 
+  const trackingStart = Math.max(0, peakStartMinute);
+  let trackingPeaks = trackingStart === 0;
   for (const event of getOrderedAirportEvents(data.airportEvents)) {
     if (event.minute > minute) break;
-    if (!(event.airport in loads)) continue;
+
+    if (!trackingPeaks && event.minute >= trackingStart) {
+      for (const airport of data.airports) {
+        peaks[airport.code] = Math.max(peaks[airport.code] || 0, loads[airport.code] || 0);
+      }
+      trackingPeaks = true;
+    }
 
     const next = Math.max(0, (loads[event.airport] || 0) + event.delta);
     loads[event.airport] = next;
-    peaks[event.airport] = Math.max(peaks[event.airport] || 0, next);
+    if (trackingPeaks && event.airport in peaks) {
+      peaks[event.airport] = Math.max(peaks[event.airport] || 0, next);
+    }
   }
 
-  return peaks;
+  if (!trackingPeaks) {
+    for (const airport of data.airports) {
+      peaks[airport.code] = Math.max(peaks[airport.code] || 0, loads[airport.code] || 0);
+    }
+  }
+
+  return { loads, peakLoads: peaks };
 }
 
 export function bearingDegrees(

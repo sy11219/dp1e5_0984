@@ -753,6 +753,10 @@ public class RealtimeSimulationService {
         CollapseOutcome collapseOutcome;
         volatile boolean planningInProgress = false;
         volatile String lastSnapshotJson = "{}";
+        private int cachedHistoricalPeakStartMinute = Integer.MIN_VALUE;
+        private int cachedHistoricalPeakBoundaryMinute = Integer.MIN_VALUE;
+        private int cachedHistoricalPeakEventCount = -1;
+        private Map<String, Integer> cachedHistoricalPeakLoads = Collections.emptyMap();
         int lastBatchStart = -1;
         int lastBatchEnd = -1;
         int batchCount = 0;
@@ -1322,6 +1326,50 @@ public class RealtimeSimulationService {
                         Math.max(0, (current == null ? 0 : current) + event.delta));
             }
             return loads;
+        }
+
+        private Map<String, Integer> airportPeakLoadsBefore(int startMinute, int boundaryMinute) {
+            int safeStartMinute = Math.max(0, startMinute);
+            int safeBoundaryMinute = Math.max(safeStartMinute, boundaryMinute);
+            if (cachedHistoricalPeakStartMinute == safeStartMinute
+                    && cachedHistoricalPeakBoundaryMinute == safeBoundaryMinute
+                    && cachedHistoricalPeakEventCount == events.size()) {
+                return cachedHistoricalPeakLoads;
+            }
+
+            Map<String, Integer> loads = new HashMap<>();
+            Map<String, Integer> peaks = new HashMap<>();
+            List<RealtimeEvent> ordered = new ArrayList<>(events);
+            ordered.sort(Comparator
+                    .comparingInt(RealtimeEvent::minute)
+                    .thenComparingInt(event -> eventPriority(event.type)));
+
+            boolean trackingPeaks = safeStartMinute == 0;
+            for (RealtimeEvent event : ordered) {
+                if (event.minute >= safeBoundaryMinute) break;
+                if (!airportMap.containsKey(event.airport)) continue;
+
+                if (!trackingPeaks && event.minute >= safeStartMinute) {
+                    peaks.putAll(loads);
+                    trackingPeaks = true;
+                }
+
+                int next = Math.max(0, loads.getOrDefault(event.airport, 0) + event.delta);
+                loads.put(event.airport, next);
+                if (trackingPeaks) {
+                    peaks.merge(event.airport, next, Math::max);
+                }
+            }
+
+            if (!trackingPeaks) {
+                peaks.putAll(loads);
+            }
+
+            cachedHistoricalPeakStartMinute = safeStartMinute;
+            cachedHistoricalPeakBoundaryMinute = safeBoundaryMinute;
+            cachedHistoricalPeakEventCount = events.size();
+            cachedHistoricalPeakLoads = Map.copyOf(peaks);
+            return cachedHistoricalPeakLoads;
         }
 
         private CollapseOutcome findDeliveryDeadlineBreach(int windowStart, int windowEnd) {
@@ -2301,8 +2349,14 @@ public class RealtimeSimulationService {
             Map<String, Integer> snapshotAirportLoads = isBatchScenario()
                     ? airportLoadsAt(snapshotEnd)
                     : Collections.emptyMap();
-            int usedFlights = (int) flights.stream()
+            Map<String, Integer> historicalAirportPeakLoads = isBatchScenario()
+                    ? airportPeakLoadsBefore(startOffsetMinutes, snapshotStart)
+                    : Collections.emptyMap();
+            List<Flight> used = flights.stream()
                     .filter(this::flightVisibleInSnapshot)
+                    .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
+                    .toList();
+            int usedFlights = (int) used.stream()
                     .filter(f -> f.getAssignedLoad() > 0)
                     .count();
 
@@ -2464,6 +2518,9 @@ public class RealtimeSimulationService {
                 json.prop("gmtOffset", a.getGmtOffset()).comma();
                 json.prop("maxCapacity", a.getMaxCapacity()).comma();
                 json.prop("peakLoad", airportLoad).comma();
+                json.prop("historicalPeakLoad", isBatchScenario()
+                        ? historicalAirportPeakLoads.getOrDefault(a.getCode(), 0)
+                        : 0).comma();
                 json.prop("finalLoad", airportLoad).comma();
                 json.prop("utilization", util).comma();
                 json.prop("status", status(util));
@@ -2474,10 +2531,6 @@ public class RealtimeSimulationService {
 
             // flights
             json.name("flights").arrayStart();
-            List<Flight> used = flights.stream()
-                    .filter(this::flightVisibleInSnapshot)
-                    .sorted(Comparator.comparingInt(Flight::absoluteDepartureMinute))
-                    .toList();
             for (int i = 0; i < used.size(); i++) {
                 Flight f = used.get(i);
                 double util = ratio(f.getAssignedLoad(), f.getMaxCapacity());

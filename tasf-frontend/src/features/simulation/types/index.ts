@@ -10,6 +10,7 @@ export interface Airport {
   gmtOffset?: number;
   maxCapacity: number;
   peakLoad: number;
+  historicalPeakLoad?: number;
   finalLoad?: number;
   utilization: number;
   status?: CapacityStatus;
@@ -164,6 +165,9 @@ export interface SimulationData {
   lastBatchRuntimeMs?: number;
   visualStartTick?: number;
   visualEndTick?: number;
+  snapshotWindowStart?: number;
+  snapshotWindowEnd?: number;
+  snapshotLimited?: boolean;
   visualStartedAt?: string;
   realtimeExecutionIntervalMs?: number;
   pendingCancellationCount?: number;

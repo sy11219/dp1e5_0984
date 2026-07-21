@@ -50,6 +50,7 @@ const MAP_MIN_ZOOM = 2;
 const MAP_MAX_ZOOM = 8;
 const MAP_ZOOM_STEP = 0.01;
 const MAP_BUTTON_ZOOM_STEP = 0.25;
+const DEFAULT_BOUNDS_PADDING: L.PointExpression = [40, 12];
 const DEFAULT_MAP_TILES_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const DEFAULT_MAP_TILES_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -93,16 +94,6 @@ export default function MapStage({
   const autoCloseFlightIdRef = useRef<string | null>(null);
 
   const airports = useMemo(() => data?.airports || [], [data]);
-  const airportLoadFilterKey = useMemo(() => {
-    if (airportColorFilter === "Todos") return "";
-
-    return airports
-      .map((airport) => {
-        const load = airportLoads[airport.code] || 0;
-        return `${airport.code}:${capacityStatus(load / airport.maxCapacity)}`;
-      })
-      .join("|");
-  }, [airportColorFilter, airportLoads, airports]);
   const visibleAirports = useMemo(
     () =>
       airports.filter((airport) => {
@@ -110,7 +101,7 @@ export default function MapStage({
         const load = airportLoads[airport.code] || 0;
         return capacityStatus(load / airport.maxCapacity) === airportColorFilter;
       }),
-    [airportColorFilter, airportLoadFilterKey, airports]
+    [airportColorFilter, airportLoads, airports]
   );
   const activeAirports = useMemo(
     () => visibleAirports.filter(isAirportActive),
@@ -156,7 +147,7 @@ export default function MapStage({
     map.invalidateSize();
     map.fitBounds(bounds.pad(0.01), {
       animate,
-      padding: [4, 4],
+      padding: DEFAULT_BOUNDS_PADDING,
     });
     setZoom(Number(map.getZoom().toFixed(2)));
   }, [activeAirports, visibleAirports]);
@@ -370,7 +361,6 @@ export default function MapStage({
     selectedFlightId,
     selectedShipment?.id,
     selectedShipmentRoute,
-    flightColorFilter,
     filteredActiveFlights
   ]);
 
@@ -519,7 +509,7 @@ export default function MapStage({
     return () => {
       mapContainer.removeEventListener("click", handleClick);
     };
-  }, [activeFlights, airportByCode, data, displayGmtOffset, onClearSelection, onSelectFlight]);
+  }, [activeFlights, airportByCode, data, displayGmtOffset, flightColorFilter, onClearSelection, onSelectFlight]);
 
   useEffect(() => {
     const clearAutoCloseTimer = () => {

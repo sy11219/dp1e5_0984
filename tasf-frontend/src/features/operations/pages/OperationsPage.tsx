@@ -17,9 +17,8 @@ import { OperationsStatusCards } from "../../simulation/components/general/Topba
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
 import type { AirportLoads, Shipment, SimulationData } from "../../simulation/types";
-import { computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../../simulation/utils/calculations";
+import { capacityStatus, computeActiveFlights, computeAirportLoadMetrics } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
-import { capacityStatus } from "../../simulation/utils/calculations";
 import type { CapacityStatus } from "../../simulation/types";
 import {
   formatClock,
@@ -244,11 +243,9 @@ export const OperationsPage = () => {
     };
   }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId, selectedShipmentId]);
 
-  const airportLoads = useMemo<AirportLoads>(() => {
-    return computeAirportLoads(data, operationalMinute);
-  }, [data, operationalMinute]);
-  const airportPeakLoads = useMemo<AirportLoads>(() => {
-    return computeAirportPeakLoads(data, operationalMinute);
+  const { loads: airportLoads, peakLoads: airportPeakLoads } = useMemo(() => {
+    const operationDayStart = Math.floor(Math.max(0, operationalMinute) / 1440) * 1440;
+    return computeAirportLoadMetrics(data, operationalMinute, operationDayStart);
   }, [data, operationalMinute]);
   const activeFlights = useMemo(
     () => computeActiveFlights(data, operationalMinute),

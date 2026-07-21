@@ -19,6 +19,7 @@ interface FlightsTableProps {
 }
 
 type ColorFilter = "Todos" | CapacityStatus;
+const PAGE_SIZE_FLIGHTS = 10;
 
 export function FlightsTable({
   flights,
@@ -43,11 +44,13 @@ export function FlightsTable({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedFlightShipments, setSelectedFlightShipments] = useState<Flight | null>(null);
   const [viewMode, setViewMode] = useState<"flights" | "flight-shipments">("flights");
+  const [page, setPage] = useState(1);
   const [remoteFlightId, setRemoteFlightId] = useState<string | null>(null);
   const [remoteFlightShipments, setRemoteFlightShipments] = useState<Shipment[]>([]);
   const [remoteFlightShipmentsLoading, setRemoteFlightShipmentsLoading] = useState(false);
   const [remoteFlightShipmentsError, setRemoteFlightShipmentsError] = useState("");
   const selectedFlightRowRef = useRef<HTMLDivElement | null>(null);
+  const lastPagedSelectedFlightId = useRef<string | null>(null);
   const colorFilter = colorFilterProp ?? localColorFilter;
   const setColorFilter = onColorFilterChange ?? setLocalColorFilter;
   const batchSimulationId = data?.simulationId;
@@ -198,14 +201,35 @@ export function FlightsTable({
     return result;
   }, [activeFlightIds, colorFilter, destinationFilter, flights, originFilter, search, sortBy, sortOrder, statusFilter]);
 
-  const visibleFlights = useMemo(() => {
-    const base = filteredAndSortedFlights.slice(0, 10);
-    if (!selectedFlightId || base.some((flight) => flight.id === selectedFlightId)) {
-      return base;
-    }
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedFlights.length / PAGE_SIZE_FLIGHTS));
+  const currentPage = Math.min(page, totalPages);
+  const visibleFlights = useMemo(
+    () =>
+      filteredAndSortedFlights.slice(
+        (currentPage - 1) * PAGE_SIZE_FLIGHTS,
+        currentPage * PAGE_SIZE_FLIGHTS
+      ),
+    [currentPage, filteredAndSortedFlights]
+  );
+  const canGoBack = currentPage > 1;
+  const canGoForward = currentPage < totalPages;
 
-    const selected = filteredAndSortedFlights.find((flight) => flight.id === selectedFlightId);
-    return selected ? [selected, ...base.slice(0, 9)] : base;
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    if (!selectedFlightId) {
+      lastPagedSelectedFlightId.current = null;
+      return;
+    }
+    if (lastPagedSelectedFlightId.current === selectedFlightId) return;
+
+    lastPagedSelectedFlightId.current = selectedFlightId;
+    const selectedIndex = filteredAndSortedFlights.findIndex((flight) => flight.id === selectedFlightId);
+    if (selectedIndex >= 0) {
+      setPage(Math.floor(selectedIndex / PAGE_SIZE_FLIGHTS) + 1);
+    }
   }, [filteredAndSortedFlights, selectedFlightId]);
 
   useEffect(() => {
@@ -273,7 +297,10 @@ export function FlightsTable({
           type="text"
           placeholder="Buscar..."
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
           style={{ width: "100%" }}
         />
       </div>
@@ -281,7 +308,13 @@ export function FlightsTable({
       <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Estado:
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "Todos" | "Activos" | "No iniciados")}>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as "Todos" | "Activos" | "No iniciados");
+              setPage(1);
+            }}
+          >
             <option value="Todos">Todos</option>
             <option value="Activos">Activos</option>
             <option value="No iniciados">No iniciados</option>
@@ -290,7 +323,13 @@ export function FlightsTable({
 
         <label className="text-sm">
           Origen:
-          <select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}>
+          <select
+            value={originFilter}
+            onChange={(event) => {
+              setOriginFilter(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value="Cualquiera">Cualquiera</option>
             {airportOptions.map((airport) => (
               <option key={airport} value={airport}>
@@ -302,7 +341,13 @@ export function FlightsTable({
 
         <label className="text-sm">
           Destino:
-          <select value={destinationFilter} onChange={(event) => setDestinationFilter(event.target.value)}>
+          <select
+            value={destinationFilter}
+            onChange={(event) => {
+              setDestinationFilter(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value="Cualquiera">Cualquiera</option>
             {airportOptions.map((airport) => (
               <option key={airport} value={airport}>
@@ -316,7 +361,13 @@ export function FlightsTable({
       <div className="filters" style={{ display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1rem" }}>
         <label className="text-sm">
           Ordenar por:
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination")}>
+          <select
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value as "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination");
+              setPage(1);
+            }}
+          >
             <option value="utilization">Ocupación</option>
             <option value="departureMinute">Hora de salida</option>
             <option value="arrivalMinute">Hora de llegada</option>
@@ -328,7 +379,13 @@ export function FlightsTable({
         <div className="flex items-center gap-2">
           <label className="text-sm">
             Dirección:
-            <select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as "asc" | "desc")}>
+            <select
+              value={sortOrder}
+              onChange={(event) => {
+                setSortOrder(event.target.value as "asc" | "desc");
+                setPage(1);
+              }}
+            >
               <option value="asc">Ascendente</option>
               <option value="desc">Descendente</option>
             </select>
@@ -336,7 +393,13 @@ export function FlightsTable({
           {!hideColorFilter && (
             <label className="text-sm">
               Color:
-              <select value={colorFilter} onChange={(event) => setColorFilter(event.target.value as ColorFilter)}>
+              <select
+                value={colorFilter}
+                onChange={(event) => {
+                  setColorFilter(event.target.value as ColorFilter);
+                  setPage(1);
+                }}
+              >
                 <option value="Todos">Todos</option>
                 <option value="green">Verde</option>
                 <option value="yellow">Amarillo</option>
@@ -455,6 +518,19 @@ export function FlightsTable({
           })
         )}
       </div>
+      {filteredAndSortedFlights.length > 0 && (
+        <div className="segmented" style={{ marginTop: "0.75rem", justifyContent: "space-between" }}>
+          <button type="button" disabled={!canGoBack} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+            Anterior
+          </button>
+          <span className="text-sm">
+            {currentPage}/{totalPages} - {filteredAndSortedFlights.length} vuelos
+          </span>
+          <button type="button" disabled={!canGoForward} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 }

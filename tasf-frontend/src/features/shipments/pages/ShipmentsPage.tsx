@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   createShipmentBatchRequest,
   createShipmentRequest,
@@ -80,7 +80,7 @@ export function ShipmentsPage() {
     [assignedAirportTime?.gmtOffset]
   );
 
-  const loadPageData = async () => {
+  const loadPageData = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -97,11 +97,11 @@ export function ShipmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [listDate]);
 
   useEffect(() => {
     void loadPageData();
-  }, [listDate]);
+  }, [loadPageData]);
 
   useEffect(() => {
     setPage(1);

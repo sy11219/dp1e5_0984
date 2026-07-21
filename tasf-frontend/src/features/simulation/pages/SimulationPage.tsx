@@ -23,7 +23,7 @@ import { DraggableMapOverlay } from "../components/general/DraggableMapOverlay"
 import { useSimulationPlayer } from "../hooks/useSimulationPlayer"
 import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../types"
 import { DEFAULT_START_DATE, DEFAULT_START_TIME, SIMULATION_DAYS } from "../utils/constants"
-import { capacityStatus, computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../utils/calculations"
+import { capacityStatus, computeActiveFlights, computeAirportLoadMetrics } from "../utils/calculations"
 import { SimulationResultModal } from "../components/general/SimulationResultModal"
 import { readMapFocus, writeMapFocus } from "../utils/mapFocusStorage"
 
@@ -738,12 +738,8 @@ export function SimulationPage() {
         : catalogSimulationData(airportCatalog, flightCatalog),
     [airportCatalog, data, flightCatalog]
   )
-  const airportLoads = useMemo(
-    () => computeAirportLoads(displayData, simMinute),
-    [displayData, simMinute]
-  )
-  const airportPeakLoads = useMemo(
-    () => computeAirportPeakLoads(displayData, simMinute),
+  const { loads: airportLoads, peakLoads: airportPeakLoads } = useMemo(
+    () => computeAirportLoadMetrics(displayData, simMinute, displayData.startOffsetMinutes ?? 0),
     [displayData, simMinute]
   )
   const activeFlights = useMemo(

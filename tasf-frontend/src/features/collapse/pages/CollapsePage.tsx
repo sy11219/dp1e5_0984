@@ -23,7 +23,7 @@ import { SimulationStatusCards } from "../../simulation/components/general/Topba
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
 import { useSimulationPlayer } from "../../simulation/hooks/useSimulationPlayer";
 import type { Airport, CapacityStatus, Flight, Shipment, SimulationData } from "../../simulation/types";
-import { capacityStatus, computeActiveFlights, computeAirportLoads, computeAirportPeakLoads } from "../../simulation/utils/calculations";
+import { capacityStatus, computeActiveFlights, computeAirportLoadMetrics } from "../../simulation/utils/calculations";
 import { DEFAULT_START_TIME } from "../../simulation/utils/constants";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 
@@ -354,8 +354,10 @@ export function CollapsePage() {
         : catalogSimulationData(airportCatalog, flightCatalog),
     [airportCatalog, data, flightCatalog]
   )
-  const airportLoads = useMemo(() => computeAirportLoads(displayData, simMinute), [displayData, simMinute]);
-  const airportPeakLoads = useMemo(() => computeAirportPeakLoads(displayData, simMinute), [displayData, simMinute]);
+  const { loads: airportLoads, peakLoads: airportPeakLoads } = useMemo(
+    () => computeAirportLoadMetrics(displayData, simMinute, displayData.startOffsetMinutes ?? 0),
+    [displayData, simMinute]
+  );
   const activeFlights = useMemo(() => computeActiveFlights(displayData, simMinute), [displayData, simMinute]);
   const filteredActiveFlights = useMemo(
     () => flightColorFilter === "Todos"

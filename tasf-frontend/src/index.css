@@ -327,20 +327,29 @@ select {
   user-select: none;
 }
 
+.map-status-overlay {
+  max-width: min(176px, calc(100% - 16px));
+}
+
 .map-draggable-overlay.is-dragging {
   cursor: grabbing;
 }
 
 .map-stacked-status-card {
   display: grid;
-  width: min(190px, calc(100vw - 88px));
+  width: min(172px, calc(100vw - 88px));
   gap: 5px;
-  padding: 7px 9px;
+  padding: 8px 9px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.9);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
   backdrop-filter: blur(6px);
+}
+
+.map-status-card-stack {
+  display: grid;
+  gap: 8px;
 }
 
 .map-stacked-status-row {
@@ -350,17 +359,27 @@ select {
 
 .map-stacked-status-row span {
   color: rgba(241, 245, 249, 0.72);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.12;
   overflow-wrap: anywhere;
 }
 
 .map-stacked-status-row strong {
   color: #fff;
-  font-size: 11px;
-  line-height: 1.15;
+  font-size: 16px;
+  line-height: 1.08;
   overflow-wrap: anywhere;
+}
+
+.map-status-card-stack .map-stacked-status-row strong {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.map-real-time-status-card .map-stacked-status-row strong {
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .status-item {
@@ -1162,7 +1181,7 @@ select {
 }
 
 .map-global-indicators-overlay {
-  width: min(380px, calc(100vw - 88px));
+  width: min(356px, calc(100vw - 88px));
   max-width: 100%;
 }
 
@@ -1173,37 +1192,47 @@ select {
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
   backdrop-filter: blur(6px);
-  padding: 8px;
+  padding: 7px;
 }
 
 .map-global-indicators-overlay h3 {
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .map-global-indicators-overlay .global-indicators {
-  gap: 6px;
+  gap: 5px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .map-global-indicators-overlay .traffic-metric {
-  padding: 6px 7px;
+  padding: 5px 6px;
   border-left-width: 4px;
   min-width: 0;
 }
 
 .map-global-indicators-overlay .traffic-metric span {
-  font-size: 8.5px;
-  line-height: 1.2;
+  font-size: 10px;
+  line-height: 1.12;
   overflow-wrap: anywhere;
 }
 
 .map-global-indicators-overlay .traffic-metric strong {
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.08;
 }
 
-.map-global-indicators-overlay .traffic-metric small {
-  font-size: 9px;
+.map-global-indicators-overlay .metric-label {
+  margin-bottom: 4px;
+}
+
+.map-global-indicators-overlay .metric-value-row {
+  margin-bottom: 3px;
+}
+
+.map-global-indicators-overlay .metric-icon {
+  width: 28px;
+  height: 28px;
 }
 
 .simulation-side-nav {
