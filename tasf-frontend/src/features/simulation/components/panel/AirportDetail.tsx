@@ -83,7 +83,7 @@ export function AirportDetail({
       onStatusUpdated?.(response.code, response.active, response.status);
     } catch {
       setActive(!nextActive);
-      setStatusError("No se pudo actualizar en BD.");
+      setStatusError("No se pudo actualizar el estado del aeropuerto.");
     } finally {
       setSavingStatus(false);
     }

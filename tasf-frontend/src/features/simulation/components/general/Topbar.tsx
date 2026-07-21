@@ -99,7 +99,7 @@ export function Topbar({
         <StatusItem
           label="Duración de la simulación"
           value={data ? formatRealTime(simulationDurationMs) : "--"}
-          sub="ejecución real"
+          sub="tiempo real"
         />
         <StatusItem
           label="Tiempo transcurrido en simulación"

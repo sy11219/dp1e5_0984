@@ -411,7 +411,7 @@ export function FlightsPage() {
 
             {!visible.length && (
               <div className="empty-state">
-                {loading ? "Cargando vuelos desde la BD..." : "No se encontraron vuelos."}
+                {loading ? "Cargando vuelos..." : "No se encontraron vuelos."}
               </div>
             )}
           </div>

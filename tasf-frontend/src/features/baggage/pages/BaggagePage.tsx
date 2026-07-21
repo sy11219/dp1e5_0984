@@ -199,7 +199,7 @@ export const BaggagePage = () => {
               </div>
             ) : (
               <div className="empty-state">
-                {loading ? "Cargando datos del backend..." : "Sin maletas para mostrar."}
+                {loading ? "Cargando información..." : "Sin maletas para mostrar."}
               </div>
             )}
           </div>

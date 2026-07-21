@@ -31,6 +31,7 @@ const COLLAPSE_START_DATE = "2026-01-02";
 const COLLAPSE_MAX_DAYS = 1100;
 const POLL_MS = 2_000;
 const MAP_FOCUS_KEY = "tasf.collapse.mapFocus";
+const TRANSIENT_NOTICE_MS = 4_000;
 
 type ColorFilter = "Todos" | CapacityStatus;
 type RightPanelSection = "flights" | "shipments" | "airports";
@@ -60,7 +61,7 @@ function controlsFromSession(data: SimulationData) {
 
 function collapseDescription(data: SimulationData | null) {
   const collapse = data?.collapse;
-  if (!collapse?.reason) return "La ejecución terminó sin registrar una condición de colapso.";
+  if (!collapse?.reason) return "La operación terminó sin registrar una condición de colapso.";
   if (collapse.reason === "WAREHOUSE_CAPACITY") {
     return `El almacén de ${collapse.airport} superó su capacidad: ${collapse.currentLoad}/${collapse.maxCapacity} maletas.`;
   }
@@ -132,6 +133,12 @@ export function CollapsePage() {
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [mapResetViewToken, setMapResetViewToken] = useState(0);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), TRANSIENT_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const focusTokenRef = useRef(0);
   const advancingRef = useRef(false);
   const latestDataRef = useRef<SimulationData | null>(null);
@@ -150,7 +157,6 @@ export function CollapsePage() {
   const updateSession = useCallback((payload: SimulationData, options?: { animate?: boolean }) => {
     latestDataRef.current = payload;
     setData(payload);
-    setNotice(payload.message || "");
     setPlaying(payload.status === "RUNNING");
 
     const controls = controlsFromSession(payload);
@@ -228,7 +234,7 @@ export function CollapsePage() {
         setFlightCatalog(flights);
       })
       .catch(() => {
-        if (!cancelled) setError("No se pudieron leer los aeropuertos o vuelos desde la BD.");
+        if (!cancelled) setError("No se pudieron cargar los aeropuertos o vuelos.");
       })
       .finally(() => {
         if (!cancelled) setLoadingCatalog(false);
@@ -314,7 +320,7 @@ export function CollapsePage() {
       const updated = await cancelCollapseSimulationRequest(data.simulationId);
       updateSession(updated, { animate: false });
       setPlaying(false);
-      setNotice("Escenario de colapso cancelado. Cualquier máquina puede limpiarlo.");
+      setNotice("Colapso cancelado.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo cancelar el escenario.");
     } finally {
@@ -334,7 +340,7 @@ export function CollapsePage() {
       setPlaying(false);
       stopAnimation();
       reset();
-      setNotice("Escenario de colapso limpiado. Está listo para una nueva ejecución.");
+      setNotice("Escenario restablecido.");
       setSelectedAirport(null);
       setSelectedFlightId(null);
       setSelectedShipment(null);
@@ -438,11 +444,11 @@ export function CollapsePage() {
     ? "⚠️ COLAPSO DEL SISTEMA"
     : data?.status === "CANCELLED"
       ? "Escenario cancelado"
-      : "Ejecución completada";
+    : "Operación finalizada";
   const terminalDescription = data?.status === "COLLAPSED"
     ? collapseDescription(data)
     : data?.status === "CANCELLED"
-      ? "La máquina dueña canceló el escenario antes de detectar un colapso."
+      ? "Quien inició el escenario lo canceló antes de detectar un colapso."
       : "El periodo configurado terminó sin detectar un colapso.";
 
   return (
@@ -462,7 +468,7 @@ export function CollapsePage() {
                 <div className="field"><label>Fecha inicial</label><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} disabled={busy || Boolean(data?.simulationId)} /></div>
                 <div className="field"><label>Hora inicial</label><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={busy || Boolean(data?.simulationId)} /></div>
                 {(!data?.simulationId || (data.status === "PAUSED" && owner)) && <button type="button" className="primary" onClick={!data?.simulationId ? runCollapse : () => void handlePause(false)} disabled={busy}>{loading ? "Iniciando..." : data?.simulationId ? "Reanudar" : "Iniciar colapso"}</button>}
-                {data?.simulationId && !terminal && !owner && <div className="empty-state">Esta máquina está observando. Solo quien inició el escenario puede pausarlo o cancelarlo.</div>}
+                {data?.simulationId && !terminal && !owner && <div className="empty-state">Esta vista está en modo consulta. Solo quien inició el escenario puede pausarlo o cancelarlo.</div>}
                 {notice && <div className="success">{notice}</div>}
                 {error && <div className="error">{error}</div>}
               </div>

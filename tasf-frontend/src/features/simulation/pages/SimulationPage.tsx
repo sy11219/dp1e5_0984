@@ -32,6 +32,7 @@ const BATCH_SIMULATION_STOPPED_KEY = "tasf.simulation5d.stoppedSessionId"
 const SIMULATION_MAP_FOCUS_KEY = "tasf.simulation5d.mapFocus"
 const FINAL_SUMMARY_KEY = "tasf.simulation5d.finalSummary"
 const DEFAULT_BATCH_INTERVAL_MS = 120_000
+const TRANSIENT_NOTICE_MS = 4_000
 type ColorFilter = "Todos" | CapacityStatus
 type RightPanelSection = "flights" | "shipments" | "airports"
 
@@ -281,6 +282,12 @@ export function SimulationPage() {
 
   const [airportColorFilter, setAirportColorFilter] = useState<ColorFilter>("Todos")
 
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(""), TRANSIENT_NOTICE_MS)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
   // Guarda el tick que tenía la animación ANTES de pedir el lote siguiente,
   // para pasar el "from" correcto a animateBatch cuando llega la respuesta.
   const prevTickRef     = useRef(0)
@@ -430,7 +437,7 @@ export function SimulationPage() {
         })
       })
       .catch(() => {
-        if (!cancelled) setError("No se pudieron leer los aeropuertos o vuelos desde la BD.")
+        if (!cancelled) setError("No se pudieron cargar los aeropuertos o vuelos.")
       })
       .finally(() => {
         if (!cancelled) {
@@ -486,7 +493,6 @@ export function SimulationPage() {
       }
 
       setData(payload)
-      setNotice(payload.message || "")
 
       const toTick = payload.tick ?? fromTick
       const payloadMaxMinute = payload.maxTick ?? maxMinute
@@ -720,10 +726,10 @@ export function SimulationPage() {
       setSelectedShipment(null)
       setMapFocusTarget(null)
       writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
-      setNotice(`Vuelo ${id} cancelado. Aplicando replanificación al siguiente batch.`)
+      setNotice("Cancelación registrada")
       setPlaying(updated.status === "RUNNING")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo y replanificar.")
+      setError(err instanceof Error ? err.message : "No se pudo registrar la cancelación.")
       setPlaying(false)
     } finally {
       setCancelling(false)

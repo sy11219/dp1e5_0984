@@ -75,16 +75,16 @@ function buildInsights(data: SimulationData) {
     },
     {
       title: busiestBucket
-        ? `El pico de throughput aparece a las ${busiestBucket.hour}.`
-        : "Sin throughput calculado.",
+        ? `El mayor volumen de maletas aparece a las ${busiestBucket.hour}.`
+        : "Sin volumen calculado.",
       detail: busiestBucket
-        ? `El backend reporta ${busiestBucket.actual} maletas planificadas en ese bloque.`
+        ? `Se registran ${busiestBucket.actual} maletas planificadas en ese periodo.`
         : "No hay envíos disponibles en el resultado recibido.",
     },
     {
       title: `${delayedBags.toLocaleString("es-PE")} maletas requieren seguimiento.`,
       detail:
-        "La cifra agrupa envíos fuera de SLA o no planificados en la simulación.",
+        "La cifra agrupa envíos fuera de plazo o no planificados en la simulación.",
     },
   ];
 }

@@ -32,6 +32,7 @@ type RightPanelSection = "flights" | "shipments" | "airports";
 
 const OPERATIONS_MAP_FOCUS_KEY = "tasf.operations.mapFocus";
 const REALTIME_STATUS_POLL_MS = 5_000;
+const TRANSIENT_NOTICE_MS = 4_000;
 
 function elapsedOperationTimeMs(data: SimulationData | null, fallbackNow = Date.now()) {
   if (!data?.realStartedAt) return 0;
@@ -71,6 +72,12 @@ export const OperationsPage = () => {
   const focusTokenRef = useRef(0);
   const refreshingRef = useRef(false);
   const selectedShipmentId = selectedShipment?.id ?? null;
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), TRANSIENT_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const operationalMinute = useMemo(() => {
     if (!data) return 0;
@@ -289,8 +296,8 @@ export const OperationsPage = () => {
       }
       setNotice(
         operationsClosed
-          ? "Operaciones del día abiertas. La planificación vuelve a ejecutarse."
-          : "Operaciones del día finalizadas. La planificación queda detenida."
+          ? "Operaciones del día abiertas."
+          : "Operaciones del día finalizadas."
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo actualizar el estado de operaciones.");
@@ -316,7 +323,7 @@ export const OperationsPage = () => {
       const updated = await restartRealtimeSessionRequest(data?.days);
       setData(updated);
       restoreMapFocus(updated);
-      setNotice("Nueva jornada iniciada con el catálogo vigente.");
+      setNotice("Nueva jornada iniciada.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo reiniciar las operaciones.");
     } finally {
@@ -337,7 +344,7 @@ export const OperationsPage = () => {
       const updated = await cancelRealtimeFlightRequest(data.simulationId, flightToCancel.trim());
       setData(updated);
       setFlightToCancel("");
-      setNotice("Cancelación registrada. Aplicando replanificación al siguiente batch.");
+      setNotice("Cancelación registrada");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cancelar el vuelo.");
     } finally {

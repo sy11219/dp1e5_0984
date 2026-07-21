@@ -211,7 +211,7 @@ export function SimulationResultModal({
             sub={`${airportBags}/${airportCapacity} maletas`}
           />
           <SummaryMetric
-            label="Tiempo de ejecución del algoritmo"
+            label="Tiempo de planificación"
             value={algorithmRuntimeMs === null ? "--" : formatDurationHms(algorithmRuntimeMs, { ceilPositiveSeconds: true })}
             sub="última planificación"
           />

@@ -392,7 +392,7 @@ export function AirportsPage() {
 
             {!visible.length && (
               <div className="empty-state">
-                {loading ? "Cargando aeropuertos desde la BD..." : "No se encontraron aeropuertos."}
+                {loading ? "Cargando aeropuertos..." : "No se encontraron aeropuertos."}
               </div>
             )}
           </div>
