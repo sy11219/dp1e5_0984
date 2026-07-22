@@ -59,6 +59,11 @@ public class RuntimeCatalogService {
         return new RuntimeCatalog(airports, airportMap, flights);
     }
 
+    public synchronized void invalidateCache() {
+        cachedBase = null;
+        cachedAtMs = 0;
+    }
+
     private CatalogSnapshot loadBaseCatalog(String startDate) throws Exception {
         long now = System.currentTimeMillis();
         if (cachedBase != null && now - cachedAtMs <= CACHE_MS) {

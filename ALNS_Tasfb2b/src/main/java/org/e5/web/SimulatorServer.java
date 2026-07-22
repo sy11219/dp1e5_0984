@@ -252,6 +252,14 @@ public class SimulatorServer {
             send(exchange, 405, "application/json", "{\"error\":\"Use POST\"}");
             return;
         }
+        try {
+            exchange.getRequestBody().readAllBytes();
+            realtimeSimulationService.syncScheduledFlightsFromDatabase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            send(exchange, 500, "application/json", "{\"error\":\"No se pudo sincronizar vuelos cargados\"}");
+            return;
+        }
         send(exchange, 200, "application/json", "{\"status\":\"success\"}");
     }
 
@@ -406,7 +414,7 @@ public class SimulatorServer {
                             "SCHEDULED"
                     );
                     String response = flightPlanService.createFlight(update);
-                    realtimeSimulationService.invalidateSharedCatalog();
+                    realtimeSimulationService.syncScheduledFlightsFromDatabase();
                     send(exchange, 201, "application/json", response);
                     return;
                 }
@@ -432,9 +440,9 @@ public class SimulatorServer {
                         new FlightPlanService.FlightPlanBatchCreateRequest(
                                 readString(SCHEDULE_DATE, body, ""),
                                 readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
-                        );
+                );
                 String response = flightPlanService.createFlightsBatch(request);
-                realtimeSimulationService.invalidateSharedCatalog();
+                realtimeSimulationService.syncScheduledFlightsFromDatabase();
                 send(exchange, 201, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
@@ -465,7 +473,7 @@ public class SimulatorServer {
                         readRequiredString(FLIGHT_STATUS_FIELD, body, "status")
                 );
                 String response = flightPlanService.updateFlight(flightMatcher.group(1), update);
-                realtimeSimulationService.invalidateSharedCatalog();
+                realtimeSimulationService.syncScheduledFlightsFromDatabase();
                 send(exchange, 200, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");

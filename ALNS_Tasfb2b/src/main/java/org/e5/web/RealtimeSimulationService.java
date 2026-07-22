@@ -261,6 +261,10 @@ public class RealtimeSimulationService {
         }
     }
 
+    public void syncScheduledFlightsFromDatabase() {
+        invalidateSharedCatalog();
+    }
+
     /**
      * Invalida el catálogo base y agrega inmediatamente los nuevos elementos a la
      * sesión vigente de tiempo real. Las sesiones de simulación por lotes y
@@ -1121,6 +1125,35 @@ public class RealtimeSimulationService {
          */
         synchronized void syncRegisteredShipmentsFromDatabase() {
             refreshRealtimeShipmentsFromDatabase(true);
+        }
+
+        synchronized void syncScheduledFlights(List<Flight> latestFlights) {
+            Set<String> knownFlightKeys = new HashSet<>();
+            for (Flight flight : flights) {
+                knownFlightKeys.add(cancellationKey(flight));
+            }
+
+            int added = 0;
+            for (Flight flight : latestFlights) {
+                if (flight.absoluteDepartureMinute() < tick || flight.absoluteDepartureMinute() > planningMaxTick) {
+                    continue;
+                }
+
+                String key = cancellationKey(flight);
+                if (!knownFlightKeys.add(key)) {
+                    continue;
+                }
+
+                flights.add(flight);
+                flightById.putIfAbsent(flight.getFlightId(), flight);
+                added++;
+            }
+
+            if (added == 0) return;
+            flights.sort(Comparator
+                    .comparingInt(Flight::absoluteDepartureMinute)
+                    .thenComparing(Flight::getFlightId));
+            System.out.printf("[Tiempo real] Sincronizados %d vuelos nuevos desde BD.%n", added);
         }
 
         synchronized void advanceBatch(int steps) {
