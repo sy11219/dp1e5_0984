@@ -2094,11 +2094,16 @@ public class RealtimeSimulationService {
         }
 
         private boolean flightVisibleInSnapshot(Flight flight) {
+            if (!isBatchScenario()) {
+                return flight.absoluteArrivalMinute() >= tick
+                        && flight.absoluteDepartureMinute() <= maxTick;
+            }
+
             int windowStart = visualWindowStartTick;
             int windowEnd = visualWindowEndTick;
             windowEnd = Math.min(windowEnd, maxTick);
 
-            if (isBatchScenario() && flight.absoluteDepartureMinute() > maxTick) {
+            if (flight.absoluteDepartureMinute() > maxTick) {
                 return false;
             }
 
