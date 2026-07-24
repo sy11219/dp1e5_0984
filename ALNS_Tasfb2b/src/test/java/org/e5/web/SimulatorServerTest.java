@@ -76,4 +76,11 @@ class SimulatorServerTest {
 
         assertTrue(state.contains("\"" + flightCode + "@" + (immediateDeparture + 1440) + "\""));
     }
+
+    @Test
+    void evaluatesTheCancellationHourThresholdWithSubMinutePrecision() {
+        assertTrue(RealtimeSimulationService.isDepartureMoreThanOneHourAway(600, 539.999));
+        assertTrue(!RealtimeSimulationService.isDepartureMoreThanOneHourAway(600, 540.0));
+        assertTrue(!RealtimeSimulationService.isDepartureMoreThanOneHourAway(600, 540.001));
+    }
 }

@@ -574,7 +574,20 @@ export function SimulationPage() {
     let cancelled = false
     void getCurrentBatchSimulationRequest()
       .then((payload) => {
-        if (cancelled || !payload) return
+        if (cancelled) return
+        if (!payload) {
+          // Una sesión de simulación vive en el backend. Tras reiniciarlo, un
+          // vuelo seleccionado en la sesión anterior solo sería una ruta fija
+          // del catálogo, no un vuelo que esté siendo simulado.
+          if (readMapFocus(SIMULATION_MAP_FOCUS_KEY)?.type === "flight") {
+            writeMapFocus(SIMULATION_MAP_FOCUS_KEY, null)
+            setSelectedFlightId(null)
+            setSelectedFlightOccurrence(null)
+            setPinnedFlight(null)
+            setMapFocusTarget(null)
+          }
+          return
+        }
         if (wasBatchSimulationStopped(payload)) {
           setBatchSimulationPaused(true)
           return

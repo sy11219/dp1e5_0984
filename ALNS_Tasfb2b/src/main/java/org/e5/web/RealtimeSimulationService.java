@@ -162,6 +162,10 @@ public class RealtimeSimulationService {
         }
     }
 
+    static boolean isDepartureMoreThanOneHourAway(int departureMinute, double referenceMinute) {
+        return departureMinute - referenceMinute > 60.0d;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  API pública
     // ════════════════════════════════════════════════════════════════════════
@@ -1104,12 +1108,16 @@ public class RealtimeSimulationService {
             }
         }
 
-        private int currentVisualTick(long nowMs) {
+        private double currentVisualMinute(long nowMs) {
             if (visualWindowEndTick <= visualWindowStartTick) return visualWindowEndTick;
             long elapsed = Math.max(0L, nowMs - visualWindowStartedAtMs);
             double progress = Math.min(1.0, elapsed / (double) Math.max(1L, planningIntervalMs()));
-            return (int) Math.round(visualWindowStartTick
-                    + (visualWindowEndTick - visualWindowStartTick) * progress);
+            return visualWindowStartTick
+                    + (visualWindowEndTick - visualWindowStartTick) * progress;
+        }
+
+        private int currentVisualTick(long nowMs) {
+            return (int) Math.round(currentVisualMinute(nowMs));
         }
 
         synchronized void setPaused(boolean nextPaused) {
@@ -1882,7 +1890,7 @@ public class RealtimeSimulationService {
         }
 
         private Flight resolveCancellationFlight(String input) {
-            int referenceMinute = currentVisualTick(System.currentTimeMillis());
+            double referenceMinute = currentVisualMinute(System.currentTimeMillis());
             Flight exact = findFlightByCancellationKey(input);
             if (exact != null) {
                 if (isCancelableWithMoreThanOneHour(exact, referenceMinute)) {
@@ -1910,13 +1918,13 @@ public class RealtimeSimulationService {
          * de anticipación se busca la siguiente salida; solo más de una hora
          * permite cancelar la salida inmediata.
          */
-        private boolean isCancelableWithMoreThanOneHour(Flight flight, int referenceMinute) {
-            return flight.absoluteDepartureMinute() > referenceMinute + 60
+        private boolean isCancelableWithMoreThanOneHour(Flight flight, double referenceMinute) {
+            return isDepartureMoreThanOneHourAway(flight.absoluteDepartureMinute(), referenceMinute)
                     && !isCancelled(flight)
                     && !isPendingCancellation(flight);
         }
 
-        private Flight nextCancelableRecurrence(Flight reference, int referenceMinute) {
+        private Flight nextCancelableRecurrence(Flight reference, double referenceMinute) {
             final Flight recurringReference = reference;
             return flights.stream()
                     .filter(f -> sameRecurringFlight(recurringReference, f))

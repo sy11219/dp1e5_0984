@@ -141,32 +141,33 @@ export const OperationsPage = () => {
 
   useEffect(() => {
     let ignore = false;
+    let retryTimer: number | undefined;
 
-    void getCurrentRealtimeSessionRequest()
-      .then((payload) => {
+    const loadCurrentSession = async () => {
+      try {
+        const current = await getCurrentRealtimeSessionRequest();
         if (ignore) return;
-        if (payload) {
-          setData(payload);
-          restoreMapFocus(payload);
-          return;
-        }
-        return startRealtimeSessionRequest().then((created) => {
-          if (ignore) return;
-          setData(created);
-          restoreMapFocus(created);
-        });
-      })
-      .catch((err) => {
-        if (!ignore) {
-          setError(err instanceof Error ? err.message : "No se pudo conectar la operación.");
-        }
-      })
-      .finally(() => {
+
+        const payload = current ?? await startRealtimeSessionRequest();
+        if (ignore) return;
+
+        setData(payload);
+        setError("");
+        restoreMapFocus(payload);
+      } catch (err) {
+        if (ignore) return;
+        setError(err instanceof Error ? err.message : "No se pudo conectar la operación.");
+        retryTimer = window.setTimeout(loadCurrentSession, REALTIME_STATUS_POLL_MS);
+      } finally {
         if (!ignore) setLoading(false);
-      });
+      }
+    };
+
+    void loadCurrentSession();
 
     return () => {
       ignore = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
   }, [restoreMapFocus]);
 
