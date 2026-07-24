@@ -195,6 +195,17 @@ export interface ShipmentPage {
   items: Shipment[];
 }
 
+export interface FlightPage {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  referenceMinute: number;
+  windowStartMinute: number;
+  windowEndMinute: number;
+  items: Flight[];
+}
+
 export type AirportLoads = Record<string, number>;
 
 export interface MapInfoCard {

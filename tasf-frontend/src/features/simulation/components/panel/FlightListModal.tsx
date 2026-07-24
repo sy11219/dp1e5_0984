@@ -8,8 +8,9 @@ interface FlightListModalProps {
   shipment: Shipment;
   flights: Flight[];
   data?: SimulationData | null;
+  currentMinute: number;
   onClose: () => void;
-  onSelectFlight?: (id: string) => void;
+  onSelectFlight?: (flight: Flight) => void;
 }
 
 function formatWait(minutes?: number) {
@@ -24,6 +25,7 @@ export function FlightListModal({
   shipment,
   flights,
   data,
+  currentMinute,
   onClose,
   onSelectFlight,
 }: FlightListModalProps) {
@@ -55,6 +57,9 @@ export function FlightListModal({
 
         <div className="flight-list">
           {route.map((leg, index) => {
+            const flight = toFocusedFlight(leg);
+            const hasArrived = leg.absoluteArrivalMinute !== undefined
+              && currentMinute >= leg.absoluteArrivalMinute;
             const departure =
               leg.absoluteDepartureMinute !== undefined
                 ? formatFlightMoment(data, leg.absoluteDepartureMinute)
@@ -86,7 +91,13 @@ export function FlightListModal({
                     <button
                       type="button"
                       className="route-focus-button"
-                      onClick={() => {onSelectFlight(leg.flightId); onClose();}}
+                      disabled={!flight || hasArrived}
+                      title={hasArrived ? "Este vuelo ya llegó a su destino." : undefined}
+                      onClick={() => {
+                        if (!flight || hasArrived) return;
+                        onSelectFlight(flight);
+                        onClose();
+                      }}
                     >
                       Enfocar vuelo
                     </button>
@@ -102,4 +113,31 @@ export function FlightListModal({
       </div>
     </div>
   );
+}
+
+function toFocusedFlight(leg: ReturnType<typeof resolveShipmentRoute>[number]): Flight | null {
+  if (leg.flight) return leg.flight;
+  if (leg.absoluteDepartureMinute === undefined || leg.absoluteArrivalMinute === undefined) {
+    return null;
+  }
+
+  const maxCapacity = Math.max(0, leg.maxCapacity ?? 0);
+  const assignedLoad = Math.max(0, leg.assignedLoad ?? 0);
+  const utilization = maxCapacity > 0 ? assignedLoad / maxCapacity : 0;
+
+  return {
+    id: leg.flightId,
+    origin: leg.origin,
+    destination: leg.destination,
+    departureMinute: ((leg.absoluteDepartureMinute % 1440) + 1440) % 1440,
+    arrivalMinute: ((leg.absoluteArrivalMinute % 1440) + 1440) % 1440,
+    dayOffset: Math.floor(leg.absoluteDepartureMinute / 1440),
+    status: "gray",
+    utilization,
+    assignedLoad,
+    maxCapacity,
+    absoluteDepartureMinute: leg.absoluteDepartureMinute,
+    absoluteArrivalMinute: leg.absoluteArrivalMinute,
+    scheduleStatus: "SCHEDULED",
+  };
 }

@@ -101,6 +101,7 @@ public class RealtimeSimulationService {
             "TASF_BATCH_SNAPSHOT_MAX_SHIPMENTS", 300);
     private static final int BATCH_SNAPSHOT_MAX_EVENTS = readPositiveInt(
             "TASF_BATCH_SNAPSHOT_MAX_EVENTS", 6_000);
+    private static final int FLIGHT_LIST_WINDOW_MINUTES = 24 * 60;
 
     // ── Parámetros del loop de tiempo real ────────────────────────────────────
     private static final int INTERVALO_TICK    = 1;
@@ -475,6 +476,22 @@ public class RealtimeSimulationService {
         return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute, historyMinutes, departureWithinMinutes, sortBy, sortOrder);
     }
 
+    public String batchFlights(String id, int page, int pageSize,
+                               String search, String origin, String destination,
+                               String status, String capacityStatus,
+                               String sortBy, String sortOrder) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedSimulationSessionId == null ? null : sessions.get(sharedSimulationSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
+        if (!"SIMULACION_LOTES".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesión indicada no es una simulación por lotes.");
+        }
+        return session.flightsPageJson(page, pageSize, search, origin, destination,
+                status, capacityStatus, sortBy, sortOrder);
+    }
+
     // ── Escenario de colapso ───────────────────────────────────────────────
 
     /**
@@ -592,6 +609,38 @@ public class RealtimeSimulationService {
             throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
         }
         return session.shipmentsPageJson(page, pageSize, search, origin, destination, status, currentMinute, historyMinute, departureWithinMinutes, sortBy, sortOrder);
+    }
+
+    public String collapseFlights(String id, int page, int pageSize,
+                                 String search, String origin, String destination,
+                                 String status, String capacityStatus,
+                                 String sortBy, String sortOrder) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedCollapseSessionId == null ? null : sessions.get(sharedCollapseSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
+        if (!"COLAPSO".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesión indicada no es un escenario de colapso.");
+        }
+        return session.flightsPageJson(page, pageSize, search, origin, destination,
+                status, capacityStatus, sortBy, sortOrder);
+    }
+
+    public String realtimeFlights(String id, int page, int pageSize,
+                                  String search, String origin, String destination,
+                                  String status, String capacityStatus,
+                                  String sortBy, String sortOrder) {
+        RealtimeSession session = sessions.get(id);
+        if (session == null) {
+            session = sharedRealtimeSessionId == null ? null : sessions.get(sharedRealtimeSessionId);
+        }
+        if (session == null) throw new IllegalArgumentException("Sesión no encontrada.");
+        if (!"TIEMPO_REAL".equals(session.scenario)) {
+            throw new IllegalArgumentException("La sesión indicada no es una operación de tiempo real.");
+        }
+        return session.flightsPageJson(page, pageSize, search, origin, destination,
+                status, capacityStatus, sortBy, sortOrder);
     }
 
     private static int parseStartTime(String startTime) {
@@ -1833,24 +1882,16 @@ public class RealtimeSimulationService {
         }
 
         private Flight resolveCancellationFlight(String input) {
+            int referenceMinute = currentVisualTick(System.currentTimeMillis());
             Flight exact = findFlightByCancellationKey(input);
             if (exact != null) {
-                if (exact.absoluteDepartureMinute() - tick >= 60
-                        && !isCancelled(exact)
-                        && !isPendingCancellation(exact)) {
+                if (isCancelableWithMoreThanOneHour(exact, referenceMinute)) {
                     return exact;
                 }
-                return null;
+                return nextCancelableRecurrence(exact, referenceMinute);
             }
 
             Flight requested = findFlight(input);
-            if (requested != null
-                    && requested.absoluteDepartureMinute() - tick >= 60
-                    && !isCancelled(requested)
-                    && !isPendingCancellation(requested)) {
-                return requested;
-            }
-
             Flight reference = requested;
             if (reference == null) {
                 reference = flights.stream()
@@ -1860,13 +1901,26 @@ public class RealtimeSimulationService {
             }
             if (reference == null) return null;
 
+            return nextCancelableRecurrence(reference, referenceMinute);
+        }
+
+        /**
+         * La regla de negocio se evalúa contra la hora que ve el operador, no
+         * contra el extremo ya planificado del lote. Con exactamente una hora
+         * de anticipación se busca la siguiente salida; solo más de una hora
+         * permite cancelar la salida inmediata.
+         */
+        private boolean isCancelableWithMoreThanOneHour(Flight flight, int referenceMinute) {
+            return flight.absoluteDepartureMinute() > referenceMinute + 60
+                    && !isCancelled(flight)
+                    && !isPendingCancellation(flight);
+        }
+
+        private Flight nextCancelableRecurrence(Flight reference, int referenceMinute) {
             final Flight recurringReference = reference;
-            int minDeparture = tick + 60;
             return flights.stream()
                     .filter(f -> sameRecurringFlight(recurringReference, f))
-                    .filter(f -> f.absoluteDepartureMinute() >= minDeparture)
-                    .filter(f -> !isCancelled(f))
-                    .filter(f -> !isPendingCancellation(f))
+                    .filter(f -> isCancelableWithMoreThanOneHour(f, referenceMinute))
                     .min(Comparator.comparingInt(Flight::absoluteDepartureMinute))
                     .orElse(null);
         }
@@ -2191,6 +2245,158 @@ public class RealtimeSimulationService {
                     .thenComparingInt(e -> eventPriority(e.type))
                     .thenComparing(RealtimeEvent::type));
             return snapshot;
+        }
+
+        synchronized String flightsPageJson(int page, int pageSize,
+                                            String search, String origin, String destination,
+                                            String statusFilter, String capacityFilter,
+                                            String sortBy, String sortOrder) {
+            int safePageSize = Math.max(1, Math.min(100, pageSize));
+            int safePage = Math.max(1, page);
+            int referenceMinute = currentVisualTick(System.currentTimeMillis());
+            int windowStart = referenceMinute - FLIGHT_LIST_WINDOW_MINUTES;
+            int windowEnd = referenceMinute + FLIGHT_LIST_WINDOW_MINUTES;
+            String normalizedSearch = normalizeFilter(search);
+            String normalizedOrigin = normalizeFilter(origin);
+            String normalizedDestination = normalizeFilter(destination);
+            String normalizedStatus = normalizeFilter(statusFilter);
+            String normalizedCapacity = normalizeFilter(capacityFilter);
+
+            List<Flight> filtered = new ArrayList<>();
+            for (Flight flight : flightsForOperationalList(windowStart)) {
+                if (flight.absoluteDepartureMinute() < windowStart
+                        || flight.absoluteDepartureMinute() > windowEnd) {
+                    continue;
+                }
+                if (!matchesFlightFilters(
+                        flight,
+                        normalizedSearch,
+                        normalizedOrigin,
+                        normalizedDestination,
+                        normalizedStatus,
+                        normalizedCapacity,
+                        referenceMinute)) {
+                    continue;
+                }
+                filtered.add(flight);
+            }
+            filtered.sort((a, b) -> compareFlights(a, b, sortBy, sortOrder));
+
+            int total = filtered.size();
+            int totalPages = total == 0 ? 1 : (int) Math.ceil(total / (double) safePageSize);
+            safePage = Math.min(safePage, totalPages);
+            int from = Math.min(total, (safePage - 1) * safePageSize);
+            int to = Math.min(total, from + safePageSize);
+
+            Json json = new Json();
+            json.objStart();
+            json.prop("page", safePage).comma();
+            json.prop("pageSize", safePageSize).comma();
+            json.prop("total", total).comma();
+            json.prop("totalPages", totalPages).comma();
+            json.prop("referenceMinute", referenceMinute).comma();
+            json.prop("windowStartMinute", windowStart).comma();
+            json.prop("windowEndMinute", windowEnd).comma();
+            json.name("items").arrayStart();
+            for (int i = from; i < to; i++) {
+                writeFlight(json, filtered.get(i), referenceMinute);
+                if (i < to - 1) json.comma();
+            }
+            json.arrayEnd();
+            json.objEnd();
+            return json.toString();
+        }
+
+        private List<Flight> flightsForOperationalList(int windowStart) {
+            if (windowStart >= 0) return flights;
+
+            List<Flight> source = new ArrayList<>(flights);
+            for (Flight flight : flights) {
+                if (flight.getDayOffset() != 0) break;
+                source.add(new Flight(
+                        flight.getFlightId(),
+                        flight.getOriginCode(),
+                        flight.getDestCode(),
+                        flight.getDepartureMinute(),
+                        flight.getArrivalMinute(),
+                        flight.getMaxCapacity(),
+                        -1
+                ));
+            }
+            return source;
+        }
+
+        private boolean matchesFlightFilters(Flight flight,
+                                             String search, String origin, String destination,
+                                             String statusFilter, String capacityFilter,
+                                             int referenceMinute) {
+            if (!origin.isBlank() && !flight.getOriginCode().toLowerCase(Locale.ROOT).equals(origin)) {
+                return false;
+            }
+            if (!destination.isBlank() && !flight.getDestCode().toLowerCase(Locale.ROOT).equals(destination)) {
+                return false;
+            }
+            if (!search.isBlank()
+                    && !flight.getFlightId().toLowerCase(Locale.ROOT).contains(search)
+                    && !flight.getOriginCode().toLowerCase(Locale.ROOT).contains(search)
+                    && !flight.getDestCode().toLowerCase(Locale.ROOT).contains(search)) {
+                return false;
+            }
+            if (!capacityFilter.isBlank()
+                    && !status(ratio(flight.getAssignedLoad(), flight.getMaxCapacity())).equals(capacityFilter)) {
+                return false;
+            }
+
+            if (statusFilter.isBlank()) return true;
+            String scheduleStatus = flightScheduleStatus(flight, referenceMinute).toLowerCase(Locale.ROOT);
+            return switch (statusFilter) {
+                case "active", "activo", "activos" -> "in_progress".equals(scheduleStatus);
+                case "not-started", "no-iniciado", "no iniciados" -> "queued".equals(scheduleStatus);
+                case "cancelled", "cancelado", "cancelados" -> "cancelled".equals(scheduleStatus);
+                case "completed", "finalizado", "finalizados" -> "completed".equals(scheduleStatus);
+                default -> true;
+            };
+        }
+
+        private int compareFlights(Flight a, Flight b, String sortBy, String sortOrder) {
+            String normalizedSortBy = normalizeFilter(sortBy);
+            boolean descending = "desc".equalsIgnoreCase(sortOrder);
+            int compare;
+            switch (normalizedSortBy) {
+                case "utilization" -> compare = Double.compare(
+                        ratio(a.getAssignedLoad(), a.getMaxCapacity()),
+                        ratio(b.getAssignedLoad(), b.getMaxCapacity()));
+                case "arrivalminute" -> compare = Integer.compare(
+                        a.absoluteArrivalMinute(), b.absoluteArrivalMinute());
+                case "origin" -> compare = a.getOriginCode().compareTo(b.getOriginCode());
+                case "destination" -> compare = a.getDestCode().compareTo(b.getDestCode());
+                default -> compare = Integer.compare(a.absoluteDepartureMinute(), b.absoluteDepartureMinute());
+            }
+            if (compare == 0) {
+                compare = Integer.compare(a.absoluteDepartureMinute(), b.absoluteDepartureMinute());
+            }
+            if (compare == 0) {
+                compare = a.getFlightId().compareTo(b.getFlightId());
+            }
+            return descending ? -compare : compare;
+        }
+
+        private String flightScheduleStatus(Flight flight, int referenceMinute) {
+            if (isCancelled(flight)
+                    || isPendingCancellation(flight)
+                    || hasQueuedCancellationRequest(flight)) {
+                return "CANCELLED";
+            }
+            if (referenceMinute < flight.absoluteDepartureMinute()) return "QUEUED";
+            if (referenceMinute <= flight.absoluteArrivalMinute()) return "IN_PROGRESS";
+            return "COMPLETED";
+        }
+
+        private boolean hasQueuedCancellationRequest(Flight flight) {
+            for (CancellationRequest request : queuedCancellationRequests) {
+                if (sameCancellationCode(flight, request.input())) return true;
+            }
+            return false;
         }
 
         synchronized String shipmentsPageJson(int page, int pageSize,
@@ -2652,25 +2858,7 @@ public class RealtimeSimulationService {
             json.name("flights").arrayStart();
             for (int i = 0; i < used.size(); i++) {
                 Flight f = used.get(i);
-                double util = ratio(f.getAssignedLoad(), f.getMaxCapacity());
-                json.objStart();
-                json.prop("id", f.getFlightId()).comma();
-                json.prop("origin", f.getOriginCode()).comma();
-                json.prop("destination", f.getDestCode()).comma();
-                json.prop("dayOffset", f.getDayOffset()).comma();
-                json.prop("departureMinute", f.getDepartureMinute()).comma();
-                json.prop("arrivalMinute", f.getArrivalMinute()).comma();
-                json.prop("absoluteDepartureMinute", f.absoluteDepartureMinute()).comma();
-                json.prop("absoluteArrivalMinute", f.absoluteArrivalMinute()).comma();
-                json.prop("assignedLoad", f.getAssignedLoad()).comma();
-                json.prop("maxCapacity", f.getMaxCapacity()).comma();
-                json.prop("utilization", util).comma();
-                json.prop("status", status(util)).comma();
-                json.prop("scheduleStatus",
-                        isCancelled(f) ? "CANCELLED" :
-                                isPendingCancellation(f) ? "PENDING_CANCEL" :
-                                        f.absoluteDepartureMinute() <= tick ? "IN_PROGRESS" : "QUEUED");
-                json.objEnd();
+                writeFlight(json, f, tick);
                 if (i < used.size() - 1) json.comma();
             }
             json.arrayEnd().comma();
@@ -2883,6 +3071,25 @@ public class RealtimeSimulationService {
                 case "shipment_created", "connection_arrival", "final_arrival" -> 1;
                 default -> 2;
             };
+        }
+
+        private void writeFlight(Json json, Flight flight, int referenceMinute) {
+            double utilization = ratio(flight.getAssignedLoad(), flight.getMaxCapacity());
+            json.objStart();
+            json.prop("id", flight.getFlightId()).comma();
+            json.prop("origin", flight.getOriginCode()).comma();
+            json.prop("destination", flight.getDestCode()).comma();
+            json.prop("dayOffset", flight.getDayOffset()).comma();
+            json.prop("departureMinute", flight.getDepartureMinute()).comma();
+            json.prop("arrivalMinute", flight.getArrivalMinute()).comma();
+            json.prop("absoluteDepartureMinute", flight.absoluteDepartureMinute()).comma();
+            json.prop("absoluteArrivalMinute", flight.absoluteArrivalMinute()).comma();
+            json.prop("assignedLoad", flight.getAssignedLoad()).comma();
+            json.prop("maxCapacity", flight.getMaxCapacity()).comma();
+            json.prop("utilization", utilization).comma();
+            json.prop("status", status(utilization)).comma();
+            json.prop("scheduleStatus", flightScheduleStatus(flight, referenceMinute));
+            json.objEnd();
         }
 
         private void writeShipment(Json json, Shipment s) {

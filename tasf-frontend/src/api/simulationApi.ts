@@ -1,4 +1,4 @@
-import type { Airport, Flight, ShipmentPage, SimulationData } from "../features/simulation/types";
+import type { Airport, Flight, FlightPage, ShipmentPage, SimulationData } from "../features/simulation/types";
 import { SIMULATION_DAYS } from "../features/simulation/utils/constants";
 import { api } from "./apiClient";
 
@@ -360,6 +360,41 @@ export async function cancelRealtimeFlightRequest(
     `/realtime/${simulationId}/cancel-flight`,
     { flightId }
   );
+  return response.data;
+}
+
+export async function getSessionFlightsPageRequest(
+  simulationId: string,
+  params: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    origin?: string;
+    destination?: string;
+    status?: string;
+    capacityStatus?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  },
+  scenario?: string
+): Promise<FlightPage> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page));
+  query.set("pageSize", String(params.pageSize));
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.origin?.trim()) query.set("origin", params.origin.trim());
+  if (params.destination?.trim()) query.set("destination", params.destination.trim());
+  if (params.status?.trim()) query.set("status", params.status.trim());
+  if (params.capacityStatus?.trim()) query.set("capacityStatus", params.capacityStatus.trim());
+  if (params.sortBy?.trim()) query.set("sortBy", params.sortBy.trim());
+  if (params.sortOrder?.trim()) query.set("sortOrder", params.sortOrder.trim());
+
+  const basePath = scenario === "Colapso"
+    ? `/collapse/${simulationId}/flights`
+    : scenario === "Tiempo real"
+      ? `/realtime/${simulationId}/flights`
+      : `/simulations/batch/${simulationId}/flights`;
+  const response = await api.get<FlightPage>(`${basePath}?${query.toString()}`);
   return response.data;
 }
 

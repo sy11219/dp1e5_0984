@@ -129,6 +129,8 @@ export function CollapsePage() {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
     () => initialMapFocus?.type === "flight" ? initialMapFocus.id : null
   );
+  const [selectedFlightOccurrence, setSelectedFlightOccurrence] = useState<Flight | null>(null);
+  const [pinnedFlight, setPinnedFlight] = useState<Flight | null>(null);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [mapResetViewToken, setMapResetViewToken] = useState(0);
@@ -287,6 +289,8 @@ export function CollapsePage() {
       updateSession(initial, { animate: false });
       setSelectedAirport(null);
       setSelectedFlightId(null);
+      setSelectedFlightOccurrence(null);
+      setPinnedFlight(null);
       setSelectedShipment(null);
       setMapFocusTarget(null);
       writeMapFocus(MAP_FOCUS_KEY, null);
@@ -343,6 +347,8 @@ export function CollapsePage() {
       setNotice("Escenario restablecido.");
       setSelectedAirport(null);
       setSelectedFlightId(null);
+      setSelectedFlightOccurrence(null);
+      setPinnedFlight(null);
       setSelectedShipment(null);
       setMapFocusTarget(null);
       writeMapFocus(MAP_FOCUS_KEY, null);
@@ -378,9 +384,10 @@ export function CollapsePage() {
   );
   const mapSelectedFlightId = useMemo(() => {
     if (!selectedFlightId || flightColorFilter === "Todos") return selectedFlightId;
+    if (selectedFlightOccurrence) return selectedFlightId;
     const selected = displayData.flights.find((flight) => flight.id === selectedFlightId);
     return selected && capacityStatus(selected.utilization) === flightColorFilter ? selectedFlightId : null;
-  }, [displayData.flights, flightColorFilter, selectedFlightId]);
+  }, [displayData.flights, flightColorFilter, selectedFlightId, selectedFlightOccurrence]);
   const mapSelectedAirport = useMemo(() => {
     if (!selectedAirport || airportColorFilter === "Todos") return selectedAirport;
     const airport = displayData.airports.find((item) => item.code === selectedAirport);
@@ -393,6 +400,8 @@ export function CollapsePage() {
   const clearMapSelection = useCallback((options?: { resetView?: boolean }) => {
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(null);
     setMapFocusTarget(null);
     if (options?.resetView) setMapResetViewToken((current) => current + 1);
@@ -406,22 +415,29 @@ export function CollapsePage() {
     }
     setSelectedAirport(code);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(null);
     setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current });
     writeMapFocus(MAP_FOCUS_KEY, { type: "airport", id: code });
   }, [clearMapSelection, selectedAirport]);
 
-  const focusFlight = useCallback((id: string) => {
-    if (selectedFlightId === id) {
+  const focusFlight = useCallback((flight: Flight, pin = false) => {
+    if (selectedFlightOccurrence?.id === flight.id
+      && selectedFlightOccurrence.absoluteDepartureMinute === flight.absoluteDepartureMinute) {
       clearMapSelection({ resetView: true });
       return;
     }
+    setRightPanelOpen(true);
+    setOpenRightPanelSection("flights");
     setSelectedAirport(null);
-    setSelectedFlightId(id);
+    setSelectedFlightId(flight.id);
+    setSelectedFlightOccurrence(flight);
+    setPinnedFlight(pin ? flight : null);
     setSelectedShipment(null);
-    setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current });
-    writeMapFocus(MAP_FOCUS_KEY, { type: "flight", id });
-  }, [clearMapSelection, selectedFlightId]);
+    setMapFocusTarget({ type: "flight", id: flight.id, token: ++focusTokenRef.current });
+    writeMapFocus(MAP_FOCUS_KEY, { type: "flight", id: flight.id });
+  }, [clearMapSelection, selectedFlightOccurrence]);
 
   const focusShipment = useCallback((shipment: Shipment) => {
     if (selectedShipment?.id === shipment.id) {
@@ -430,6 +446,8 @@ export function CollapsePage() {
     }
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(shipment);
     setMapFocusTarget({ type: "shipment", id: shipment.id, token: ++focusTokenRef.current });
     writeMapFocus(MAP_FOCUS_KEY, null);
@@ -494,7 +512,7 @@ export function CollapsePage() {
         )}
 
         <section className="panel map-panel">
-          <MapStage data={displayData} activeFlights={filteredActiveFlights} airportLoads={airportLoads} airportPeakLoads={airportPeakLoads} airportColorFilter={airportColorFilter} selectedAirport={mapSelectedAirport} selectedFlightId={mapSelectedFlightId} selectedShipment={selectedShipment} focusTarget={mapFocusTarget} resetViewToken={mapResetViewToken} displayGmtOffset={displayGmtOffset} onSelectAirport={focusAirport} onSelectFlight={focusFlight} onClearSelection={clearMapSelection}>
+          <MapStage data={displayData} activeFlights={filteredActiveFlights} airportLoads={airportLoads} airportPeakLoads={airportPeakLoads} airportColorFilter={airportColorFilter} selectedAirport={mapSelectedAirport} selectedFlightId={mapSelectedFlightId} focusedFlight={selectedFlightOccurrence} selectedShipment={selectedShipment} focusTarget={mapFocusTarget} resetViewToken={mapResetViewToken} displayGmtOffset={displayGmtOffset} onSelectAirport={focusAirport} onSelectFlight={focusFlight} onClearSelection={clearMapSelection}>
             <SimulationStatusCards data={data} simMinute={simMinute} durationMs={realTimeMs} displayGmtOffset={displayGmtOffset} displayAirportLabel={displayAirportLabel} variant="collapse" />
             <DraggableMapOverlay anchor="bottom-right" initialX={18} initialY={76} className="map-global-indicators-overlay"><GlobalIndicators data={data} currentMinute={simMinute} samplingIntervalMinutes={data?.planningIntervalMinutes} /></DraggableMapOverlay>
           </MapStage>
@@ -505,11 +523,11 @@ export function CollapsePage() {
             <div className="panel section panel-runtime"><span>Panel de operaciones</span><button type="button" className="panel-collapse-button panel-collapse-button-right" onClick={() => setRightPanelOpen(false)} aria-label="Ocultar panel derecho"><PanelRightClose size={18} /></button></div>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "flights" ? null : "flights")} aria-expanded={openRightPanelSection === "flights"}><span>Vuelos</span><strong>{openRightPanelSection === "flights" ? "-" : "+"}</strong></button>
-              {openRightPanelSection === "flights" && <div className="collapsible-content">{loadingCatalog && <div className="empty-state">Cargando vuelos...</div>}<FlightsTable flights={displayData.flights} activeFlightIds={activeFlightIds} shipments={visibleShipments} data={data} selectedFlightId={selectedFlightId} onSelectFlight={focusFlight} displayGmtOffset={displayGmtOffset} colorFilter={flightColorFilter} onColorFilterChange={setFlightColorFilter} /></div>}
+              {openRightPanelSection === "flights" && <div className="collapsible-content">{loadingCatalog && <div className="empty-state">Cargando vuelos...</div>}<FlightsTable flights={displayData.flights} activeFlightIds={activeFlightIds} shipments={visibleShipments} data={data} selectedFlightId={selectedFlightId} selectedFlight={selectedFlightOccurrence} pinnedFlight={pinnedFlight} onSelectFlight={focusFlight} displayGmtOffset={displayGmtOffset} colorFilter={flightColorFilter} onColorFilterChange={setFlightColorFilter} currentMinute={simMinute} /></div>}
             </section>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "shipments" ? null : "shipments")} aria-expanded={openRightPanelSection === "shipments"}><span>Envíos</span><strong>{openRightPanelSection === "shipments" ? "-" : "+"}</strong></button>
-              {openRightPanelSection === "shipments" && <div className="collapsible-content"><ShipmentsTable shipments={visibleShipments} flights={displayData.flights} data={data} simMinute={simMinute} displayGmtOffset={displayGmtOffset} selectedShipmentId={selectedShipment?.id ?? null} onSelectShipment={focusShipment} onSelectFlight={focusFlight} /></div>}
+              {openRightPanelSection === "shipments" && <div className="collapsible-content"><ShipmentsTable shipments={visibleShipments} flights={displayData.flights} data={data} simMinute={simMinute} displayGmtOffset={displayGmtOffset} selectedShipmentId={selectedShipment?.id ?? null} onSelectShipment={focusShipment} onSelectFlight={(flight) => focusFlight(flight, true)} /></div>}
             </section>
             <section className="panel section collapsible-section">
               <button type="button" className="collapsible-trigger" onClick={() => setOpenRightPanelSection((current) => current === "airports" ? null : "airports")} aria-expanded={openRightPanelSection === "airports"}><span>Aeropuertos</span><strong>{openRightPanelSection === "airports" ? "-" : "+"}</strong></button>

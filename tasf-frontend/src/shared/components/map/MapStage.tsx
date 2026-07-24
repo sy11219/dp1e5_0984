@@ -22,12 +22,13 @@ type MapStageProps = {
   flightColorFilter?: "Todos" | CapacityStatus;
   selectedAirport: string | null;
   selectedFlightId?: string | null;
+  focusedFlight?: Flight | null;
   selectedShipment?: Shipment | null;
   focusTarget?: MapFocusTarget | null;
   resetViewToken?: number;
   displayGmtOffset?: number;
   onSelectAirport: (code: string) => void;
-  onSelectFlight?: (id: string) => void;
+  onSelectFlight?: (flight: Flight) => void;
   onClearSelection?: () => void;
   children?: ReactNode;
 };
@@ -67,6 +68,7 @@ export default function MapStage({
   flightColorFilter = "Todos",
   selectedAirport,
   selectedFlightId,
+  focusedFlight,
   selectedShipment,
   focusTarget,
   resetViewToken,
@@ -117,10 +119,11 @@ export default function MapStage({
   );
   const selectedFlight = useMemo(
     () =>
+      focusedFlight ??
       activeFlights.find((flight) => flight.id === selectedFlightId) ??
       data?.flights.find((flight) => flight.id === selectedFlightId) ??
       null,
-    [activeFlights, data?.flights, selectedFlightId]
+    [activeFlights, data?.flights, focusedFlight, selectedFlightId]
   );
 
   useEffect(() => {
@@ -304,6 +307,9 @@ export default function MapStage({
       canvasRef.current.width,
       canvasRef.current.height,
       selectedFlightId ?? "",
+      selectedFlight
+        ? `${selectedFlight.id}@${selectedFlight.absoluteDepartureMinute}`
+        : "",
       selectedShipment?.id ?? "",
       selectedShipmentRoute
         .map((leg) => `${leg.flightId}:${leg.absoluteDepartureMinute ?? "x"}:${leg.absoluteArrivalMinute ?? "x"}`)
@@ -324,7 +330,7 @@ export default function MapStage({
 
     if (selectedShipmentRoute.length > 0) {
       drawShipmentRoute(ctx, mapRef.current, selectedShipmentRoute, airportByCode, canvasOrigin);
-    } else if (selectedFlight && !activeFlights.some((flight) => flight.id === selectedFlight.id)) {
+    } else if (selectedFlight && !activeFlights.some((flight) => sameFlightOccurrence(flight, selectedFlight))) {
       drawStaticFlightRoute(ctx, mapRef.current, selectedFlight, airportByCode, canvasOrigin);
     }
 
@@ -335,7 +341,9 @@ export default function MapStage({
 
     const { destPixel, planePixel, angle } =
       getRouteGeometry(mapRef.current, origin, destination, flight.progress, canvasOrigin);
-    const isSelected = flight.id === selectedFlightId;
+    const isSelected = selectedFlight
+      ? sameFlightOccurrence(flight, selectedFlight)
+      : flight.id === selectedFlightId;
     const status = capacityStatus(flight.utilization);
     const flightColor = flight.assignedLoad <= 0 ? STATUS_COLOR.gray : STATUS_COLOR[status];
 
@@ -494,7 +502,7 @@ export default function MapStage({
 
         const dist = Math.hypot(x - planePixel.x, y - planePixel.y);
         if (dist < 12) {
-          onSelectFlight?.(flight.id);
+          onSelectFlight?.(flight);
           setMapInfo(createFlightInfo(data, flight, origin, destination, displayGmtOffset));
           return;
         }
@@ -752,6 +760,11 @@ function createAirportInfo(airport: Airport, load: number, peakLoad?: number): M
   };
 }
 
+function sameFlightOccurrence(a: Flight, b: Flight) {
+  return a.id === b.id
+    && a.absoluteDepartureMinute === b.absoluteDepartureMinute;
+}
+
 function createFlightInfo(
   data: SimulationData | null,
   flight: Flight | ActiveFlight,
@@ -759,6 +772,7 @@ function createFlightInfo(
   destination: Airport,
   displayGmtOffset?: number
 ): MapInfo {
+  const cancelled = isFlightCancelled(data, flight);
   const progress = "progress" in flight ? `${Math.round(flight.progress * 100)}%` : "Planificado";
   return {
     type: "flight",
@@ -771,13 +785,26 @@ function createFlightInfo(
       ["Destino", `${destination.code} - ${destination.city}`],
       ["Salida", formatFlightMoment(data, flight.absoluteDepartureMinute, displayGmtOffset)],
       ["Llegada", formatFlightMoment(data, flight.absoluteArrivalMinute, displayGmtOffset)],
-      ["Avance", progress],
-      [
-        "Carga",
-        `${flight.assignedLoad}/${flight.maxCapacity} maletas (${Math.round(flight.utilization * 100)}%)`,
-      ],
+      ...(cancelled
+        ? [["Estado", "Cancelado"] as [string, string]]
+        : [
+          ["Avance", progress] as [string, string],
+          [
+            "Carga",
+            `${flight.assignedLoad}/${flight.maxCapacity} maletas (${Math.round(flight.utilization * 100)}%)`,
+          ] as [string, string],
+        ]),
     ],
   };
+}
+
+function isFlightCancelled(data: SimulationData | null, flight: Flight | ActiveFlight) {
+  const cancellationKey = `${flight.id}@${flight.absoluteDepartureMinute}`;
+  return flight.scheduleStatus?.toUpperCase() === "CANCELLED"
+    || data?.cancelledFlightIds?.includes(cancellationKey)
+    || data?.cancelledFlightIds?.includes(`PENDING@${flight.id}`)
+    || data?.cancelledFlightIds?.includes(flight.id)
+    || false;
 }
 
 function createShipmentInfo(

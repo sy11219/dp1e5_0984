@@ -17,8 +17,8 @@ import { SimulationResultModal } from "../../simulation/components/general/Simul
 import { OperationsStatusCards } from "../../simulation/components/general/Topbar";
 import MapStage, { type MapFocusTarget } from "../../../shared/components/map/MapStage";
 import { DraggableMapOverlay } from "../../simulation/components/general/DraggableMapOverlay";
-import type { Shipment, SimulationData } from "../../simulation/types";
-import { capacityStatus, computeActiveFlights, computeAirportLoadMetrics } from "../../simulation/utils/calculations";
+import type { Flight, Shipment, SimulationData } from "../../simulation/types";
+import { computeActiveFlights, computeAirportLoadMetrics } from "../../simulation/utils/calculations";
 import { readMapFocus, writeMapFocus } from "../../simulation/utils/mapFocusStorage";
 import type { CapacityStatus } from "../../simulation/types";
 import {
@@ -56,6 +56,8 @@ export const OperationsPage = () => {
   const [selectedFlightId, setSelectedFlightId] = useState<string | null>(
     () => initialMapFocus?.type === "flight" ? initialMapFocus.id : null
   );
+  const [selectedFlightOccurrence, setSelectedFlightOccurrence] = useState<Flight | null>(null);
+  const [pinnedFlight, setPinnedFlight] = useState<Flight | null>(null);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<MapFocusTarget | null>(null);
   const [mapResetViewToken, setMapResetViewToken] = useState(0);
@@ -106,6 +108,8 @@ export const OperationsPage = () => {
     if (stored?.type === "airport" && payload.airports.some((airport) => airport.code === stored.id)) {
       setSelectedAirport(stored.id);
       setSelectedFlightId(null);
+      setSelectedFlightOccurrence(null);
+      setPinnedFlight(null);
       setSelectedShipment(null);
       setMapFocusTarget({ type: "airport", id: stored.id, token: ++focusTokenRef.current });
       return;
@@ -114,6 +118,8 @@ export const OperationsPage = () => {
     if (stored?.type === "flight" && payload.flights.some((flight) => flight.id === stored.id)) {
       setSelectedAirport(null);
       setSelectedFlightId(stored.id);
+      setSelectedFlightOccurrence(null);
+      setPinnedFlight(null);
       setSelectedShipment(null);
       setMapFocusTarget({ type: "flight", id: stored.id, token: ++focusTokenRef.current });
       return;
@@ -122,6 +128,8 @@ export const OperationsPage = () => {
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(null);
     setMapFocusTarget(null);
   }, []);
@@ -178,8 +186,11 @@ export const OperationsPage = () => {
             setSelectedAirport(null);
             writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
           }
-          if (selectedFlightId && !payload.flights.some((flight) => flight.id === selectedFlightId)) {
+          if (selectedFlightId
+            && !selectedFlightOccurrence
+            && !payload.flights.some((flight) => flight.id === selectedFlightId)) {
             setSelectedFlightId(null);
+            setPinnedFlight(null);
             writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
           }
           if (selectedShipmentId && !payload.shipments.some((shipment) => shipment.id === selectedShipmentId)) {
@@ -202,7 +213,7 @@ export const OperationsPage = () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId, selectedShipmentId]);
+  }, [data?.simulationId, data?.status, selectedAirport, selectedFlightId, selectedFlightOccurrence, selectedShipmentId]);
 
   const { loads: airportLoads, peakLoads: airportPeakLoads } = useMemo(() => {
     const operationDayStart = Math.floor(Math.max(0, operationalMinute) / 1440) * 1440;
@@ -230,6 +241,8 @@ export const OperationsPage = () => {
   const clearMapSelection = useCallback((options?: { resetView?: boolean }) => {
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(null);
     setMapFocusTarget(null);
     if (options?.resetView) setMapResetViewToken((token) => token + 1);
@@ -244,22 +257,29 @@ export const OperationsPage = () => {
 
     setSelectedAirport(code);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(null);
     setMapFocusTarget({ type: "airport", id: code, token: ++focusTokenRef.current });
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "airport", id: code });
   };
 
-  const focusFlight = (id: string) => {
-    if (selectedFlightId === id) {
+  const focusFlight = (flight: Flight, pin = false) => {
+    if (selectedFlightOccurrence?.id === flight.id
+      && selectedFlightOccurrence.absoluteDepartureMinute === flight.absoluteDepartureMinute) {
       clearMapSelection({ resetView: true });
       return;
     }
 
+    setRightPanelOpen(true);
+    setOpenRightPanelSection("flights");
     setSelectedAirport(null);
-    setSelectedFlightId(id);
+    setSelectedFlightId(flight.id);
+    setSelectedFlightOccurrence(flight);
+    setPinnedFlight(pin ? flight : null);
     setSelectedShipment(null);
-    setMapFocusTarget({ type: "flight", id, token: ++focusTokenRef.current });
-    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "flight", id });
+    setMapFocusTarget({ type: "flight", id: flight.id, token: ++focusTokenRef.current });
+    writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, { type: "flight", id: flight.id });
   };
 
   const focusShipment = (shipment: Shipment) => {
@@ -270,6 +290,8 @@ export const OperationsPage = () => {
 
     setSelectedAirport(null);
     setSelectedFlightId(null);
+    setSelectedFlightOccurrence(null);
+    setPinnedFlight(null);
     setSelectedShipment(shipment);
     setMapFocusTarget({ type: "shipment", id: shipment.id, token: ++focusTokenRef.current });
     writeMapFocus(OPERATIONS_MAP_FOCUS_KEY, null);
@@ -459,6 +481,7 @@ export const OperationsPage = () => {
             airportPeakLoads={airportPeakLoads}
             selectedAirport={selectedAirport}
             selectedFlightId={selectedFlightId}
+            focusedFlight={selectedFlightOccurrence}
             selectedShipment={selectedShipment}
             focusTarget={mapFocusTarget}
             resetViewToken={mapResetViewToken}
@@ -512,16 +535,19 @@ export const OperationsPage = () => {
             {openRightPanelSection === "flights" && (
               <div className="collapsible-content">
                 <FlightsTable
-                  flights={flightColorFilter === "Todos" ? data?.flights || [] : (data?.flights || []).filter((f) => capacityStatus(f.utilization) === flightColorFilter)}
+                  flights={data?.flights || []}
                   activeFlightIds={activeFlightIds}
                   shipments={visibleShipments}
                   data={data}
                   selectedFlightId={selectedFlightId}
+                  selectedFlight={selectedFlightOccurrence}
+                  pinnedFlight={pinnedFlight}
                   onSelectFlight={focusFlight}
                   displayGmtOffset={displayGmtOffset}
                   colorFilter={flightColorFilter}
                   onColorFilterChange={setFlightColorFilter}
                   hideColorFilter={false}
+                  currentMinute={operationalMinute}
                 />
               </div>
             )}
@@ -550,7 +576,7 @@ export const OperationsPage = () => {
               displayGmtOffset={displayGmtOffset}
               selectedShipmentId={selectedShipmentId}
               onSelectShipment={focusShipment}
-              onSelectFlight={focusFlight}
+              onSelectFlight={(flight) => focusFlight(flight, true)}
             />
               </div>
             )}

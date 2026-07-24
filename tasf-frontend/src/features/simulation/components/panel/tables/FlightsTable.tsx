@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { getBatchShipmentsPageRequest } from "../../../../../api/simulationApi";
-import type { CapacityStatus, Flight, Shipment, SimulationData } from "../../../types";
+import { getBatchShipmentsPageRequest, getSessionFlightsPageRequest } from "../../../../../api/simulationApi";
+import type { CapacityStatus, Flight, FlightPage, Shipment, SimulationData } from "../../../types";
 import { STATUS_COLOR } from "../../../utils/constants";
 import { capacityStatus } from "../../../utils/calculations";
 import { formatFlightMoment } from "../../../utils/formatters";
@@ -11,15 +11,23 @@ interface FlightsTableProps {
   shipments: Shipment[];
   data?: SimulationData | null;
   selectedFlightId?: string | null;
-  onSelectFlight?: (id: string) => void;
+  selectedFlight?: Flight | null;
+  pinnedFlight?: Flight | null;
+  onSelectFlight?: (flight: Flight) => void;
   displayGmtOffset?: number;
   colorFilter?: ColorFilter;
   onColorFilterChange?: (filter: ColorFilter) => void;
   hideColorFilter?: boolean;
+  currentMinute?: number;
 }
 
 type ColorFilter = "Todos" | CapacityStatus;
 const PAGE_SIZE_FLIGHTS = 10;
+
+function sameFlightOccurrence(a: Flight, b: Flight) {
+  return a.id === b.id
+    && a.absoluteDepartureMinute === b.absoluteDepartureMinute;
+}
 
 export function FlightsTable({
   flights,
@@ -27,16 +35,19 @@ export function FlightsTable({
   shipments,
   data,
   selectedFlightId,
+  selectedFlight: selectedFlightOccurrence,
+  pinnedFlight,
   onSelectFlight,
   displayGmtOffset,
   colorFilter: colorFilterProp,
   onColorFilterChange,
   hideColorFilter,
+  currentMinute,
 }: FlightsTableProps) {
   const [search, setSearch] = useState("");
   const [originFilter, setOriginFilter] = useState("Cualquiera");
   const [destinationFilter, setDestinationFilter] = useState("Cualquiera");
-  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activos" | "No iniciados">("Todos");
+  const [statusFilter, setStatusFilter] = useState<"Todos" | "Activos" | "No iniciados" | "Cancelados" | "Finalizados">("Todos");
   const [localColorFilter, setLocalColorFilter] = useState<ColorFilter>("Todos");
   const [sortBy, setSortBy] = useState<
     "utilization" | "departureMinute" | "arrivalMinute" | "origin" | "destination"
@@ -49,6 +60,9 @@ export function FlightsTable({
   const [remoteFlightShipments, setRemoteFlightShipments] = useState<Shipment[]>([]);
   const [remoteFlightShipmentsLoading, setRemoteFlightShipmentsLoading] = useState(false);
   const [remoteFlightShipmentsError, setRemoteFlightShipmentsError] = useState("");
+  const [remoteFlightPage, setRemoteFlightPage] = useState<FlightPage | null>(null);
+  const [remoteFlightsLoading, setRemoteFlightsLoading] = useState(false);
+  const [remoteFlightsError, setRemoteFlightsError] = useState("");
   const selectedFlightRowRef = useRef<HTMLDivElement | null>(null);
   const lastPagedSelectedFlightId = useRef<string | null>(null);
   const colorFilter = colorFilterProp ?? localColorFilter;
@@ -57,27 +71,106 @@ export function FlightsTable({
   const usesRemoteBatchShipments = Boolean(
     batchSimulationId && (data?.planningWindowMinutes ?? 0) > 2
   );
+  const usesRemoteFlights = Boolean(data?.simulationId);
 
   const cancelledFlightKeys = useMemo(() => {
     return new Set(data?.cancelledFlightIds ?? []);
   }, [data?.cancelledFlightIds]);
+  const cancelledFlightIdsKey = data?.cancelledFlightIds?.join("|") ?? "";
 
   const airportOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const flight of flights) {
-      set.add(flight.origin);
-      set.add(flight.destination);
+    for (const airport of data?.airports ?? []) {
+      set.add(airport.code);
+    }
+    if (set.size === 0) {
+      for (const flight of flights) {
+        set.add(flight.origin);
+        set.add(flight.destination);
+      }
     }
     return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [flights]);
+  }, [data?.airports, flights]);
 
-  const selectedFlight = useMemo(
-    () => (selectedFlightId ? flights.find((flight) => flight.id === selectedFlightId) ?? null : null),
-    [flights, selectedFlightId]
+  const selectedFlightForShipments = useMemo(
+    () => selectedFlightOccurrence
+      ?? (selectedFlightId
+        ? remoteFlightPage?.items.find((flight) => flight.id === selectedFlightId)
+          ?? flights.find((flight) => flight.id === selectedFlightId)
+          ?? null
+        : null),
+    [flights, remoteFlightPage?.items, selectedFlightId, selectedFlightOccurrence]
   );
 
   useEffect(() => {
-    if (!usesRemoteBatchShipments || !batchSimulationId || !selectedFlight) {
+    if (!usesRemoteFlights || !data?.simulationId) {
+      setRemoteFlightPage(null);
+      setRemoteFlightsLoading(false);
+      setRemoteFlightsError("");
+      return;
+    }
+
+    let cancelled = false;
+    setRemoteFlightsLoading(true);
+    setRemoteFlightsError("");
+
+    void getSessionFlightsPageRequest(data.simulationId, {
+      page,
+      pageSize: PAGE_SIZE_FLIGHTS,
+      search,
+      origin: originFilter !== "Cualquiera" ? originFilter : undefined,
+      destination: destinationFilter !== "Cualquiera" ? destinationFilter : undefined,
+      status: statusFilter === "Activos"
+        ? "active"
+        : statusFilter === "No iniciados"
+          ? "not-started"
+          : statusFilter === "Cancelados"
+            ? "cancelled"
+            : statusFilter === "Finalizados"
+              ? "completed"
+              : undefined,
+      capacityStatus: colorFilter !== "Todos" ? colorFilter : undefined,
+      sortBy,
+      sortOrder,
+    }, data.scenario)
+      .then((payload) => {
+        if (cancelled) return;
+        setRemoteFlightPage(payload);
+        if (payload.page !== page) setPage(payload.page);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setRemoteFlightsError(
+            error instanceof Error ? error.message : "No se pudieron cargar los vuelos."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRemoteFlightsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cancelledFlightIdsKey,
+    colorFilter,
+    data?.scenario,
+    data?.simulationId,
+    data?.tick,
+    data?.visualStartedAt,
+    destinationFilter,
+    originFilter,
+    page,
+    search,
+    sortBy,
+    sortOrder,
+    statusFilter,
+    usesRemoteFlights,
+  ]);
+
+  useEffect(() => {
+    if (!usesRemoteBatchShipments || !batchSimulationId || !selectedFlightForShipments) {
       setRemoteFlightId(null);
       setRemoteFlightShipments([]);
       setRemoteFlightShipmentsLoading(false);
@@ -86,7 +179,7 @@ export function FlightsTable({
     }
 
     let cancelled = false;
-    const flightId = selectedFlight.id;
+    const flightId = selectedFlightForShipments.id;
     setRemoteFlightId(flightId);
     setRemoteFlightShipments([]);
     setRemoteFlightShipmentsLoading(true);
@@ -128,7 +221,7 @@ export function FlightsTable({
     return () => {
       cancelled = true;
     };
-  }, [batchSimulationId, data?.scenario, selectedFlight, usesRemoteBatchShipments]);
+  }, [batchSimulationId, data?.scenario, selectedFlightForShipments, usesRemoteBatchShipments]);
 
   const relatedShipments = useMemo(() => {
     if (!selectedFlightShipments) return [];
@@ -150,6 +243,24 @@ export function FlightsTable({
     }
     return counts;
   }, [shipments]);
+
+  const isFlightCancelled = (flight: Flight) => {
+    const cancellationKey = `${flight.id}@${flight.absoluteDepartureMinute}`;
+    return flight.scheduleStatus?.toUpperCase() === "CANCELLED"
+      || cancelledFlightKeys.has(cancellationKey)
+      || cancelledFlightKeys.has(`PENDING@${flight.id}`)
+      || cancelledFlightKeys.has(flight.id);
+  };
+
+  const isFlightActive = (flight: Flight) => {
+    if (isFlightCancelled(flight)) return false;
+    if (typeof currentMinute === "number") {
+      return currentMinute >= flight.absoluteDepartureMinute
+        && currentMinute <= flight.absoluteArrivalMinute;
+    }
+    return flight.scheduleStatus?.toUpperCase() === "IN_PROGRESS"
+      || activeFlightIds.has(flight.id);
+  };
 
   const filteredAndSortedFlights = useMemo(() => {
     let result = [...flights];
@@ -173,9 +284,17 @@ export function FlightsTable({
     }
 
     if (statusFilter === "Activos") {
-      result = result.filter((flight) => activeFlightIds.has(flight.id));
+      result = result.filter(isFlightActive);
     } else if (statusFilter === "No iniciados") {
-      result = result.filter((flight) => !activeFlightIds.has(flight.id));
+      result = result.filter((flight) => !isFlightActive(flight) && !isFlightCancelled(flight));
+    } else if (statusFilter === "Cancelados") {
+      result = result.filter(isFlightCancelled);
+    } else if (statusFilter === "Finalizados") {
+      result = result.filter((flight) =>
+        !isFlightCancelled(flight)
+        && (flight.scheduleStatus?.toUpperCase() === "COMPLETED"
+          || (typeof currentMinute === "number" && currentMinute > flight.absoluteArrivalMinute))
+      );
     }
 
     if (colorFilter !== "Todos") {
@@ -183,8 +302,8 @@ export function FlightsTable({
     }
 
     result.sort((a, b) => {
-      const aActive = activeFlightIds.has(a.id);
-      const bActive = activeFlightIds.has(b.id);
+      const aActive = isFlightActive(a);
+      const bActive = isFlightActive(b);
 
       if (aActive !== bActive) return aActive ? -1 : 1;
 
@@ -199,47 +318,70 @@ export function FlightsTable({
     });
 
     return result;
-  }, [activeFlightIds, colorFilter, destinationFilter, flights, originFilter, search, sortBy, sortOrder, statusFilter]);
+  }, [activeFlightIds, cancelledFlightIdsKey, colorFilter, currentMinute, destinationFilter, flights, originFilter, search, sortBy, sortOrder, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredAndSortedFlights.length / PAGE_SIZE_FLIGHTS));
-  const currentPage = Math.min(page, totalPages);
+  const totalPages = usesRemoteFlights
+    ? remoteFlightPage?.totalPages ?? 1
+    : Math.max(1, Math.ceil(filteredAndSortedFlights.length / PAGE_SIZE_FLIGHTS));
+  const currentPage = usesRemoteFlights
+    ? remoteFlightPage?.page ?? page
+    : Math.min(page, totalPages);
   const visibleFlights = useMemo(
-    () =>
-      filteredAndSortedFlights.slice(
-        (currentPage - 1) * PAGE_SIZE_FLIGHTS,
-        currentPage * PAGE_SIZE_FLIGHTS
-      ),
-    [currentPage, filteredAndSortedFlights]
+    () => usesRemoteFlights
+      ? remoteFlightPage?.items ?? []
+      : filteredAndSortedFlights.slice(
+          (currentPage - 1) * PAGE_SIZE_FLIGHTS,
+          currentPage * PAGE_SIZE_FLIGHTS
+        ),
+    [currentPage, filteredAndSortedFlights, remoteFlightPage?.items, usesRemoteFlights]
   );
+  const renderedFlights = useMemo(() => {
+    if (!pinnedFlight) return visibleFlights;
+    return [
+      pinnedFlight,
+      ...visibleFlights.filter((flight) => !sameFlightOccurrence(flight, pinnedFlight)),
+    ];
+  }, [pinnedFlight, visibleFlights]);
   const canGoBack = currentPage > 1;
   const canGoForward = currentPage < totalPages;
 
   useEffect(() => {
+    if (usesRemoteFlights) return;
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  }, [page, totalPages, usesRemoteFlights]);
 
   useEffect(() => {
-    if (!selectedFlightId) {
+    if (usesRemoteFlights) return;
+    const selectedOccurrence = selectedFlightOccurrence;
+    const selectedId = selectedOccurrence?.id ?? selectedFlightId;
+    if (!selectedId) {
       lastPagedSelectedFlightId.current = null;
       return;
     }
-    if (lastPagedSelectedFlightId.current === selectedFlightId) return;
+    const selectionKey = selectedOccurrence
+      ? `${selectedOccurrence.id}@${selectedOccurrence.absoluteDepartureMinute}`
+      : selectedId;
+    if (lastPagedSelectedFlightId.current === selectionKey) return;
 
-    lastPagedSelectedFlightId.current = selectedFlightId;
-    const selectedIndex = filteredAndSortedFlights.findIndex((flight) => flight.id === selectedFlightId);
+    lastPagedSelectedFlightId.current = selectionKey;
+    const selectedIndex = filteredAndSortedFlights.findIndex((flight) =>
+      selectedOccurrence
+        ? sameFlightOccurrence(flight, selectedOccurrence)
+        : flight.id === selectedId
+    );
     if (selectedIndex >= 0) {
       setPage(Math.floor(selectedIndex / PAGE_SIZE_FLIGHTS) + 1);
     }
-  }, [filteredAndSortedFlights, selectedFlightId]);
+  }, [filteredAndSortedFlights, selectedFlightId, selectedFlightOccurrence, usesRemoteFlights]);
 
   useEffect(() => {
-    if (!selectedFlightId) return;
+    if (!selectedFlightOccurrence && !selectedFlightId) return;
 
     const selectedRow = selectedFlightRowRef.current;
     if (selectedRow) {
       selectedRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [selectedFlightId, visibleFlights]);
+  }, [selectedFlightId, selectedFlightOccurrence, renderedFlights]);
 
   const flightMomentData = data ?? null;
 
@@ -311,13 +453,15 @@ export function FlightsTable({
           <select
             value={statusFilter}
             onChange={(event) => {
-              setStatusFilter(event.target.value as "Todos" | "Activos" | "No iniciados");
+              setStatusFilter(event.target.value as "Todos" | "Activos" | "No iniciados" | "Cancelados" | "Finalizados");
               setPage(1);
             }}
           >
             <option value="Todos">Todos</option>
             <option value="Activos">Activos</option>
             <option value="No iniciados">No iniciados</option>
+            <option value="Cancelados">Cancelados</option>
+            <option value="Finalizados">Finalizados</option>
           </select>
         </label>
 
@@ -412,17 +556,24 @@ export function FlightsTable({
       </div>
 
       <div className="table">
-        {visibleFlights.length === 0 ? (
+        {remoteFlightsLoading ? (
+          <div className="empty-state">Cargando vuelos...</div>
+        ) : remoteFlightsError ? (
+          <div className="empty-state">{remoteFlightsError}</div>
+        ) : renderedFlights.length === 0 ? (
           <div className="empty-state">No se encontraron resultados.</div>
         ) : (
-          visibleFlights.map((flight) => {
-            const active = activeFlightIds.has(flight.id);
-            const isSelected = selectedFlightId === flight.id;
+          renderedFlights.map((flight) => {
+            const active = isFlightActive(flight);
+            const isSelected = selectedFlightOccurrence
+              ? sameFlightOccurrence(flight, selectedFlightOccurrence)
+              : selectedFlightId === flight.id;
             const cancellationKey = `${flight.id}@${flight.absoluteDepartureMinute}`;
-            const isCancelled =
-              cancelledFlightKeys.has(cancellationKey) ||
-              cancelledFlightKeys.has(`PENDING@${flight.id}`) ||
-              cancelledFlightKeys.has(flight.id);
+            const isCancelled = isFlightCancelled(flight);
+            const completed = !isCancelled && (
+              flight.scheduleStatus?.toUpperCase() === "COMPLETED"
+              || (typeof currentMinute === "number" && currentMinute > flight.absoluteArrivalMinute)
+            );
             const remoteResultMatchesFlight = remoteFlightId === flight.id;
             const isLoadingFlightShipments =
               isSelected &&
@@ -434,11 +585,11 @@ export function FlightsTable({
               isSelected && usesRemoteBatchShipments && remoteResultMatchesFlight
                 ? remoteFlightShipments.length
                 : relatedShipmentCounts.get(flight.id) ?? 0;
-            const status = capacityStatus(flight.utilization);
+            const status = isCancelled ? "gray" : capacityStatus(flight.utilization);
             const accentColor = STATUS_COLOR[status];
 
             return (
-              <Fragment key={flight.id}>
+              <Fragment key={cancellationKey}>
                 <div
                   ref={isSelected ? selectedFlightRowRef : undefined}
                   className={[
@@ -446,7 +597,7 @@ export function FlightsTable({
                     !active ? "row-inactive" : "",
                     isSelected ? "selected" : "",
                   ].filter(Boolean).join(" ")}
-                  onClick={() => onSelectFlight?.(flight.id)}
+                  onClick={() => onSelectFlight?.(flight)}
                   style={{
                     opacity: active ? 1 : 0.6,
                     cursor: onSelectFlight ? "pointer" : undefined,
@@ -482,7 +633,13 @@ export function FlightsTable({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {isCancelled ? "Cancelado" : active ? `${Math.round(flight.utilization * 100)}%` : "No iniciado"}
+                    {isCancelled
+                      ? "Cancelado"
+                      : active
+                        ? `${Math.round(flight.utilization * 100)}%`
+                        : completed
+                          ? "Finalizado"
+                          : "No iniciado"}
                   </span>
                 </div>
                 {isSelected && (
@@ -507,7 +664,7 @@ export function FlightsTable({
                     <button
                       type="button"
                       className="table-action-button table-action-button-ghost"
-                      onClick={() => onSelectFlight?.(flight.id)}
+                      onClick={() => onSelectFlight?.(flight)}
                     >
                       Quitar selección
                     </button>
@@ -518,13 +675,13 @@ export function FlightsTable({
           })
         )}
       </div>
-      {filteredAndSortedFlights.length > 0 && (
+      {(usesRemoteFlights ? (remoteFlightPage?.total ?? 0) : filteredAndSortedFlights.length) > 0 && (
         <div className="segmented" style={{ marginTop: "0.75rem", justifyContent: "space-between" }}>
           <button type="button" disabled={!canGoBack} onClick={() => setPage((value) => Math.max(1, value - 1))}>
             Anterior
           </button>
           <span className="text-sm">
-            {currentPage}/{totalPages} - {filteredAndSortedFlights.length} vuelos
+            {currentPage}/{totalPages} - {usesRemoteFlights ? remoteFlightPage?.total : filteredAndSortedFlights.length} vuelos
           </span>
           <button type="button" disabled={!canGoForward} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
             Siguiente

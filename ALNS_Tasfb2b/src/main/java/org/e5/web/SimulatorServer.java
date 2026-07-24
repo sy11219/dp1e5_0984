@@ -612,6 +612,24 @@ public class SimulatorServer {
                 return;
             }
 
+            Matcher flightsMatcher = Pattern.compile("^/api/realtime/([^/]+)/flights$").matcher(path);
+            if (flightsMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                Map<String, String> query = queryParams(exchange);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.realtimeFlights(
+                                flightsMatcher.group(1),
+                                queryInt(query, "page", 1),
+                                queryInt(query, "pageSize", 10),
+                                query.getOrDefault("search", ""),
+                                query.getOrDefault("origin", ""),
+                                query.getOrDefault("destination", ""),
+                                query.getOrDefault("status", ""),
+                                query.getOrDefault("capacityStatus", ""),
+                                query.getOrDefault("sortBy", "departureMinute"),
+                                query.getOrDefault("sortOrder", "asc")));
+                return;
+            }
+
             Matcher cancelMatcher = Pattern.compile("^/api/realtime/([^/]+)/cancel-flight$").matcher(path);
             if (cancelMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 String flightId = readString(FLIGHT_ID, body, "");
@@ -713,6 +731,24 @@ public class SimulatorServer {
                                 queryInt(query, "departureWithinMinutes", -1),
                                 query.getOrDefault("sortBy", ""),
                                 query.getOrDefault("sortOrder", "")));
+                return;
+            }
+
+            Matcher flightsMatcher = Pattern.compile("^/api/simulations/batch/([^/]+)/flights$").matcher(path);
+            if (flightsMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                Map<String, String> query = queryParams(exchange);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.batchFlights(
+                                flightsMatcher.group(1),
+                                queryInt(query, "page", 1),
+                                queryInt(query, "pageSize", 10),
+                                query.getOrDefault("search", ""),
+                                query.getOrDefault("origin", ""),
+                                query.getOrDefault("destination", ""),
+                                query.getOrDefault("status", ""),
+                                query.getOrDefault("capacityStatus", ""),
+                                query.getOrDefault("sortBy", "departureMinute"),
+                                query.getOrDefault("sortOrder", "asc")));
                 return;
             }
 
@@ -827,6 +863,24 @@ public class SimulatorServer {
                                 queryInt(query, "departureWithinMinutes", -1),
                                 query.getOrDefault("sortBy", ""),
                                 query.getOrDefault("sortOrder", "")));
+                return;
+            }
+
+            Matcher flightsMatcher = Pattern.compile("^/api/collapse/([^/]+)/flights$").matcher(path);
+            if (flightsMatcher.matches() && "GET".equalsIgnoreCase(method)) {
+                Map<String, String> query = queryParams(exchange);
+                send(exchange, 200, "application/json",
+                        realtimeSimulationService.collapseFlights(
+                                flightsMatcher.group(1),
+                                queryInt(query, "page", 1),
+                                queryInt(query, "pageSize", 10),
+                                query.getOrDefault("search", ""),
+                                query.getOrDefault("origin", ""),
+                                query.getOrDefault("destination", ""),
+                                query.getOrDefault("status", ""),
+                                query.getOrDefault("capacityStatus", ""),
+                                query.getOrDefault("sortBy", "departureMinute"),
+                                query.getOrDefault("sortOrder", "asc")));
                 return;
             }
 

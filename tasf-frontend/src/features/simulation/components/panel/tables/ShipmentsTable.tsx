@@ -12,7 +12,7 @@ interface ShipmentsTableProps {
   displayGmtOffset?: number;
   selectedShipmentId?: string | null;
   onSelectShipment?: (shipment: Shipment) => void;
-  onSelectFlight?: (id: string) => void;
+  onSelectFlight?: (flight: Flight) => void;
 }
 
 const ANY = "Cualquiera";
@@ -556,6 +556,7 @@ export function ShipmentsTable({
           shipment={selectedShipment}
           flights={flights}
           data={data}
+          currentMinute={simMinute}
           onClose={() => setSelectedShipment(null)}
           onSelectFlight={onSelectFlight}
         />
