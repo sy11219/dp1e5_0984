@@ -100,7 +100,7 @@ public class AirportStatusService {
 
         try (Connection connection = openConnection()) {
             if (airportExists(connection, normalizedCode)) {
-                throw new IllegalArgumentException("Ya existe un aeropuerto con codigo: " + normalizedCode);
+                throw new IllegalArgumentException("Ya existe un aeropuerto con código: " + normalizedCode);
             }
 
             try (PreparedStatement statement = connection.prepareStatement("""
@@ -191,17 +191,17 @@ public class AirportStatusService {
 
     private String normalizeCode(String code) {
         if (code == null || !code.matches("(?i)[A-Z]{4}")) {
-            throw new IllegalArgumentException("Codigo de aeropuerto invalido.");
+            throw new IllegalArgumentException("Código de aeropuerto inválido.");
         }
         return code.toUpperCase(Locale.ROOT);
     }
 
     private void validateAirportUpdate(AirportUpdate update) {
         if (update == null) {
-            throw new IllegalArgumentException("Datos de aeropuerto invalidos.");
+            throw new IllegalArgumentException("Datos de aeropuerto inválidos.");
         }
         requireText(update.city(), "Ciudad");
-        requireText(update.country(), "Pais");
+        requireText(update.country(), "País");
         requireText(update.continent(), "Continente");
         normalizeStatus(update.status());
         if (update.latitude() < -90 || update.latitude() > 90) {

@@ -36,6 +36,10 @@ public class SimulationService {
         return runAlns(startDate, days, ZoneId.systemDefault().getId());
     }
 
+    public void invalidateCatalogCache() {
+        catalogService.invalidate();
+    }
+
     public String runAlns(String startDate, int days, String timeZone) throws Exception {
         validate(startDate, days);
         ZoneId simulationZone = resolveZone(timeZone);
@@ -80,7 +84,7 @@ public class SimulationService {
         }
         LocalDate.parse(startDate, RAW_DATE);
         //if (days != 5) {
-        //    throw new IllegalArgumentException("Solo se permite simular 5 dias.");
+        //    throw new IllegalArgumentException("Solo se permite simular 5 días.");
         //}
     }
 

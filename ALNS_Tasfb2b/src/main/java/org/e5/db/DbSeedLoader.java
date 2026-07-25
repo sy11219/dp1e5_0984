@@ -268,7 +268,7 @@ public class DbSeedLoader {
 
                 Matcher matcher = FLIGHT_PATTERN.matcher(line);
                 if (!matcher.matches()) {
-                    System.out.println("Vuelo ignorado por formato invalido: " + line);
+                    System.out.println("Vuelo ignorado por formato inválido: " + line);
                     continue;
                 }
 

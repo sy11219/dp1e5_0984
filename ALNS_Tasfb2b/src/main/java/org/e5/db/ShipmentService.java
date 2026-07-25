@@ -86,11 +86,11 @@ public class ShipmentService {
 
     public String createShipmentsBatch(ShipmentBatchCreateRequest request) throws SQLException {
         if (request == null) {
-            throw new IllegalArgumentException("Datos de lote invalidos.");
+            throw new IllegalArgumentException("Datos de lote inválidos.");
         }
         String originCode = normalizeAirportCode(request.originAirportCode());
         if (request.fileContent() == null || request.fileContent().isBlank()) {
-            throw new IllegalArgumentException("El archivo de envios esta vacio.");
+            throw new IllegalArgumentException("El archivo de envíos está vacío.");
         }
 
         String[] lines = request.fileContent().split("\\R");
@@ -125,7 +125,7 @@ public class ShipmentService {
 
                     Matcher matcher = SHIPMENT_LINE.matcher(line);
                     if (!matcher.matches()) {
-                        throw new IllegalArgumentException("Linea " + (index + 1) + " invalida: " + line);
+                        throw new IllegalArgumentException("Línea " + (index + 1) + " inválida: " + line);
                     }
 
                     String externalShipmentId = matcher.group(1);
@@ -137,7 +137,7 @@ public class ShipmentService {
                     String destinationCode = normalizeAirportCode(matcher.group(5));
                     int baggageCount = Integer.parseInt(matcher.group(6));
                     if (baggageCount <= 0) {
-                        throw new IllegalArgumentException("Linea " + (index + 1) + ": la cantidad de maletas debe ser mayor a cero.");
+                        throw new IllegalArgumentException("Línea " + (index + 1) + ": la cantidad de maletas debe ser mayor a cero.");
                     }
                     String clientId = normalizeClientId(matcher.group(7));
 
@@ -149,7 +149,7 @@ public class ShipmentService {
                         }
                     }
                     if (destination == null) {
-                        throw new IllegalArgumentException("Linea " + (index + 1) + ": aeropuerto destino no encontrado: " + destinationCode);
+                        throw new IllegalArgumentException("Línea " + (index + 1) + ": aeropuerto destino no encontrado: " + destinationCode);
                     }
 
                     statement.setObject(1, UUID.randomUUID());
@@ -179,7 +179,7 @@ public class ShipmentService {
 
             if (parsed == 0) {
                 connection.rollback();
-                throw new IllegalArgumentException("El archivo no contiene lineas de envios validas.");
+                throw new IllegalArgumentException("El archivo no contiene líneas de envíos válidas.");
             }
 
             connection.commit();
@@ -332,7 +332,7 @@ public class ShipmentService {
 
     private void validateRequest(ShipmentCreateRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("Datos de envio invalidos.");
+            throw new IllegalArgumentException("Datos de envío inválidos.");
         }
         normalizeAirportCode(request.originAirportCode());
         normalizeAirportCode(request.destinationAirportCode());
@@ -345,14 +345,14 @@ public class ShipmentService {
 
     private String normalizeAirportCode(String code) {
         if (code == null || !code.matches("(?i)[A-Z]{4}")) {
-            throw new IllegalArgumentException("Codigo de aeropuerto invalido.");
+            throw new IllegalArgumentException("Código de aeropuerto inválido.");
         }
         return code.toUpperCase(Locale.ROOT);
     }
 
     private String normalizeShipmentId(String shipmentId) {
         if (shipmentId == null || !shipmentId.matches("\\d{1,9}")) {
-            throw new IllegalArgumentException("El id del envio debe tener hasta 9 digitos.");
+            throw new IllegalArgumentException("El id del envío debe tener hasta 9 dígitos.");
         }
         return String.format("%09d", Integer.parseInt(shipmentId));
     }
@@ -380,7 +380,7 @@ public class ShipmentService {
                 result.next();
                 int nextId = result.getInt("next_id");
                 if (nextId > 999_999_999) {
-                    throw new IllegalArgumentException("Se alcanzo el maximo de envios para " + originCode + ".");
+                    throw new IllegalArgumentException("Se alcanzó el máximo de envíos para " + originCode + ".");
                 }
                 return originCode + "-" + String.format("%09d", nextId);
             }
@@ -420,7 +420,7 @@ public class ShipmentService {
                             + "T" + hour + ":" + minute
             ).atZone(originZone).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Linea " + lineNumber + ": fecha de salida invalida.");
+            throw new IllegalArgumentException("Línea " + lineNumber + ": fecha de salida inválida.");
         }
     }
 

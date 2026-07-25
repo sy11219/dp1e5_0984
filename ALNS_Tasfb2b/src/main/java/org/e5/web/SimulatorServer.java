@@ -190,6 +190,11 @@ public class SimulatorServer {
         }
     }
 
+    private void invalidateScenarioCatalogs() {
+        simulationService.invalidateCatalogCache();
+        realtimeSimulationService.invalidateSharedCatalog();
+    }
+
     private void health(HttpExchange exchange) throws IOException {
         if (preflight(exchange)) return;
         send(exchange, 200, "application/json", "{\"status\":\"ok\",\"service\":\"ALNS simulator\"}");
@@ -202,7 +207,7 @@ public class SimulatorServer {
             return;
         }
         if (MAP_TILES_API_KEY.isBlank()) {
-            send(exchange, 503, "application/json", "{\"error\":\"MapTiles no esta configurado\"}");
+            send(exchange, 503, "application/json", "{\"error\":\"MapTiles no está configurado\"}");
             return;
         }
 
@@ -254,7 +259,7 @@ public class SimulatorServer {
         }
         try {
             exchange.getRequestBody().readAllBytes();
-            realtimeSimulationService.syncScheduledFlightsFromDatabase();
+            invalidateScenarioCatalogs();
         } catch (Exception e) {
             e.printStackTrace();
             send(exchange, 500, "application/json", "{\"error\":\"No se pudo sincronizar vuelos cargados\"}");
@@ -308,9 +313,9 @@ public class SimulatorServer {
                             readRequiredInt(GMT_OFFSET, body, "gmtOffset"),
                             readRequiredInt(MAX_CAPACITY, body, "maxCapacity")
                     );
-                    send(exchange, 201, "application/json",
-                            airportStatusService.createAirport(readRequiredString(CODE, body, "code"), update));
-                    realtimeSimulationService.invalidateSharedCatalog();
+                    String response = airportStatusService.createAirport(readRequiredString(CODE, body, "code"), update);
+                    invalidateScenarioCatalogs();
+                    send(exchange, 201, "application/json", response);
                     return;
                 }
 
@@ -341,7 +346,7 @@ public class SimulatorServer {
                     return;
                 }
                 String response = airportStatusService.updateStatus(code, active).toJson();
-                realtimeSimulationService.invalidateSharedCatalog();
+                invalidateScenarioCatalogs();
                 send(exchange, 200, "application/json", response);
                 return;
             }
@@ -375,9 +380,9 @@ public class SimulatorServer {
                         readRequiredInt(GMT_OFFSET, body, "gmtOffset"),
                         readRequiredInt(MAX_CAPACITY, body, "maxCapacity")
                 );
-                send(exchange, 200, "application/json",
-                        airportStatusService.updateAirport(airportMatcher.group(1), update));
-                realtimeSimulationService.invalidateSharedCatalog();
+                String response = airportStatusService.updateAirport(airportMatcher.group(1), update);
+                invalidateScenarioCatalogs();
+                send(exchange, 200, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
             } catch (Exception e) {
@@ -414,7 +419,7 @@ public class SimulatorServer {
                             "SCHEDULED"
                     );
                     String response = flightPlanService.createFlight(update);
-                    realtimeSimulationService.syncScheduledFlightsFromDatabase();
+                    invalidateScenarioCatalogs();
                     send(exchange, 201, "application/json", response);
                     return;
                 }
@@ -442,7 +447,7 @@ public class SimulatorServer {
                                 readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
                 );
                 String response = flightPlanService.createFlightsBatch(request);
-                realtimeSimulationService.syncScheduledFlightsFromDatabase();
+                invalidateScenarioCatalogs();
                 send(exchange, 201, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
@@ -473,7 +478,7 @@ public class SimulatorServer {
                         readRequiredString(FLIGHT_STATUS_FIELD, body, "status")
                 );
                 String response = flightPlanService.updateFlight(flightMatcher.group(1), update);
-                realtimeSimulationService.syncScheduledFlightsFromDatabase();
+                invalidateScenarioCatalogs();
                 send(exchange, 200, "application/json", response);
             } catch (IllegalArgumentException e) {
                 send(exchange, 400, "application/json", "{\"error\":\"" + escape(e.getMessage()) + "\"}");
@@ -525,7 +530,7 @@ public class SimulatorServer {
                         readRequiredBase64String(FILE_CONTENT_BASE64, body, "fileContentBase64")
                 );
                 String response = shipmentService.createShipmentsBatch(request);
-                // Solo sincroniza la sesion de TIEMPO_REAL vigente; los otros
+                // Solo sincroniza la sesión de TIEMPO_REAL vigente; los otros
                 // escenarios mantienen sus fuentes de datos originales.
                 realtimeSimulationService.syncRegisteredShipmentsFromDatabase();
                 send(exchange, 201, "application/json", response);
@@ -818,7 +823,7 @@ public class SimulatorServer {
             if (pauseMatcher.matches() && "POST".equalsIgnoreCase(method)) {
                 Boolean paused = readBoolean(PAUSED, body);
                 if (paused == null) {
-                    send(exchange, 400, "application/json", "{\"error\":\"Envie paused como true o false\"}");
+                    send(exchange, 400, "application/json", "{\"error\":\"Envíe paused como true o false\"}");
                     return;
                 }
                 send(exchange, 200, "application/json",
@@ -1029,7 +1034,7 @@ public class SimulatorServer {
         try {
             return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Campo invalido: " + name);
+            throw new IllegalArgumentException("Campo inválido: " + name);
         }
     }
 

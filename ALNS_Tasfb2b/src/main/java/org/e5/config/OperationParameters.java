@@ -1,9 +1,9 @@
 package org.e5.config;
 
 /**
- * Parametros operativos compartidos por el planificador y la simulacion.
+ * Parámetros operativos compartidos por el planificador y la simulación.
  *
- * Pueden ajustarse con variables de entorno sin tocar codigo:
+ * Pueden ajustarse con variables de entorno sin tocar código:
  * - TASF_CONNECTION_WAIT_MINUTES: espera minima en escala.
  * - TASF_FINAL_PICKUP_WAIT_MINUTES: tiempo hasta retiro en destino final.
  */

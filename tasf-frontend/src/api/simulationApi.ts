@@ -41,7 +41,7 @@ function rememberBatchControlToken(data: SimulationData): void {
   try {
     window.localStorage.setItem(batchTokenKey(data.simulationId), data.controlToken);
   } catch {
-    // Sin localStorage, la maquina queda como observadora tras recargar.
+    // Sin localStorage, la máquina queda como observadora tras recargar.
   }
 }
 
@@ -68,7 +68,7 @@ function rememberCollapseControlToken(data: SimulationData): void {
   try {
     window.localStorage.setItem(collapseTokenKey(data.simulationId), data.controlToken);
   } catch {
-    // Sin localStorage, la maquina queda como observadora tras recargar.
+    // Sin localStorage, la máquina queda como observadora tras recargar.
   }
 }
 

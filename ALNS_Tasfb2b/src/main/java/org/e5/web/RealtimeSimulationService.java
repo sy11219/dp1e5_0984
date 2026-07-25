@@ -56,11 +56,11 @@ public class RealtimeSimulationService {
     private static final long MINUTE_MS = 60_000L;
     private static final int SIMULATION_PLANNING_INTERVAL_MINUTES = readPositiveInt("TASF_SIMULATION_SA_MINUTES", 2);
     private static final int SIMULATION_PLANNING_K = readPositiveInt("TASF_SIMULATION_K", 90);
-    /** Sc de simulacion: minutos simulados consumidos en cada ejecucion. */
+    /** Sc de simulación: minutos simulados consumidos en cada ejecución. */
     public static final int BATCH_MINUTES = readPositiveInt(
             "TASF_SIMULATION_SC_MINUTES",
             SIMULATION_PLANNING_INTERVAL_MINUTES * SIMULATION_PLANNING_K);
-    /** Sa de simulacion: milisegundos reales entre inicios de ejecucion. */
+    /** Sa de simulación: milisegundos reales entre inicios de ejecución. */
     public static final long BATCH_INTERVAL_MS = readPositiveLong(
             "TASF_SIMULATION_SA_MS",
             SIMULATION_PLANNING_INTERVAL_MINUTES * MINUTE_MS);
@@ -217,7 +217,7 @@ public class RealtimeSimulationService {
     public synchronized String pauseRealtime(String id, boolean paused) {
         RealtimeSession session = require(id);
         if (!"TIEMPO_REAL".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesión indicada no es una operacion de tiempo real.");
+            throw new IllegalArgumentException("La sesión indicada no es una operación de tiempo real.");
         }
         session.setPaused(paused);
         return session.snapshotJson();
@@ -372,7 +372,7 @@ public class RealtimeSimulationService {
             return "{}";
         }
         if (!"SIMULACION_LOTES".equals(session.scenario)) {
-            throw new IllegalArgumentException("La sesión indicada no es una simulacion por lotes.");
+            throw new IllegalArgumentException("La sesión indicada no es una simulación por lotes.");
         }
         if (!session.completed) {
             requireBatchControl(session, clientId, controlToken);
@@ -499,8 +499,8 @@ public class RealtimeSimulationService {
     // ── Escenario de colapso ───────────────────────────────────────────────
 
     /**
-     * Inicia una ejecucion aislada de colapso. A diferencia de la simulacion
-     * de 5 dias, esta sesión consume los TXT en ventanas de 12 horas hasta
+     * Inicia una ejecución aislada de colapso. A diferencia de la simulación
+     * de 5 días, esta sesión consume los TXT en ventanas de 12 horas hasta
      * hallar el primer incumplimiento.
      */
     public synchronized String startCollapseSimulation(String startDate, int days, String startTime,
@@ -566,7 +566,7 @@ public class RealtimeSimulationService {
         return session.snapshotJson();
     }
 
-    /** Solo la maquina dueña puede cancelar una ejecucion activa. */
+    /** Solo la máquina dueña puede cancelar una ejecución activa. */
     public synchronized String cancelCollapseSimulation(String id, String clientId, String controlToken) {
         RealtimeSession session = require(id);
         if (!"COLAPSO".equals(session.scenario)) {
@@ -578,8 +578,8 @@ public class RealtimeSimulationService {
     }
 
     /**
-     * Una ejecucion que termino o fue cancelada puede eliminarse desde cualquier
-     * maquina. La sesión activa nunca se limpia por esta ruta.
+     * Una ejecución que terminó o fue cancelada puede eliminarse desde cualquier
+     * máquina. La sesión activa nunca se limpia por esta ruta.
      */
     public synchronized String clearCollapseSimulation(String id) {
         RealtimeSession session = sessions.get(id);
@@ -796,10 +796,10 @@ public class RealtimeSimulationService {
         LocalDate.parse(startDate, RAW_DATE);
 //        if (batch) {
 //            if (days != 5)
-//                throw new IllegalArgumentException("Solo se permite simular 5 dias.");
+//                throw new IllegalArgumentException("Solo se permite simular 5 días.");
 //        } else {
 //            if (days < 1 || days > 7)
-//                throw new IllegalArgumentException("Tiempo real permite operar entre 1 y 7 dias.");
+//                throw new IllegalArgumentException("Tiempo real permite operar entre 1 y 7 días.");
 //        }
     }
 
@@ -1446,10 +1446,10 @@ public class RealtimeSimulationService {
         }
 
         /**
-         * El colapso se evalua contra la operacion real hasta el final de la
-         * ventana: capacidad fisica de almacenes y vencimiento real del SLA.
-         * Un envio sin ruta no colapsa de inmediato; lo hace cuando vence su
-         * plazo de 1 o 2 dias y aun falta alguna de sus maletas.
+         * El colapso se evalúa contra la operación real hasta el final de la
+         * ventana: capacidad física de almacenes y vencimiento real del SLA.
+         * Un envío sin ruta no colapsa de inmediato; lo hace cuando vence su
+         * plazo de 1 o 2 días y aún falta alguna de sus maletas.
          */
         private CollapseOutcome findFirstCollapseOutcome(int windowStart, int windowEnd) {
             CollapseOutcome capacity = findWarehouseCapacityBreach(windowStart, windowEnd);
@@ -1935,7 +1935,7 @@ public class RealtimeSimulationService {
 
         private void queueCancellationRequest(String input) {
             if (input == null || input.isBlank()) {
-                throw new IllegalArgumentException("Codigo de vuelo invalido.");
+                throw new IllegalArgumentException("Código de vuelo inválido.");
             }
             String normalized = normalizeFlightInput(input);
             boolean exists = queuedCancellationRequests.stream()

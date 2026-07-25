@@ -153,7 +153,7 @@ public class Route {
         int currentReady = startMinute;
         for (int i = 0; i < flights.size(); i++) {
             Flight f = flights.get(i);
-            sb.append(String.format(" --[Vuelo %s Dia%d %s->%s]-> %s",
+            sb.append(String.format(" --[Vuelo %s Día%d %s->%s]-> %s",
                     f.getFlightId(),
                     f.getDayOffset(),
                     Flight.minutesToHHMM(f.getDepartureMinute()),
@@ -164,7 +164,7 @@ public class Route {
             }
         }
         int arrival = calculateArrivalMinute();
-        sb.append(String.format(" | Llegada estimada: min %d (%s Dia %d)",
+        sb.append(String.format(" | Llegada estimada: min %d (%s Día %d)",
                 arrival,
                 Flight.minutesToHHMM(arrival % 1440),
                 arrival / 1440));

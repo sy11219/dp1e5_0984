@@ -11,7 +11,7 @@ export default function App() {
         if (!cancelled) assignAirportTimeFromSystemTimeZone(airports);
       })
       .catch(() => {
-        // Si no se puede leer el catalogo, no se asigna aeropuerto automaticamente.
+        // Si no se puede leer el catálogo, no se asigna aeropuerto automáticamente.
       });
 
     return () => {

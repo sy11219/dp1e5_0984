@@ -41,7 +41,7 @@ export function FlightListModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(event) => event.stopPropagation()}>
-        <h3>Ruta del envio {shipment.id}</h3>
+        <h3>Ruta del envío {shipment.id}</h3>
         <p className="route-modal-summary">
           {`${shipment.origin} -> ${shipment.destination} - ${shipment.suitcases} maletas - pedido ${
             data ? formatFlightMoment(data, shipment.requestMinute) : formatSimMinute(shipment.requestMinute)
@@ -108,7 +108,7 @@ export function FlightListModal({
           })}
         </div>
 
-        {!route.length && <div className="empty-state">El envio no tiene ruta asignada.</div>}
+        {!route.length && <div className="empty-state">El envío no tiene ruta asignada.</div>}
         <button onClick={onClose}>Cerrar</button>
       </div>
     </div>

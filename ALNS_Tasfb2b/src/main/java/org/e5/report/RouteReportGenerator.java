@@ -101,9 +101,9 @@ public class RouteReportGenerator {
         pw.println("  TASF.B2B - REPORTE DE PLANIFICACION DE RUTAS DE MALETAS");
         pw.println(SEPARATOR);
         pw.printf("  Fecha de generacion  : %s%n", timestamp);
-        pw.printf("  Inicio de simulacion : %s%n", formatDate(simulationStartDate));
-        pw.printf("  Dias simulados       : %d%n", simulationDays);
-        pw.printf("  Total de envios      : %d%n", shipments.size());
+        pw.printf("  Inicio de simulación : %s%n", formatDate(simulationStartDate));
+        pw.printf("  Días simulados       : %d%n", simulationDays);
+        pw.printf("  Total de envíos      : %d%n", shipments.size());
         pw.println(SEPARATOR);
         pw.println();
 
@@ -162,7 +162,7 @@ public class RouteReportGenerator {
                 if (!s.isPlanned()) {
                     pw.println("  *** PARCIAL: no todas las maletas pudieron planificarse ***");
                 }
-                pw.printf("  Llegada est : minuto %d (%s, Dia %d)%n",
+                pw.printf("  Llegada est : minuto %d (%s, Día %d)%n",
                         s.getEstimatedArrival(),
                         Flight.minutesToHHMM(s.getEstimatedArrival() % 1440),
                         s.getEstimatedArrival() / 1440);
@@ -194,7 +194,7 @@ public class RouteReportGenerator {
                     Flight f = routeFlights.get(fi);
                     usedFlights.putIfAbsent(f.getFlightId(), f);
                     suitcasesByFlightDay.merge(f.getDayOffset(), s.getSuitcaseCount(), Integer::sum);
-                    pw.printf("    Vuelo %d: %s → %s | Dia %d | Salida: %s (min abs %d) | Llegada: %s (min abs %d) | Capacidad usada: %d/%d%n",
+                    pw.printf("    Vuelo %d: %s → %s | Día %d | Salida: %s (min abs %d) | Llegada: %s (min abs %d) | Capacidad usada: %d/%d%n",
                             fi + 1,
                             f.getOriginCode(), f.getDestCode(),
                             f.getDayOffset(),
@@ -215,7 +215,7 @@ public class RouteReportGenerator {
         pw.println(SEPARATOR);
         pw.println("  RESUMEN GLOBAL");
         pw.println(SEPARATOR);
-        pw.printf("  Total envios planificados : %d%n", shipments.size());
+        pw.printf("  Total envíos planificados : %d%n", shipments.size());
         pw.printf("  Total maletas             : %d%n",
                 onTimeSuitcases + lateSuitcases + noRouteSuitcases);
         pw.printf("  A tiempo                  : %d (%.1f%%)%n",
@@ -321,7 +321,7 @@ public class RouteReportGenerator {
     private void printBusiestFlightDay(PrintWriter pw, Map<Integer, Integer> suitcasesByFlightDay,
                                        String simulationStartDate) {
         if (suitcasesByFlightDay.isEmpty()) {
-            pw.println("  Dia con mas maletas enviadas: N/A (0 maletas)");
+            pw.println("  Día con más maletas enviadas: N/A (0 maletas)");
             return;
         }
         int busiestDay   = -1;
@@ -334,7 +334,7 @@ public class RouteReportGenerator {
                 maxSuitcases = suitcases;
             }
         }
-        pw.printf("  Dia con mas maletas enviadas: Dia %d (%s) | %d maletas%n",
+        pw.printf("  Día con más maletas enviadas: Día %d (%s) | %d maletas%n",
                 busiestDay, formatSimulationDay(simulationStartDate, busiestDay), maxSuitcases);
     }
 

@@ -49,10 +49,10 @@ public final class AirportTimeZones {
             try {
                 return ZoneOffset.of(normalized.substring(3));
             } catch (Exception ignored) {
-                throw new IllegalArgumentException("Timezone de aeropuerto invalido: " + value);
+                throw new IllegalArgumentException("Zona horaria de aeropuerto inválida: " + value);
             }
         }
-        throw new IllegalArgumentException("Timezone de aeropuerto invalido: " + value);
+        throw new IllegalArgumentException("Zona horaria de aeropuerto inválida: " + value);
     }
 
     private static String normalizeCode(String value) {

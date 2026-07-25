@@ -39,7 +39,7 @@ public class FlightPlanService {
 
     public void updateStatus(String flightCode, String status) throws SQLException {
         if (flightCode == null || flightCode.isBlank()) {
-            throw new IllegalArgumentException("Codigo de vuelo invalido.");
+            throw new IllegalArgumentException("Código de vuelo inválido.");
         }
 
         try (Connection connection = openConnection();
@@ -76,10 +76,10 @@ public class FlightPlanService {
                 throw new IllegalArgumentException("Aeropuerto destino no encontrado: " + destinationCode);
             }
             if (originZone == null) {
-                throw new IllegalArgumentException("Timezone de aeropuerto origen no encontrado: " + originCode);
+                throw new IllegalArgumentException("Zona horaria de aeropuerto origen no encontrada: " + originCode);
             }
             if (destinationZone == null) {
-                throw new IllegalArgumentException("Timezone de aeropuerto destino no encontrado: " + destinationCode);
+                throw new IllegalArgumentException("Zona horaria de aeropuerto destino no encontrada: " + destinationCode);
             }
 
             LocalDateTime departureLocal = parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL");
@@ -141,10 +141,10 @@ public class FlightPlanService {
                 throw new IllegalArgumentException("Aeropuerto destino no encontrado: " + destinationCode);
             }
             if (originZone == null) {
-                throw new IllegalArgumentException("Timezone de aeropuerto origen no encontrado: " + originCode);
+                throw new IllegalArgumentException("Zona horaria de aeropuerto origen no encontrada: " + originCode);
             }
             if (destinationZone == null) {
-                throw new IllegalArgumentException("Timezone de aeropuerto destino no encontrado: " + destinationCode);
+                throw new IllegalArgumentException("Zona horaria de aeropuerto destino no encontrada: " + destinationCode);
             }
 
             LocalDateTime departureLocal = parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL");
@@ -187,7 +187,7 @@ public class FlightPlanService {
      */
     public String createFlightsBatch(FlightPlanBatchCreateRequest request) throws SQLException {
         if (request == null || request.fileContent() == null || request.fileContent().isBlank()) {
-            throw new IllegalArgumentException("El archivo de planes de vuelo esta vacio.");
+            throw new IllegalArgumentException("El archivo de planes de vuelo está vacío.");
         }
         LocalDate scheduleDate = parseScheduleDate(request.scheduleDate());
         List<FlightPlanLine> plans = parseBatchLines(request.fileContent());
@@ -477,7 +477,7 @@ public class FlightPlanService {
                 return candidate;
             }
         }
-        throw new IllegalArgumentException("No se pudo asignar un codigo unico al vuelo: " + baseFlightCode);
+        throw new IllegalArgumentException("No se pudo asignar un código único al vuelo: " + baseFlightCode);
     }
 
     private void insertFlight(
@@ -530,7 +530,7 @@ public class FlightPlanService {
 
     private void validateUpdate(FlightPlanUpdate update) {
         if (update == null) {
-            throw new IllegalArgumentException("Datos de vuelo invalidos.");
+            throw new IllegalArgumentException("Datos de vuelo inválidos.");
         }
         normalizeAirportCode(update.originAirportCode());
         normalizeAirportCode(update.destinationAirportCode());
@@ -546,7 +546,7 @@ public class FlightPlanService {
 
     private void validateCreate(FlightPlanUpdate update) {
         if (update == null) {
-            throw new IllegalArgumentException("Datos de vuelo invalidos.");
+            throw new IllegalArgumentException("Datos de vuelo inválidos.");
         }
         normalizeAirportCode(update.originAirportCode());
         normalizeAirportCode(update.destinationAirportCode());
@@ -559,7 +559,7 @@ public class FlightPlanService {
 
     private void validatePersistedFlight(FlightPlanUpdate update) {
         if (update == null) {
-            throw new IllegalArgumentException("Datos de vuelo invalidos.");
+            throw new IllegalArgumentException("Datos de vuelo inválidos.");
         }
         normalizeAirportCode(update.destinationAirportCode());
         parseLocalDateTime(update.departureTimeLocal(), "SALIDA_LOCAL");
@@ -572,14 +572,14 @@ public class FlightPlanService {
 
     private String normalizeFlightCode(String flightCode) {
         if (flightCode == null || flightCode.isBlank()) {
-            throw new IllegalArgumentException("Codigo de vuelo invalido.");
+            throw new IllegalArgumentException("Código de vuelo inválido.");
         }
         return flightCode.trim();
     }
 
     private String normalizeAirportCode(String code) {
         if (code == null || !code.matches("(?i)[A-Z]{4}")) {
-            throw new IllegalArgumentException("Codigo de aeropuerto invalido.");
+            throw new IllegalArgumentException("Código de aeropuerto inválido.");
         }
         return code.toUpperCase(Locale.ROOT);
     }
@@ -645,7 +645,7 @@ public class FlightPlanService {
 
             Matcher matcher = BATCH_FLIGHT_LINE.matcher(line);
             if (!matcher.matches()) {
-                throw new IllegalArgumentException("Linea de vuelo invalida: " + line
+                throw new IllegalArgumentException("Línea de vuelo inválida: " + line
                         + ". Usa ORIG-DEST-HO:MO-HD:MD-####.");
             }
             String origin = normalizeAirportCode(matcher.group(1));
@@ -664,7 +664,7 @@ public class FlightPlanService {
                         capacity
                 ));
             } catch (RuntimeException e) {
-                throw new IllegalArgumentException("Hora invalida en el vuelo: " + line);
+                throw new IllegalArgumentException("Hora inválida en el vuelo: " + line);
             }
         }
 

@@ -185,7 +185,7 @@ public class ShipmentParser {
             return parseAll("data/envios", simulationStartDate, maxSimulationDays, zone);
         }
 
-        System.out.printf("[ShipmentParser] Cargados %d envios desde BD.%n", shipments.size());
+        System.out.printf("[ShipmentParser] Cargados %d envíos desde BD.%n", shipments.size());
         return shipments;
     }
 
@@ -239,11 +239,11 @@ public class ShipmentParser {
             allShipments.addAll(shipments);
             fileCount++;
 
-            System.out.printf("[ShipmentParser] %s → %d envios cargados desde '%s'%n",
+            System.out.printf("[ShipmentParser] %s → %d envíos cargados desde '%s'%n",
                     airportCode, shipments.size(), file.getName());
         }
 
-        System.out.printf("[ShipmentParser] Total TXT: %d envios cargados de %d archivos.%n",
+        System.out.printf("[ShipmentParser] Total TXT: %d envíos cargados de %d archivos.%n",
                 allShipments.size(), fileCount);
         return allShipments;
     }
@@ -285,7 +285,7 @@ public class ShipmentParser {
 
                 Matcher m = LINE_PATTERN.matcher(line);
                 if (!m.matches()) {
-                    System.err.printf("[ShipmentParser] Linea %d ignorada en %s: '%s'%n",
+                    System.err.printf("[ShipmentParser] Línea %d ignorada en %s: '%s'%n",
                             lineNumber, filePath, line);
                     continue;
                 }

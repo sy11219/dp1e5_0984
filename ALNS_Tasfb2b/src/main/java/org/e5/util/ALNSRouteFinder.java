@@ -19,7 +19,7 @@ import java.util.PriorityQueue;
  * Buscador de rutas para ALNS.
  *
  * La parte costosa del planificador es buscar rutas repetidamente para los
- * mismos envios. Este buscador mantiene indices por origen y cache de rutas
+ * mismos envíos. Este buscador mantiene índices por origen y caché de rutas
  * candidatas para que las reparaciones del ALNS prueben rutas ya calculadas
  * antes de ejecutar otra busqueda completa.
  */

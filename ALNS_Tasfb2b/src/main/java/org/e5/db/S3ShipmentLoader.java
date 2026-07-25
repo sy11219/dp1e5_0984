@@ -32,7 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Funcion de backend para cargar envios desde S3 hacia PostgreSQL/RDS.
+ * Función de backend para cargar envíos desde S3 hacia PostgreSQL/RDS.
  *
  * Variables de entorno requeridas:
  * - S3_BUCKET: bucket donde estan los txt.
@@ -64,7 +64,7 @@ public class S3ShipmentLoader {
     public String loadShipments(String fechaInicio, int dias) throws Exception {
         LocalDate startDate = parseDate(fechaInicio);
         if (dias < 1) {
-            throw new IllegalArgumentException("dias debe ser mayor o igual a 1");
+            throw new IllegalArgumentException("días debe ser mayor o igual a 1");
         }
         LocalDate endDateExclusive = startDate.plusDays(dias);
 
@@ -113,7 +113,7 @@ public class S3ShipmentLoader {
                         batch.clear();
                     }
                 }
-                System.out.printf("[S3ShipmentLoader] %s -> %d envios dentro del rango.%n", key, fileCount);
+                System.out.printf("[S3ShipmentLoader] %s -> %d envíos dentro del rango.%n", key, fileCount);
             }
 
             if (!batch.isEmpty()) {
@@ -186,7 +186,7 @@ public class S3ShipmentLoader {
 
                 Matcher matcher = LINE_PATTERN.matcher(line);
                 if (!matcher.matches()) {
-                    System.out.printf("[S3ShipmentLoader] Linea ignorada %s:%d -> %s%n", key, lineNumber, line);
+                    System.out.printf("[S3ShipmentLoader] Línea ignorada %s:%d -> %s%n", key, lineNumber, line);
                     continue;
                 }
 
@@ -273,7 +273,7 @@ public class S3ShipmentLoader {
     private ZoneOffset parseTimezone(String value) {
         Matcher matcher = TZ_PATTERN.matcher(value);
         if (!matcher.matches()) {
-            throw new IllegalArgumentException("Formato timezone no soportado en airports.timezone: " + value);
+            throw new IllegalArgumentException("Formato de zona horaria no soportado en airports.timezone: " + value);
         }
         int sign = matcher.group(1).equals("+") ? 1 : -1;
         int hours = Integer.parseInt(matcher.group(2));

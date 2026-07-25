@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  *
  * El backend usa parse() para leer desde PostgreSQL/RDS. La sobrecarga
  * parse(String) se mantiene como lector legado de data/aeropuertos.txt para
- * scripts o pruebas locales que aun dependan del archivo.
+ * scripts o pruebas locales que aún dependan del archivo.
  */
 public class AirportParser {
 

@@ -21,11 +21,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lectura secuencial de los TXT de envios para el escenario de colapso.
+ * Lectura secuencial de los TXT de envíos para el escenario de colapso.
  *
- * Cada archivo se recorre una sola vez y conserva su siguiente envio pendiente.
- * Asi una ejecucion larga no vuelve a escanear los ~400 MB de TXT en cada
- * ventana de planificacion.
+ * Cada archivo se recorre una sola vez y conserva su siguiente envío pendiente.
+ * Así una ejecución larga no vuelve a escanear los ~400 MB de TXT en cada
+ * ventana de planificación.
  */
 final class CollapseShipmentSource implements AutoCloseable {
     private static final DateTimeFormatter RAW_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -157,7 +157,7 @@ final class CollapseShipmentSource implements AutoCloseable {
             try {
                 reader.close();
             } catch (IOException ignored) {
-                // El lector se usa solo para el ciclo de vida de una sesion.
+                // El lector se usa solo para el ciclo de vida de una sesión.
             }
         }
     }
