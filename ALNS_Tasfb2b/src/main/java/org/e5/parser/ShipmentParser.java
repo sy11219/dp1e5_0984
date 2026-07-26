@@ -2,6 +2,7 @@ package org.e5.parser;
 
 import org.e5.model.Airport;
 import org.e5.model.Shipment;
+import org.e5.util.AirportTimeZones;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -198,6 +199,75 @@ public class ShipmentParser {
      * @return Lista completa de envíos dentro del rango
      * @throws IOException Si hay error de lectura
      */
+    public List<Shipment> parseAllRegisteredFromDatabase(
+            String simulationStartDate,
+            ZoneId simulationZone
+    ) throws IOException {
+        if (simulationStartDate == null || !simulationStartDate.matches("\\d{8}")) {
+            throw new IOException("La fecha inicial debe tener formato aaaammdd.");
+        }
+
+        LocalDate startDate = LocalDate.parse(simulationStartDate, RAW_DATE);
+        ZoneId zone = simulationZone == null ? ZoneOffset.UTC : simulationZone;
+        Instant startInstant = startDate.atStartOfDay(zone).toInstant();
+        List<Shipment> shipments = new ArrayList<>();
+
+        try (Connection connection = openConnection()) {
+            boolean hasClientId = columnExists(connection, "shipments", "client_id");
+            String clientColumn = hasClientId ? "s.client_id AS client_id," : "NULL AS client_id,";
+            String sql = """
+                    SELECT s.shipment_code,
+                           %s
+                           oa.code AS origin_code,
+                           oa.timezone AS origin_timezone,
+                           da.code AS destination_code,
+                           s.baggage_count,
+                           s.registered_at
+                    FROM shipments s
+                    JOIN airports oa ON oa.id = s.origin_airport_id
+                    JOIN airports da ON da.id = s.destination_airport_id
+                    WHERE (s.status IS NULL OR UPPER(s.status) <> 'CANCELED')
+                    ORDER BY s.registered_at, s.shipment_code
+                    """.formatted(clientColumn);
+
+            try (PreparedStatement statement = connection.prepareStatement(sql);
+                 ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    OffsetDateTime registeredAt = result.getObject("registered_at", OffsetDateTime.class);
+                    if (registeredAt == null) continue;
+
+                    Instant registeredInstant = registeredAt.toInstant();
+                    int requestMinute = (int) Duration.between(startInstant, registeredInstant).toMinutes();
+                    String originCode = result.getString("origin_code");
+                    ZoneId originZone = AirportTimeZones.resolve(
+                            originCode, result.getString("origin_timezone"));
+                    OffsetDateTime originLocalTime = registeredInstant
+                            .atZone(originZone)
+                            .toOffsetDateTime();
+                    String clientId = result.getString("client_id");
+
+                    shipments.add(new Shipment(
+                            result.getString("shipment_code"),
+                            originCode,
+                            result.getString("destination_code"),
+                            requestMinute,
+                            result.getInt("baggage_count"),
+                            clientId == null ? "" : clientId,
+                            originLocalTime.format(RAW_DATE),
+                            twoDigits(originLocalTime.getHour()),
+                            twoDigits(originLocalTime.getMinute())
+                    ));
+                }
+            }
+        } catch (IllegalStateException | SQLException e) {
+            throw new IOException("No se pudieron leer los envíos desde BD: " + e.getMessage(), e);
+        }
+
+        System.out.printf("[ShipmentParser] Cargados %d envíos desde BD sin límite de tiempo.%n",
+                shipments.size());
+        return shipments;
+    }
+
     public List<Shipment> parseAll(String folderPath, String simulationStartDate, int maxSimulationDays) throws IOException {
         return parseAll(folderPath, simulationStartDate, maxSimulationDays, ZoneOffset.UTC);
     }

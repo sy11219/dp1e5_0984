@@ -1670,7 +1670,7 @@ public class RealtimeSimulationService {
 
             List<Shipment> latest;
             try {
-                latest = new ShipmentParser(airportMap).parseAllFromDatabase(startDate, days, originZone);
+                latest = new ShipmentParser(airportMap).parseAllRegisteredFromDatabase(startDate, originZone);
             } catch (IOException e) {
                 System.err.printf("[Tiempo real] No se pudieron refrescar envíos desde BD: %s%n", e.getMessage());
                 return;
@@ -1679,10 +1679,6 @@ public class RealtimeSimulationService {
             int added = 0;
             int queuedLate = 0;
             for (Shipment shipment : latest) {
-                if (shipment.getRequestMinute() >= maxTick) {
-                    continue;
-                }
-
                 if (!knownShipmentIds.add(shipment.getShipmentId())) {
                     continue;
                 }
