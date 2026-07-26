@@ -1679,8 +1679,7 @@ public class RealtimeSimulationService {
             int added = 0;
             int queuedLate = 0;
             for (Shipment shipment : latest) {
-                if (shipment.getRequestMinute() < startOffsetMinutes
-                        || shipment.getRequestMinute() >= maxTick) {
+                if (shipment.getRequestMinute() >= maxTick) {
                     continue;
                 }
 
